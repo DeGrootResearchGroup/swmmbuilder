@@ -1,0 +1,19 @@
+[project]
+name = "SewerNetworkx"
+version = "0.1.0"
+description = "A tool manipulating GIS data files to product sewer subnetworks and .inp files for pyswmm."
+license = {file = "LICENCE"}
+authors = [{name = "Anthony Sherratt", email="asherra@uwo.ca"}, {name = "Christopher DeGroot", email="christopher.degroot@uwo.ca"},]
+maintainers = [{name = "Anthony Sherratt", email="asherra@uwo.ca"}, {name = "Christopher DeGroot", email="christopher.degroot@uwo.ca"},]
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = [
+  "geopandas",
+  "networkx",
+  "matplotlib",
+  "shutil",
+  "pyswmm",
+]
+
+[tool.setuptools]
+packages = ["sewernetworks"]
