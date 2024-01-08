@@ -100,6 +100,8 @@ class SubNetwork(Network):
             """
 
     def __init__(self, node, depth=None, file_path=None):
+        """Class initialization"""
+
         if file_path:
             super().__init__(file_path)
         self.network_data = {}
@@ -257,6 +259,28 @@ class SubNetwork(Network):
         return trimmed_graph
 
     def write_nodes_pyswmm(self, pyswmm_file, max_depth, init_depth, surcharge_depth, ponding_area):
+        """ Add subnetwork data into the Nodes section of a .inp file.
+
+        Parameters
+        ----------
+
+        output_file_path : str
+            Path to the write out PySWMM input file (.inp).
+
+        max_depth : float)
+            Maximum depth for node (default is 0.0).
+
+        init_depth : float
+            Initial depth for node (default is 0.0).
+
+        surcharge_depth : float
+            Surcharge depth for node (default is 0.0).
+
+        ponding_area : float
+            Ponding area for node (default is 0.0).
+
+        """
+
         with open(pyswmm_file, 'r') as file:
             content = file.read()
 
@@ -276,6 +300,34 @@ class SubNetwork(Network):
             file.write(modified_content)
 
     def write_conduits_pyswmm(self, pyswmm_file, manning_n, inlet_offset, outlet_offset, init_flow, max_flow, barrels):
+        """Add subnetwork data into the Conduits and XSection section of a .inp file.
+
+        Parameters
+        ----------
+
+        output_file_path : str
+            Path to the write out PySWMM input file (.inp).
+        
+        manning_n : float
+            Manning N coefficient for conduit (default is 0.01).
+
+        inlet_offset : float
+            Inlet offset height for conduit (default is 0.0).
+
+        outlet_offset : float
+            Outlet offset height for conduit (default is 0.0).
+
+        init_flow : float
+            Initial flow value for conduit (default is 0.0).
+
+        max_flow : float
+            Maximum flow value for conduit (default is 0.0).
+
+        barrels : float
+            Barrel value for conduit (default is 0.0).
+
+        """
+
         with open(pyswmm_file, 'r') as file:
             content = file.read()
 
