@@ -99,7 +99,7 @@ class SubNetwork(Network):
                 Path to GeoJSON file.
             """
 
-    def __init__(self, node, depth=None, file_path=None):
+    def __init__(self, full_network, node, depth=None, file_path=None):
         """Class initialization"""
 
         if file_path:
@@ -116,10 +116,9 @@ class SubNetwork(Network):
                           "Relief", "LastEditDate", "Abandoned", "Grouted", "CCTVInspectionDate",
                           "ShapeSTLength"]
 
-        self.reduced_keys_data = Network.full_data.copy()
+        self.reduced_keys_data = full_network.full_data.copy()
 
         for keys in keys_to_remove:
-
             if keys in self.reduced_keys_data.columns:
                 self.reduced_keys_data.drop(keys, axis=1, inplace=True)
 
