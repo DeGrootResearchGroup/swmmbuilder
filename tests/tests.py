@@ -25,3 +25,11 @@ def test_num_sewers(level_2_model):
     subnet_graph, node_colours = level_2_model.create_sub_network()
     assert (subnet_graph.number_of_nodes() == 53)
 
+
+def test_end_nodes(level_2_model):
+    subnet_graph, node_colours = level_2_model.create_sub_network()
+    num = 0
+    for nodes in subnet_graph.nodes:
+        if len(list(subnet_graph.successors(nodes))) == 0:
+            num += 1
+    assert (num == 6)
