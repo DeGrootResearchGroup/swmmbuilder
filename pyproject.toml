@@ -16,4 +16,4 @@ dependencies = [
 ]
 
 [tool.setuptools]
-packages = ["sewernetworks"]
+packages = ["sewernetworkx"]
