@@ -1,4 +1,4 @@
-from SewerNetworkx_orig import *
+import SewerNetworkx
 from pyswmm import Simulation
 import pytest
 
