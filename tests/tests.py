@@ -33,3 +33,10 @@ def test_end_nodes(level_2_model):
         if len(list(subnet_graph.successors(nodes))) == 0:
             num += 1
     assert (num == 6)
+
+
+def test_pyswmm_model(swmm_simulation):
+    try:
+        swmm_simulation.execute()
+    except Exception as e:
+        pytest.fail(f"pyswmm model execution failed with error: {e}")
