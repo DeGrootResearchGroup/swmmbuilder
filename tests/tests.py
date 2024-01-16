@@ -21,3 +21,7 @@ def test_init_subnetwork_with_geojson(geojson_file_path):
     network_test = Network(geojson_file_path)
     subnetwork_test = SubNetwork(network_test, starting_node, levels)
     assert True
+def test_num_sewers(level_2_model):
+    subnet_graph, node_colours = level_2_model.create_sub_network()
+    assert (subnet_graph.number_of_nodes() == 53)
+
