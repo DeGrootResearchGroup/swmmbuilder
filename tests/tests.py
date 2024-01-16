@@ -1,11 +1,27 @@
-from sewernetworkx import *
+from SewerNetworkx_orig import *
+from pyswmm import Simulation
 import pytest
-from pathlib import Path
 
 
 @pytest.fixture
 def geojson_file_path():
-    return f'./Sewer_Pipes.geojson'
+    return f'./Testing_file.geojson'
+
+
+@pytest.fixture
+def swmm_simulation():
+    # Initialize the PySWMM model
+    simulation = Simulation('London_branch1.inp')
+    return simulation
+
+
+@pytest.fixture
+def level_2_model(geojson_file_path):
+    levels = 2
+    starting_node = 'WT1420'
+    network = Network(geojson_file_path)
+    subnetwork = SubNetwork(network, starting_node, levels)
+    return subnetwork
 
 
 # Test if a Network class will be initialized
@@ -15,12 +31,10 @@ def test_init_network_with_geojson(geojson_file_path):
 
 
 # Test if a SubNetwork class will be initialized
-def test_init_subnetwork_with_geojson(geojson_file_path):
-    levels = 2
-    starting_node = 'WT1420'
-    network_test = Network(geojson_file_path)
-    subnetwork_test = SubNetwork(network_test, starting_node, levels)
+def test_init_subnetwork_with_geojson(level_2_model):
     assert True
+
+
 def test_num_sewers(level_2_model):
     subnet_graph, node_colours = level_2_model.create_sub_network()
     assert (subnet_graph.number_of_nodes() == 53)
