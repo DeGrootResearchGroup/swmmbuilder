@@ -1,1 +1,1 @@
-from sewers import *
+from .sewers import Network, SubNetwork
