@@ -1,4 +1,4 @@
-import SewerNetworkx
+from sewernetworkx import Network, SubNetwork
 from pyswmm import Simulation
 import pytest
 
