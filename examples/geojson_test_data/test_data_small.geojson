@@ -1,0 +1,2681 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "OBJECTID": 97240,
+        "GIS_ID": 26053435,
+        "GIS_FeatureKey": "26053435",
+        "FlowType": "SAN",
+        "StreetName": "RIVERSIDE Dr.",
+        "Location": "Road",
+        "UpstreamID": "OK0438",
+        "DownstreamID": "OK0439",
+        "Length": 69.5,
+        "PipeShape": "R",
+        "Height": 200,
+        "Width": 200,
+        "Material": "AC",
+        "MaterialClass": "2400",
+        "UpstreamInvert": 250.616,
+        "DownstreamInvert": 248.909,
+        "DropStructureInvert": 0.0,
+        "Slope": 2.46,
+        "AverageDepth": 4.3,
+        "MaximumDepth": 5.5,
+        "PDC_Count": 4.0,
+        "ConstructionDate": "1975-02-01T00:00:00Z",
+        "Ownership": "CITY",
+        "Assumed": 1,
+        "Combined": 0,
+        "Relief": 0,
+        "Trunk": 0,
+        "LastEditDate": "2022-03-24T15:58:41Z",
+        "Abandoned": 0,
+        "Grouted": 0,
+        "Diameter": 200,
+        "CCTVInspectionDate": "2011-11-21T00:00:00Z",
+        "ShapeSTLength": 69.42551659274852
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            -81.2833036459908,
+            42.97859750831595
+          ],
+          [
+            -81.28408173869002,
+            42.97834363373957
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "OBJECTID": 97303,
+        "GIS_ID": 26159457,
+        "GIS_FeatureKey": "26159457",
+        "FlowType": "SAN",
+        "StreetName": "BRAEMAR CRESCENT",
+        "Location": "Road",
+        "UpstreamID": "OK0446",
+        "DownstreamID": "OK0447",
+        "Length": 82.2,
+        "PipeShape": "R",
+        "Height": 200,
+        "Width": 200,
+        "Material": "AC",
+        "MaterialClass": "2400",
+        "UpstreamInvert": 238.134,
+        "DownstreamInvert": 237.872,
+        "DropStructureInvert": 0.0,
+        "Slope": 0.31,
+        "AverageDepth": 3.5,
+        "MaximumDepth": 3.5,
+        "PDC_Count": 7.0,
+        "ConstructionDate": "1966-01-01T00:00:00Z",
+        "Ownership": "CITY",
+        "Assumed": 1,
+        "Combined": 0,
+        "Relief": 0,
+        "Trunk": 0,
+        "LastEditDate": "2022-03-24T15:58:41Z",
+        "Abandoned": 0,
+        "Grouted": 0,
+        "Diameter": 200,
+        "CCTVInspectionDate": "2013-03-07T00:00:00Z",
+        "ShapeSTLength": 83.0669464107114
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            -81.28734512980128,
+            42.97828732134472
+          ],
+          [
+            -81.28800104712198,
+            42.977714966261175
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "OBJECTID": 97315,
+        "GIS_ID": 26055061,
+        "GIS_FeatureKey": "26055061",
+        "FlowType": "SAN",
+        "StreetName": "BRAEMAR CRESCENT",
+        "Location": "Road",
+        "UpstreamID": "OK0441",
+        "DownstreamID": "OK0442",
+        "Length": 26.1,
+        "PipeShape": "R",
+        "Height": 200,
+        "Width": 200,
+        "Material": "AC",
+        "MaterialClass": "2400",
+        "UpstreamInvert": 241.38,
+        "DownstreamInvert": 240.792,
+        "DropStructureInvert": 0.0,
+        "Slope": 2.18,
+        "AverageDepth": 0.0,
+        "MaximumDepth": 0.0,
+        "PDC_Count": 0.0,
+        "ConstructionDate": "1977-08-01T00:00:00Z",
+        "Ownership": "CITY",
+        "Assumed": 1,
+        "Combined": 0,
+        "Relief": 0,
+        "Trunk": 0,
+        "LastEditDate": "2022-03-24T15:58:41Z",
+        "Abandoned": 0,
+        "Grouted": 0,
+        "Diameter": 200,
+        "CCTVInspectionDate": "2011-11-21T00:00:00Z",
+        "ShapeSTLength": 26.995836621412572
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            -81.28572106194584,
+            42.977797304790485
+          ],
+          [
+            -81.28585085418064,
+            42.97802094524577
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "OBJECTID": 97316,
+        "GIS_ID": 26055603,
+        "GIS_FeatureKey": "26055603",
+        "FlowType": "SAN",
+        "StreetName": "BRAEMAR CRESCENT",
+        "Location": "Road",
+        "UpstreamID": "OK0447",
+        "DownstreamID": "OK0448",
+        "Length": 14.3,
+        "PipeShape": "R",
+        "Height": 200,
+        "Width": 200,
+        "Material": "AC",
+        "MaterialClass": "2400",
+        "UpstreamInvert": 237.79,
+        "DownstreamInvert": 237.735,
+        "DropStructureInvert": 0.0,
+        "Slope": 0.38,
+        "AverageDepth": 3.5,
+        "MaximumDepth": 3.5,
+        "PDC_Count": 1.0,
+        "ConstructionDate": "1966-01-01T00:00:00Z",
+        "Ownership": "CITY",
+        "Assumed": 1,
+        "Combined": 0,
+        "Relief": 0,
+        "Trunk": 0,
+        "LastEditDate": "2022-03-24T15:58:41Z",
+        "Abandoned": 0,
+        "Grouted": 0,
+        "Diameter": 200,
+        "CCTVInspectionDate": "2011-11-21T00:00:00Z",
+        "ShapeSTLength": 14.247482335486504
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            -81.28800104712198,
+            42.977714966261175
+          ],
+          [
+            -81.28801453805157,
+            42.97758704971603
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "OBJECTID": 97334,
+        "GIS_ID": 26054519,
+        "GIS_FeatureKey": "26054519",
+        "FlowType": "SAN",
+        "StreetName": "RIVERSIDE Dr.",
+        "Location": "Road",
+        "UpstreamID": "OK0440",
+        "DownstreamID": "OK0441",
+        "Length": 29.8,
+        "PipeShape": "R",
+        "Height": 200,
+        "Width": 200,
+        "Material": "AC",
+        "MaterialClass": "2400",
+        "UpstreamInvert": 242.999,
+        "DownstreamInvert": 241.389,
+        "DropStructureInvert": 0.0,
+        "Slope": 5.62,
+        "AverageDepth": 3.7,
+        "MaximumDepth": 3.8,
+        "PDC_Count": 2.0,
+        "ConstructionDate": "1977-08-01T00:00:00Z",
+        "Ownership": "CITY",
+        "Assumed": 1,
+        "Combined": 0,
+        "Relief": 0,
+        "Trunk": 0,
+        "LastEditDate": "2022-03-24T15:58:41Z",
+        "Abandoned": 0,
+        "Grouted": 0,
+        "Diameter": 200,
+        "CCTVInspectionDate": "2011-11-21T00:00:00Z",
+        "ShapeSTLength": 29.79997824965649
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            -81.2853893342395,
+            42.97790992911626
+          ],
+          [
+            -81.28572106194584,
+            42.977797304790485
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "OBJECTID": 97344,
+        "GIS_ID": 26052893,
+        "GIS_FeatureKey": "26052893",
+        "FlowType": "SAN",
+        "StreetName": "RIVERSIDE Dr.",
+        "Location": "Road",
+        "UpstreamID": "OK0437",
+        "DownstreamID": "OK0438",
+        "Length": 86.9,
+        "PipeShape": "R",
+        "Height": 200,
+        "Width": 200,
+        "Material": "AC",
+        "MaterialClass": "2400",
+        "UpstreamInvert": 254.197,
+        "DownstreamInvert": 252.265,
+        "DropStructureInvert": 250.616,
+        "Slope": 2.22,
+        "AverageDepth": 3.6,
+        "MaximumDepth": 3.9,
+        "PDC_Count": 9.0,
+        "ConstructionDate": "1975-02-01T00:00:00Z",
+        "Ownership": "CITY",
+        "Assumed": 1,
+        "Combined": 0,
+        "Relief": 0,
+        "Trunk": 0,
+        "LastEditDate": "2022-03-24T15:58:41Z",
+        "Abandoned": 0,
+        "Grouted": 0,
+        "Diameter": 200,
+        "CCTVInspectionDate": "2011-11-21T00:00:00Z",
+        "ShapeSTLength": 86.46836238093098
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            -81.28226337099983,
+            42.978748778053905
+          ],
+          [
+            -81.2833036459908,
+            42.97859750831595
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "OBJECTID": 97413,
+        "GIS_ID": 26158915,
+        "GIS_FeatureKey": "26158915",
+        "FlowType": "SAN",
+        "StreetName": "BRAEMAR CRESCENT",
+        "Location": "Road",
+        "UpstreamID": "OK0442",
+        "DownstreamID": "OK0443",
+        "Length": 94.5,
+        "PipeShape": "R",
+        "Height": 200,
+        "Width": 200,
+        "Material": "AC",
+        "MaterialClass": "2400",
+        "UpstreamInvert": 240.298,
+        "DownstreamInvert": 239.244,
+        "DropStructureInvert": 0.0,
+        "Slope": 1.12,
+        "AverageDepth": 3.6,
+        "MaximumDepth": 3.9,
+        "PDC_Count": 8.0,
+        "ConstructionDate": "1966-01-01T00:00:00Z",
+        "Ownership": "CITY",
+        "Assumed": 1,
+        "Combined": 0,
+        "Relief": 0,
+        "Trunk": 0,
+        "LastEditDate": "2022-03-24T15:58:41Z",
+        "Abandoned": 0,
+        "Grouted": 0,
+        "Diameter": 200,
+        "CCTVInspectionDate": "2013-03-07T00:00:00Z",
+        "ShapeSTLength": 94.04146468202205
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            -81.28585085418064,
+            42.97802094524577
+          ],
+          [
+            -81.2862477421248,
+            42.97881607518986
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "OBJECTID": 97454,
+        "GIS_ID": 26058295,
+        "GIS_FeatureKey": "26058295",
+        "FlowType": "SAN",
+        "StreetName": "Wonderland Rd. N.",
+        "Location": "Road",
+        "UpstreamID": "OK0432",
+        "DownstreamID": "OK0433",
+        "Length": 72.2,
+        "PipeShape": "R",
+        "Height": 300,
+        "Width": 300,
+        "Material": "AC",
+        "MaterialClass": "2400",
+        "UpstreamInvert": 231.319,
+        "DownstreamInvert": 230.487,
+        "DropStructureInvert": 0.0,
+        "Slope": 1.15,
+        "AverageDepth": 1.9,
+        "MaximumDepth": 1.9,
+        "PDC_Count": 1.0,
+        "ConstructionDate": "1968-03-01T00:00:00Z",
+        "Ownership": "CITY",
+        "Assumed": 1,
+        "Combined": 0,
+        "Relief": 0,
+        "Trunk": 0,
+        "LastEditDate": "2022-03-24T15:58:41Z",
+        "Abandoned": 0,
+        "Grouted": 0,
+        "Diameter": 300,
+        "CCTVInspectionDate": "2016-08-15T00:00:00Z",
+        "ShapeSTLength": 72.25586457471809
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            -81.29081750443163,
+            42.974905826890975
+          ],
+          [
+            -81.29052459517878,
+            42.97551992044219
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "OBJECTID": 97455,
+        "GIS_ID": 26059379,
+        "GIS_FeatureKey": "26059379",
+        "FlowType": "SAN",
+        "StreetName": "RIVERSIDE Dr.",
+        "Location": "Road",
+        "UpstreamID": "OK0434",
+        "DownstreamID": "OK0435",
+        "Length": 83.2,
+        "PipeShape": "R",
+        "Height": 400,
+        "Width": 400,
+        "Material": "AC",
+        "MaterialClass": "2400",
+        "UpstreamInvert": 228.164,
+        "DownstreamInvert": 227.902,
+        "DropStructureInvert": 0.0,
+        "Slope": 0.31,
+        "AverageDepth": 5.1,
+        "MaximumDepth": 6.5,
+        "PDC_Count": 0.0,
+        "ConstructionDate": "1968-03-01T00:00:00Z",
+        "Ownership": "CITY",
+        "Assumed": 1,
+        "Combined": 0,
+        "Relief": 0,
+        "Trunk": 0,
+        "LastEditDate": "2022-03-24T15:58:41Z",
+        "Abandoned": 0,
+        "Grouted": 0,
+        "Diameter": 400,
+        "CCTVInspectionDate": "2016-08-15T00:00:00Z",
+        "ShapeSTLength": 82.06938809842559
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            -81.29004274401807,
+            42.975862518512955
+          ],
+          [
+            -81.28927578978235,
+            42.97634109413769
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "OBJECTID": 97500,
+        "GIS_ID": 26057753,
+        "GIS_FeatureKey": "26057753",
+        "FlowType": "SAN",
+        "StreetName": "RIVERSIDE Dr.",
+        "Location": "Road",
+        "UpstreamID": "OK0450",
+        "DownstreamID": "OK0451",
+        "Length": 78.9,
+        "PipeShape": "R",
+        "Height": 200,
+        "Width": 200,
+        "Material": "AC",
+        "MaterialClass": "3300",
+        "UpstreamInvert": 233.693,
+        "DownstreamInvert": 231.648,
+        "DropStructureInvert": 228.05,
+        "Slope": 2.59,
+        "AverageDepth": 5.0,
+        "MaximumDepth": 5.0,
+        "PDC_Count": 2.0,
+        "ConstructionDate": "1966-01-01T00:00:00Z",
+        "Ownership": "CITY",
+        "Assumed": 1,
+        "Combined": 0,
+        "Relief": 0,
+        "Trunk": 0,
+        "LastEditDate": "2022-03-24T15:58:41Z",
+        "Abandoned": 0,
+        "Grouted": 0,
+        "Diameter": 200,
+        "CCTVInspectionDate": "2011-11-21T00:00:00Z",
+        "ShapeSTLength": 78.78660448305918
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            -81.28817150240687,
+            42.97690331103083
+          ],
+          [
+            -81.28890887263834,
+            42.97644481969613
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "OBJECTID": 97522,
+        "GIS_ID": 26058837,
+        "GIS_FeatureKey": "26058837",
+        "FlowType": "SAN",
+        "StreetName": "RIVERSIDE Dr.",
+        "Location": "Road",
+        "UpstreamID": "OK0433",
+        "DownstreamID": "OK0434",
+        "Length": 54.9,
+        "PipeShape": "R",
+        "Height": 400,
+        "Width": 400,
+        "Material": "AC",
+        "MaterialClass": "2400",
+        "UpstreamInvert": 228.387,
+        "DownstreamInvert": 228.189,
+        "DropStructureInvert": 0.0,
+        "Slope": 0.36,
+        "AverageDepth": 3.8,
+        "MaximumDepth": 4.0,
+        "PDC_Count": 0.0,
+        "ConstructionDate": "1968-03-01T00:00:00Z",
+        "Ownership": "CITY",
+        "Assumed": 1,
+        "Combined": 0,
+        "Relief": 0,
+        "Trunk": 0,
+        "LastEditDate": "2022-03-24T15:58:41Z",
+        "Abandoned": 0,
+        "Grouted": 0,
+        "Diameter": 400,
+        "CCTVInspectionDate": "2022-11-29T00:00:00Z",
+        "ShapeSTLength": 54.69166461216919
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            -81.29052459517878,
+            42.97551992044219
+          ],
+          [
+            -81.29004274401807,
+            42.975862518512955
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "OBJECTID": 97548,
+        "GIS_ID": 26056669,
+        "GIS_FeatureKey": "26056669",
+        "FlowType": "SAN",
+        "StreetName": "BRAEMAR CRESCENT",
+        "Location": "Road",
+        "UpstreamID": "OK0448",
+        "DownstreamID": "OK0449",
+        "Length": 61.4,
+        "PipeShape": "R",
+        "Height": 200,
+        "Width": 200,
+        "Material": "AC",
+        "MaterialClass": "2400",
+        "UpstreamInvert": 237.704,
+        "DownstreamInvert": 237.415,
+        "DropStructureInvert": 0.0,
+        "Slope": 0.47,
+        "AverageDepth": 3.6,
+        "MaximumDepth": 3.8,
+        "PDC_Count": 4.0,
+        "ConstructionDate": "1966-01-01T00:00:00Z",
+        "Ownership": "CITY",
+        "Assumed": 1,
+        "Combined": 0,
+        "Relief": 0,
+        "Trunk": 0,
+        "LastEditDate": "2022-03-24T15:58:41Z",
+        "Abandoned": 0,
+        "Grouted": 0,
+        "Diameter": 200,
+        "CCTVInspectionDate": "2011-11-21T00:00:00Z",
+        "ShapeSTLength": 61.43173001845219
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            -81.28801453805157,
+            42.97758704971603
+          ],
+          [
+            -81.28775966276181,
+            42.9770664699162
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "OBJECTID": 97549,
+        "GIS_ID": 26057211,
+        "GIS_FeatureKey": "26057211",
+        "FlowType": "SAN",
+        "StreetName": "RIVERSIDE Dr.",
+        "Location": "Road",
+        "UpstreamID": "OK0449",
+        "DownstreamID": "OK0450",
+        "Length": 38.2,
+        "PipeShape": "R",
+        "Height": 200,
+        "Width": 200,
+        "Material": "AC",
+        "MaterialClass": "2400",
+        "UpstreamInvert": 236.872,
+        "DownstreamInvert": 235.97,
+        "DropStructureInvert": 233.693,
+        "Slope": 2.36,
+        "AverageDepth": 3.5,
+        "MaximumDepth": 4.3,
+        "PDC_Count": 1.0,
+        "ConstructionDate": "1966-01-01T00:00:00Z",
+        "Ownership": "CITY",
+        "Assumed": 1,
+        "Combined": 0,
+        "Relief": 0,
+        "Trunk": 0,
+        "LastEditDate": "2022-03-24T15:58:41Z",
+        "Abandoned": 0,
+        "Grouted": 0,
+        "Diameter": 200,
+        "CCTVInspectionDate": "2011-11-21T00:00:00Z",
+        "ShapeSTLength": 38.1572255354081
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            -81.28775966276181,
+            42.9770664699162
+          ],
+          [
+            -81.28817150240687,
+            42.97690331103083
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "OBJECTID": 97919,
+        "GIS_ID": 26079439,
+        "GIS_FeatureKey": "26079439",
+        "FlowType": "SAN",
+        "StreetName": null,
+        "Location": "City Land",
+        "UpstreamID": "WT1418",
+        "DownstreamID": "WT1419",
+        "Length": 48.9,
+        "PipeShape": "R",
+        "Height": 200,
+        "Width": 200,
+        "Material": "AC",
+        "MaterialClass": "2400",
+        "UpstreamInvert": 234.022,
+        "DownstreamInvert": 232.791,
+        "DropStructureInvert": 230.91,
+        "Slope": 2.52,
+        "AverageDepth": 2.3,
+        "MaximumDepth": 2.5,
+        "PDC_Count": 0.0,
+        "ConstructionDate": "1973-05-01T00:00:00Z",
+        "Ownership": "CITY",
+        "Assumed": 1,
+        "Combined": 0,
+        "Relief": 0,
+        "Trunk": 0,
+        "LastEditDate": "2022-03-24T15:58:41Z",
+        "Abandoned": 0,
+        "Grouted": 0,
+        "Diameter": 200,
+        "CCTVInspectionDate": "2022-11-07T00:00:00Z",
+        "ShapeSTLength": 49.929877751602795
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            -81.27954621982762,
+            42.975485861650334
+          ],
+          [
+            -81.2796700842561,
+            42.97592618874437
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "OBJECTID": 97950,
+        "GIS_ID": 26079981,
+        "GIS_FeatureKey": "26079981",
+        "FlowType": "SAN",
+        "StreetName": null,
+        "Location": "City Land",
+        "UpstreamID": "WT1419",
+        "DownstreamID": "WT1420",
+        "Length": 93.8,
+        "PipeShape": "R",
+        "Height": 200,
+        "Width": 200,
+        "Material": "AC",
+        "MaterialClass": "2400",
+        "UpstreamInvert": 230.91,
+        "DownstreamInvert": 230.429,
+        "DropStructureInvert": 0.0,
+        "Slope": 0.51,
+        "AverageDepth": 4.4,
+        "MaximumDepth": 4.4,
+        "PDC_Count": 0.0,
+        "ConstructionDate": "1973-05-01T00:00:00Z",
+        "Ownership": "CITY",
+        "Assumed": 1,
+        "Combined": 0,
+        "Relief": 0,
+        "Trunk": 0,
+        "LastEditDate": "2022-03-24T15:58:41Z",
+        "Abandoned": 0,
+        "Grouted": 0,
+        "Diameter": 200,
+        "CCTVInspectionDate": "2013-03-21T00:00:00Z",
+        "ShapeSTLength": 93.74439441827975
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            -81.2796700842561,
+            42.97592618874437
+          ],
+          [
+            -81.2807789370546,
+            42.976149121755526
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "OBJECTID": 97965,
+        "GIS_ID": 26082149,
+        "GIS_FeatureKey": "26082149",
+        "FlowType": "SAN",
+        "StreetName": null,
+        "Location": "Easement",
+        "UpstreamID": "WT1421",
+        "DownstreamID": "WT1420",
+        "Length": 123.4,
+        "PipeShape": "R",
+        "Height": 1200,
+        "Width": 1200,
+        "Material": "CONC",
+        "MaterialClass": "IV",
+        "UpstreamInvert": 224.717,
+        "DownstreamInvert": 224.519,
+        "DropStructureInvert": 0.0,
+        "Slope": 0.16,
+        "AverageDepth": 0.0,
+        "MaximumDepth": 0.0,
+        "PDC_Count": 0.0,
+        "ConstructionDate": "1962-04-01T00:00:00Z",
+        "Ownership": "CITY",
+        "Assumed": 1,
+        "Combined": 0,
+        "Relief": 0,
+        "Trunk": 1,
+        "LastEditDate": "2022-03-24T15:58:41Z",
+        "Abandoned": 0,
+        "Grouted": 0,
+        "Diameter": 1200,
+        "CCTVInspectionDate": "2021-07-28T00:00:00Z",
+        "ShapeSTLength": 112.5924627372987
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            -81.28083858105722,
+            42.97716207859271
+          ],
+          [
+            -81.2807789370546,
+            42.976149121755526
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "OBJECTID": 98055,
+        "GIS_ID": 26078355,
+        "GIS_FeatureKey": "26078355",
+        "FlowType": "SAN",
+        "StreetName": null,
+        "Location": "Easement",
+        "UpstreamID": "WT1416",
+        "DownstreamID": "WT1417",
+        "Length": 42.5,
+        "PipeShape": "R",
+        "Height": 200,
+        "Width": 200,
+        "Material": "AC",
+        "MaterialClass": "2400",
+        "UpstreamInvert": 235.01,
+        "DownstreamInvert": 234.85,
+        "DropStructureInvert": 0.0,
+        "Slope": 0.37,
+        "AverageDepth": 2.1,
+        "MaximumDepth": 2.2,
+        "PDC_Count": 0.0,
+        "ConstructionDate": "1973-05-01T00:00:00Z",
+        "Ownership": "CITY",
+        "Assumed": 1,
+        "Combined": 0,
+        "Relief": 0,
+        "Trunk": 0,
+        "LastEditDate": "2022-03-24T15:58:41Z",
+        "Abandoned": 0,
+        "Grouted": 0,
+        "Diameter": 200,
+        "CCTVInspectionDate": "2022-11-07T00:00:00Z",
+        "ShapeSTLength": 42.468171962659284
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            -81.27920904517903,
+            42.97431427598065
+          ],
+          [
+            -81.27931756464156,
+            42.97468831103237
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "OBJECTID": 98078,
+        "GIS_ID": 26078897,
+        "GIS_FeatureKey": "26078897",
+        "FlowType": "SAN",
+        "StreetName": null,
+        "Location": "Easement",
+        "UpstreamID": "WT1417",
+        "DownstreamID": "WT1418",
+        "Length": 90.4,
+        "PipeShape": "R",
+        "Height": 200,
+        "Width": 200,
+        "Material": "AC",
+        "MaterialClass": "3300",
+        "UpstreamInvert": 234.83,
+        "DownstreamInvert": 234.37,
+        "DropStructureInvert": 0.0,
+        "Slope": 0.51,
+        "AverageDepth": 2.0,
+        "MaximumDepth": 2.2,
+        "PDC_Count": 0.0,
+        "ConstructionDate": "1973-05-01T00:00:00Z",
+        "Ownership": "CITY",
+        "Assumed": 1,
+        "Combined": 0,
+        "Relief": 0,
+        "Trunk": 0,
+        "LastEditDate": "2022-03-24T15:58:41Z",
+        "Abandoned": 0,
+        "Grouted": 0,
+        "Diameter": 200,
+        "CCTVInspectionDate": "2013-03-15T00:00:00Z",
+        "ShapeSTLength": 90.5080810814703
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            -81.27931756464156,
+            42.97468831103237
+          ],
+          [
+            -81.27954621982762,
+            42.975485861650334
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "OBJECTID": 99095,
+        "GIS_ID": 26132953,
+        "GIS_FeatureKey": "26132953",
+        "FlowType": "SAN",
+        "StreetName": "BRAEMAR CRESCENT",
+        "Location": "Road",
+        "UpstreamID": "OK0443",
+        "DownstreamID": "OK0444",
+        "Length": 13.7,
+        "PipeShape": "R",
+        "Height": 200,
+        "Width": 200,
+        "Material": "AC",
+        "MaterialClass": "2400",
+        "UpstreamInvert": 239.207,
+        "DownstreamInvert": 239.155,
+        "DropStructureInvert": 0.0,
+        "Slope": 0.38,
+        "AverageDepth": 3.2,
+        "MaximumDepth": 3.3,
+        "PDC_Count": 0.0,
+        "ConstructionDate": "1966-01-01T00:00:00Z",
+        "Ownership": "CITY",
+        "Assumed": 1,
+        "Combined": 0,
+        "Relief": 0,
+        "Trunk": 0,
+        "LastEditDate": "2022-03-24T15:58:41Z",
+        "Abandoned": 0,
+        "Grouted": 0,
+        "Diameter": 200,
+        "CCTVInspectionDate": "2011-11-21T00:00:00Z",
+        "ShapeSTLength": 13.68094703447097
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            -81.2862477421248,
+            42.97881607518986
+          ],
+          [
+            -81.28638692700771,
+            42.978884877330216
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "OBJECTID": 99113,
+        "GIS_ID": 26133483,
+        "GIS_FeatureKey": "26133483",
+        "FlowType": "SAN",
+        "StreetName": "BRAEMAR CRESCENT",
+        "Location": "Road",
+        "UpstreamID": "OK0444",
+        "DownstreamID": "OK0445",
+        "Length": 22.0,
+        "PipeShape": "R",
+        "Height": 200,
+        "Width": 200,
+        "Material": "AC",
+        "MaterialClass": "2400",
+        "UpstreamInvert": 239.14,
+        "DownstreamInvert": 239.018,
+        "DropStructureInvert": 0.0,
+        "Slope": 0.56,
+        "AverageDepth": 3.2,
+        "MaximumDepth": 3.2,
+        "PDC_Count": 2.0,
+        "ConstructionDate": "1966-01-01T00:00:00Z",
+        "Ownership": "CITY",
+        "Assumed": 1,
+        "Combined": 0,
+        "Relief": 0,
+        "Trunk": 0,
+        "LastEditDate": "2022-03-24T15:58:41Z",
+        "Abandoned": 0,
+        "Grouted": 0,
+        "Diameter": 200,
+        "CCTVInspectionDate": "2011-11-21T00:00:00Z",
+        "ShapeSTLength": 21.97714817372809
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            -81.28638692700771,
+            42.978884877330216
+          ],
+          [
+            -81.286656383261,
+            42.97888004606915
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "OBJECTID": 100041,
+        "GIS_ID": 26134025,
+        "GIS_FeatureKey": "26134025",
+        "FlowType": "SAN",
+        "StreetName": "BRAEMAR CRESCENT",
+        "Location": "Road",
+        "UpstreamID": "OK0445",
+        "DownstreamID": "OK0446",
+        "Length": 87.4,
+        "PipeShape": "R",
+        "Height": 200,
+        "Width": 200,
+        "Material": "AC",
+        "MaterialClass": "2400",
+        "UpstreamInvert": 238.985,
+        "DownstreamInvert": 238.21,
+        "DropStructureInvert": 0.0,
+        "Slope": 0.89,
+        "AverageDepth": 3.3,
+        "MaximumDepth": 3.5,
+        "PDC_Count": 9.0,
+        "ConstructionDate": "1966-01-01T00:00:00Z",
+        "Ownership": "CITY",
+        "Assumed": 1,
+        "Combined": 0,
+        "Relief": 0,
+        "Trunk": 0,
+        "LastEditDate": "2022-03-24T15:58:41Z",
+        "Abandoned": 0,
+        "Grouted": 0,
+        "Diameter": 200,
+        "CCTVInspectionDate": "2011-11-21T00:00:00Z",
+        "ShapeSTLength": 86.52288818122058
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            -81.286656383261,
+            42.97888004606915
+          ],
+          [
+            -81.28734512980128,
+            42.97828732134472
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "OBJECTID": 100867,
+        "GIS_ID": 29693295,
+        "GIS_FeatureKey": "29693295",
+        "FlowType": "SAN",
+        "StreetName": "RIVERSIDE Dr.",
+        "Location": "Road",
+        "UpstreamID": "OK0616",
+        "DownstreamID": "OK0440",
+        "Length": 59.3,
+        "PipeShape": "R",
+        "Height": 200,
+        "Width": 200,
+        "Material": "PVC",
+        "MaterialClass": "SDR35",
+        "UpstreamInvert": 243.294,
+        "DownstreamInvert": 243.041,
+        "DropStructureInvert": 0.0,
+        "Slope": 0.44,
+        "AverageDepth": 5.2,
+        "MaximumDepth": 6.6,
+        "PDC_Count": 4.0,
+        "ConstructionDate": "1991-07-01T00:00:00Z",
+        "Ownership": "CITY",
+        "Assumed": 1,
+        "Combined": 0,
+        "Relief": 0,
+        "Trunk": 0,
+        "LastEditDate": "2022-03-24T15:58:41Z",
+        "Abandoned": 0,
+        "Grouted": 0,
+        "Diameter": 200,
+        "CCTVInspectionDate": "2011-11-21T00:00:00Z",
+        "ShapeSTLength": 59.23030720543327
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            -81.28472701791777,
+            42.97812899633448
+          ],
+          [
+            -81.2853893342395,
+            42.97790992911626
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "OBJECTID": 100913,
+        "GIS_ID": 29692753,
+        "GIS_FeatureKey": "29692753",
+        "FlowType": "SAN",
+        "StreetName": "RIVERSIDE Dr.",
+        "Location": "Road",
+        "UpstreamID": "OK0439",
+        "DownstreamID": "OK0616",
+        "Length": 57.4,
+        "PipeShape": "R",
+        "Height": 200,
+        "Width": 200,
+        "Material": "AC",
+        "MaterialClass": "2400",
+        "UpstreamInvert": 248.738,
+        "DownstreamInvert": 246.068,
+        "DropStructureInvert": 243.294,
+        "Slope": 4.78,
+        "AverageDepth": 3.5,
+        "MaximumDepth": 3.8,
+        "PDC_Count": 3.0,
+        "ConstructionDate": "1977-08-01T00:00:00Z",
+        "Ownership": "CITY",
+        "Assumed": 1,
+        "Combined": 0,
+        "Relief": 0,
+        "Trunk": 0,
+        "LastEditDate": "2022-03-24T15:58:41Z",
+        "Abandoned": 0,
+        "Grouted": 0,
+        "Diameter": 200,
+        "CCTVInspectionDate": "2011-11-21T00:00:00Z",
+        "ShapeSTLength": 57.7616320320851
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            -81.28408173869002,
+            42.97834363373957
+          ],
+          [
+            -81.28472701791777,
+            42.97812899633448
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "OBJECTID": 101794,
+        "GIS_ID": 26228261,
+        "GIS_FeatureKey": "26228261",
+        "FlowType": "SAN",
+        "StreetName": "Wonderland Rd. N.",
+        "Location": "Road",
+        "UpstreamID": "OK0431",
+        "DownstreamID": "OK0432",
+        "Length": 65.8,
+        "PipeShape": "R",
+        "Height": 300,
+        "Width": 300,
+        "Material": "AC",
+        "MaterialClass": "2400",
+        "UpstreamInvert": 232.081,
+        "DownstreamInvert": 231.343,
+        "DropStructureInvert": 0.0,
+        "Slope": 1.12,
+        "AverageDepth": 1.9,
+        "MaximumDepth": 1.9,
+        "PDC_Count": 0.0,
+        "ConstructionDate": "1968-03-01T00:00:00Z",
+        "Ownership": "CITY",
+        "Assumed": 1,
+        "Combined": 0,
+        "Relief": 0,
+        "Trunk": 0,
+        "LastEditDate": "2022-03-24T15:58:41Z",
+        "Abandoned": 0,
+        "Grouted": 0,
+        "Diameter": 300,
+        "CCTVInspectionDate": "2016-08-15T00:00:00Z",
+        "ShapeSTLength": 65.67872992697103
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            -81.29131276812875,
+            42.974439406936106
+          ],
+          [
+            -81.29081750443163,
+            42.974905826890975
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "OBJECTID": 118420,
+        "GIS_ID": 25942119,
+        "GIS_FeatureKey": "25942119",
+        "FlowType": "SAN",
+        "StreetName": null,
+        "Location": "Easement",
+        "UpstreamID": "OS1158",
+        "DownstreamID": "OS1159",
+        "Length": 93.4,
+        "PipeShape": "R",
+        "Height": 250,
+        "Width": 250,
+        "Material": "AC",
+        "MaterialClass": "2400",
+        "UpstreamInvert": 233.212,
+        "DownstreamInvert": 232.721,
+        "DropStructureInvert": 0.0,
+        "Slope": 0.52,
+        "AverageDepth": 3.7,
+        "MaximumDepth": 4.8,
+        "PDC_Count": 2.0,
+        "ConstructionDate": "1968-08-30T00:00:00Z",
+        "Ownership": "CITY",
+        "Assumed": 1,
+        "Combined": 0,
+        "Relief": 0,
+        "Trunk": 0,
+        "LastEditDate": "2022-03-24T15:58:41Z",
+        "Abandoned": 0,
+        "Grouted": 0,
+        "Diameter": 250,
+        "CCTVInspectionDate": null,
+        "ShapeSTLength": 95.14265206966851
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            -81.27598447261202,
+            42.9795310175302
+          ],
+          [
+            -81.2755904322789,
+            42.9787245797904
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "OBJECTID": 118819,
+        "GIS_ID": 25942661,
+        "GIS_FeatureKey": "25942661",
+        "FlowType": "SAN",
+        "StreetName": null,
+        "Location": "Easement",
+        "UpstreamID": "OS1159",
+        "DownstreamID": "OS1160",
+        "Length": 7.3,
+        "PipeShape": "R",
+        "Height": 250,
+        "Width": 250,
+        "Material": "AC",
+        "MaterialClass": "2400",
+        "UpstreamInvert": 232.721,
+        "DownstreamInvert": 232.651,
+        "DropStructureInvert": 0.0,
+        "Slope": 0.8,
+        "AverageDepth": 2.9,
+        "MaximumDepth": 3.1,
+        "PDC_Count": 0.0,
+        "ConstructionDate": "1968-08-30T00:00:00Z",
+        "Ownership": "CITY",
+        "Assumed": 1,
+        "Combined": 0,
+        "Relief": 0,
+        "Trunk": 0,
+        "LastEditDate": "2022-03-24T15:58:41Z",
+        "Abandoned": 0,
+        "Grouted": 0,
+        "Diameter": 250,
+        "CCTVInspectionDate": null,
+        "ShapeSTLength": 7.299907813116548
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            -81.2755904322789,
+            42.9787245797904
+          ],
+          [
+            -81.2756664244911,
+            42.97868982434971
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "OBJECTID": 118834,
+        "GIS_ID": 26052351,
+        "GIS_FeatureKey": "26052351",
+        "FlowType": "SAN",
+        "StreetName": "RIVERSIDE Dr.",
+        "Location": "Road",
+        "UpstreamID": "OK0436",
+        "DownstreamID": "OK0437",
+        "Length": 50.3,
+        "PipeShape": "R",
+        "Height": 200,
+        "Width": 200,
+        "Material": "AC",
+        "MaterialClass": "2400",
+        "UpstreamInvert": 254.587,
+        "DownstreamInvert": 254.197,
+        "DropStructureInvert": 0.0,
+        "Slope": 0.78,
+        "AverageDepth": 3.3,
+        "MaximumDepth": 3.4,
+        "PDC_Count": 1.0,
+        "ConstructionDate": "1975-02-01T00:00:00Z",
+        "Ownership": "CITY",
+        "Assumed": 1,
+        "Combined": 0,
+        "Relief": 0,
+        "Trunk": 0,
+        "LastEditDate": "2022-03-24T15:58:41Z",
+        "Abandoned": 0,
+        "Grouted": 0,
+        "Diameter": 200,
+        "CCTVInspectionDate": "2011-11-21T00:00:00Z",
+        "ShapeSTLength": 50.14245413270076
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            -81.28166117148793,
+            42.978840307258146
+          ],
+          [
+            -81.28226337099983,
+            42.978748778053905
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "OBJECTID": 127632,
+        "GIS_ID": 30013810,
+        "GIS_FeatureKey": "30013810",
+        "FlowType": "SAN",
+        "StreetName": null,
+        "Location": "Easement",
+        "UpstreamID": "WT1767",
+        "DownstreamID": "WT1768",
+        "Length": 100.4,
+        "PipeShape": "R",
+        "Height": 1050,
+        "Width": 1050,
+        "Material": "CONC",
+        "MaterialClass": "CL100",
+        "UpstreamInvert": 225.8,
+        "DownstreamInvert": 225.47,
+        "DropStructureInvert": 0.0,
+        "Slope": 0.33,
+        "AverageDepth": 0.0,
+        "MaximumDepth": 0.0,
+        "PDC_Count": 0.0,
+        "ConstructionDate": "1997-10-01T00:00:00Z",
+        "Ownership": "CITY",
+        "Assumed": 1,
+        "Combined": 0,
+        "Relief": 0,
+        "Trunk": 1,
+        "LastEditDate": "2022-03-24T15:58:41Z",
+        "Abandoned": 0,
+        "Grouted": 0,
+        "Diameter": 1050,
+        "CCTVInspectionDate": "2021-07-26T00:00:00Z",
+        "ShapeSTLength": 84.8652515483811
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            -81.28414699512433,
+            42.97670558636827
+          ],
+          [
+            -81.28314163016795,
+            42.97690326459333
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "OBJECTID": 128104,
+        "GIS_ID": 26114007,
+        "GIS_FeatureKey": "26114007",
+        "FlowType": "SAN",
+        "StreetName": null,
+        "Location": "Easement",
+        "UpstreamID": "OS1161",
+        "DownstreamID": "OS1162",
+        "Length": 85.3,
+        "PipeShape": "R",
+        "Height": 1200,
+        "Width": 1200,
+        "Material": "CONC",
+        "MaterialClass": "IV",
+        "UpstreamInvert": 225.409,
+        "DownstreamInvert": 225.269,
+        "DropStructureInvert": 0.0,
+        "Slope": 0.16,
+        "AverageDepth": 7.8,
+        "MaximumDepth": 8.5,
+        "PDC_Count": 0.0,
+        "ConstructionDate": "1962-04-01T00:00:00Z",
+        "Ownership": "CITY",
+        "Assumed": 1,
+        "Combined": 0,
+        "Relief": 0,
+        "Trunk": 1,
+        "LastEditDate": "2022-03-24T15:58:41Z",
+        "Abandoned": 0,
+        "Grouted": 0,
+        "Diameter": 1200,
+        "CCTVInspectionDate": "2021-07-28T00:00:00Z",
+        "ShapeSTLength": 89.95691930168574
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            -81.27675273044588,
+            42.9779726792299
+          ],
+          [
+            -81.27783064327299,
+            42.97780006569298
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "OBJECTID": 128121,
+        "GIS_ID": 30018732,
+        "GIS_FeatureKey": "30018732",
+        "FlowType": "SAN",
+        "StreetName": null,
+        "Location": "Easement",
+        "UpstreamID": "WT1770",
+        "DownstreamID": "WT1421",
+        "Length": 3.5,
+        "PipeShape": "R",
+        "Height": 1200,
+        "Width": 1200,
+        "Material": "CONC",
+        "MaterialClass": "IV",
+        "UpstreamInvert": 224.76,
+        "DownstreamInvert": 224.741,
+        "DropStructureInvert": 0.0,
+        "Slope": 0.16,
+        "AverageDepth": 0.0,
+        "MaximumDepth": 0.0,
+        "PDC_Count": 0.0,
+        "ConstructionDate": "1962-04-01T00:00:00Z",
+        "Ownership": "CITY",
+        "Assumed": 1,
+        "Combined": 0,
+        "Relief": 0,
+        "Trunk": 1,
+        "LastEditDate": "2022-03-24T15:58:41Z",
+        "Abandoned": 0,
+        "Grouted": 0,
+        "Diameter": 1200,
+        "CCTVInspectionDate": "2021-07-28T00:00:00Z",
+        "ShapeSTLength": 14.856782323571952
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            -81.28078200760069,
+            42.97728925261639
+          ],
+          [
+            -81.28083858105722,
+            42.97716207859271
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "OBJECTID": 128162,
+        "GIS_ID": 25910321,
+        "GIS_FeatureKey": "25910321",
+        "FlowType": "SAN",
+        "StreetName": null,
+        "Location": "Easement",
+        "UpstreamID": "OS1143",
+        "DownstreamID": "OS1160",
+        "Length": 48.8,
+        "PipeShape": "R",
+        "Height": 1200,
+        "Width": 1200,
+        "Material": "CONC",
+        "MaterialClass": "IV",
+        "UpstreamInvert": 225.875,
+        "DownstreamInvert": 225.796,
+        "DropStructureInvert": 0.0,
+        "Slope": 0.16,
+        "AverageDepth": 7.3,
+        "MaximumDepth": 10.0,
+        "PDC_Count": 0.0,
+        "ConstructionDate": "1962-04-01T00:00:00Z",
+        "Ownership": "CITY",
+        "Assumed": 1,
+        "Combined": 0,
+        "Relief": 0,
+        "Trunk": 1,
+        "LastEditDate": "2022-03-24T15:58:41Z",
+        "Abandoned": 0,
+        "Grouted": 0,
+        "Diameter": 1200,
+        "CCTVInspectionDate": "2021-07-26T00:00:00Z",
+        "ShapeSTLength": 48.799952562476946
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            -81.27508856458887,
+            42.9788042387183
+          ],
+          [
+            -81.2756664244911,
+            42.97868982434971
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "OBJECTID": 128513,
+        "GIS_ID": 25907611,
+        "GIS_FeatureKey": "25907611",
+        "FlowType": "SAN",
+        "StreetName": null,
+        "Location": "Easement",
+        "UpstreamID": "OS1139",
+        "DownstreamID": "OS1140",
+        "Length": 98.5,
+        "PipeShape": "R",
+        "Height": 1200,
+        "Width": 1200,
+        "Material": "CONC",
+        "MaterialClass": "IV",
+        "UpstreamInvert": 226.661,
+        "DownstreamInvert": 226.503,
+        "DropStructureInvert": 0.0,
+        "Slope": 0.16,
+        "AverageDepth": 3.6,
+        "MaximumDepth": 3.6,
+        "PDC_Count": 0.0,
+        "ConstructionDate": "1962-04-01T00:00:00Z",
+        "Ownership": "CITY",
+        "Assumed": 1,
+        "Combined": 0,
+        "Relief": 0,
+        "Trunk": 1,
+        "LastEditDate": "2022-03-24T15:58:41Z",
+        "Abandoned": 0,
+        "Grouted": 0,
+        "Diameter": 1200,
+        "CCTVInspectionDate": "2021-07-26T00:00:00Z",
+        "ShapeSTLength": 98.4999567109042
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            -81.27012587229092,
+            42.97865059251552
+          ],
+          [
+            -81.2713185349196,
+            42.978791671681684
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "OBJECTID": 128573,
+        "GIS_ID": 25909237,
+        "GIS_FeatureKey": "25909237",
+        "FlowType": "SAN",
+        "StreetName": null,
+        "Location": "Easement",
+        "UpstreamID": "OS1141",
+        "DownstreamID": "OS1142",
+        "Length": 99.1,
+        "PipeShape": "R",
+        "Height": 1200,
+        "Width": 1200,
+        "Material": "CONC",
+        "MaterialClass": "IV",
+        "UpstreamInvert": 226.296,
+        "DownstreamInvert": 226.137,
+        "DropStructureInvert": 0.0,
+        "Slope": 0.16,
+        "AverageDepth": 4.8,
+        "MaximumDepth": 4.9,
+        "PDC_Count": 0.0,
+        "ConstructionDate": "1962-04-01T00:00:00Z",
+        "Ownership": "CITY",
+        "Assumed": 1,
+        "Combined": 0,
+        "Relief": 0,
+        "Trunk": 1,
+        "LastEditDate": "2022-03-24T15:58:41Z",
+        "Abandoned": 0,
+        "Grouted": 0,
+        "Diameter": 1200,
+        "CCTVInspectionDate": "2021-07-26T00:00:00Z",
+        "ShapeSTLength": 97.43471733514703
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            -81.27253799818118,
+            42.97894713232267
+          ],
+          [
+            -81.27371748899122,
+            42.97908795219141
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "OBJECTID": 128575,
+        "GIS_ID": 26059921,
+        "GIS_FeatureKey": "26059921",
+        "FlowType": "SAN",
+        "StreetName": "RIVERSIDE Dr.",
+        "Location": "Road",
+        "UpstreamID": "OK0435",
+        "DownstreamID": "OK0451",
+        "Length": 29.9,
+        "PipeShape": "R",
+        "Height": 450,
+        "Width": 450,
+        "Material": "AC",
+        "MaterialClass": "2400",
+        "UpstreamInvert": 227.853,
+        "DownstreamInvert": 227.771,
+        "DropStructureInvert": 0.0,
+        "Slope": 0.28,
+        "AverageDepth": 7.1,
+        "MaximumDepth": 7.6,
+        "PDC_Count": 0.0,
+        "ConstructionDate": "1968-03-01T00:00:00Z",
+        "Ownership": "CITY",
+        "Assumed": 1,
+        "Combined": 0,
+        "Relief": 0,
+        "Trunk": 0,
+        "LastEditDate": "2023-02-02T16:17:17Z",
+        "Abandoned": 0,
+        "Grouted": 0,
+        "Diameter": 450,
+        "CCTVInspectionDate": "2016-08-15T00:00:00Z",
+        "ShapeSTLength": 32.05919050397249
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            -81.28927578978235,
+            42.97634109413769
+          ],
+          [
+            -81.28890887263834,
+            42.97644481969613
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "OBJECTID": 128612,
+        "GIS_ID": 30013808,
+        "GIS_FeatureKey": "30013808",
+        "FlowType": "SAN",
+        "StreetName": null,
+        "Location": "Easement",
+        "UpstreamID": "WT1765",
+        "DownstreamID": "WT1766",
+        "Length": 103.1,
+        "PipeShape": "R",
+        "Height": 1050,
+        "Width": 1050,
+        "Material": "CONC",
+        "MaterialClass": "CL100",
+        "UpstreamInvert": 226.393,
+        "DownstreamInvert": 226.07,
+        "DropStructureInvert": 0.0,
+        "Slope": 0.31,
+        "AverageDepth": 0.0,
+        "MaximumDepth": 0.0,
+        "PDC_Count": 5.0,
+        "ConstructionDate": "1997-10-01T00:00:00Z",
+        "Ownership": "CITY",
+        "Assumed": 1,
+        "Combined": 0,
+        "Relief": 0,
+        "Trunk": 1,
+        "LastEditDate": "2022-03-24T15:58:41Z",
+        "Abandoned": 0,
+        "Grouted": 0,
+        "Diameter": 1050,
+        "CCTVInspectionDate": "2021-07-26T00:00:00Z",
+        "ShapeSTLength": 103.60674559819935
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            -81.28662156197811,
+            42.97651279005978
+          ],
+          [
+            -81.28535254822555,
+            42.97655978231256
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "OBJECTID": 130274,
+        "GIS_ID": 25908153,
+        "GIS_FeatureKey": "25908153",
+        "FlowType": "SAN",
+        "StreetName": null,
+        "Location": "Easement",
+        "UpstreamID": "OS1140",
+        "DownstreamID": "OS1141",
+        "Length": 99.1,
+        "PipeShape": "R",
+        "Height": 1200,
+        "Width": 1200,
+        "Material": "CONC",
+        "MaterialClass": "IV",
+        "UpstreamInvert": 226.479,
+        "DownstreamInvert": 226.32,
+        "DropStructureInvert": 0.0,
+        "Slope": 0.16,
+        "AverageDepth": 4.2,
+        "MaximumDepth": 4.7,
+        "PDC_Count": 0.0,
+        "ConstructionDate": "1962-04-01T00:00:00Z",
+        "Ownership": "CITY",
+        "Assumed": 1,
+        "Combined": 0,
+        "Relief": 0,
+        "Trunk": 1,
+        "LastEditDate": "2022-03-24T15:58:41Z",
+        "Abandoned": 0,
+        "Grouted": 0,
+        "Diameter": 1200,
+        "CCTVInspectionDate": "2021-07-26T00:00:00Z",
+        "ShapeSTLength": 100.91864929823427
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            -81.2713185349196,
+            42.978791671681684
+          ],
+          [
+            -81.27253799818118,
+            42.97894713232267
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "OBJECTID": 130276,
+        "GIS_ID": 26060463,
+        "GIS_FeatureKey": "26060463",
+        "FlowType": "SAN",
+        "StreetName": null,
+        "Location": "Easement",
+        "UpstreamID": "OK0332",
+        "DownstreamID": "OK0451",
+        "Length": 81.4,
+        "PipeShape": "R",
+        "Height": 1050,
+        "Width": 1050,
+        "Material": "CONC",
+        "MaterialClass": "V",
+        "UpstreamInvert": 227.363,
+        "DownstreamInvert": 227.183,
+        "DropStructureInvert": 0.0,
+        "Slope": 0.22,
+        "AverageDepth": 7.7,
+        "MaximumDepth": 8.2,
+        "PDC_Count": 2.0,
+        "ConstructionDate": "1965-01-01T00:00:00Z",
+        "Ownership": "CITY",
+        "Assumed": 1,
+        "Combined": 0,
+        "Relief": 0,
+        "Trunk": 1,
+        "LastEditDate": "2022-03-24T15:58:41Z",
+        "Abandoned": 0,
+        "Grouted": 0,
+        "Diameter": 1050,
+        "CCTVInspectionDate": "2017-03-09T00:00:00Z",
+        "ShapeSTLength": 81.2925558294854
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            -81.28925433007127,
+            42.977131512502325
+          ],
+          [
+            -81.28890887263834,
+            42.97644481969613
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "OBJECTID": 130383,
+        "GIS_ID": 25910863,
+        "GIS_FeatureKey": "25910863",
+        "FlowType": "SAN",
+        "StreetName": null,
+        "Location": "Easement",
+        "UpstreamID": "OS1160",
+        "DownstreamID": "OS1161",
+        "Length": 118.9,
+        "PipeShape": "R",
+        "Height": 1200,
+        "Width": 1200,
+        "Material": "CONC",
+        "MaterialClass": "IV",
+        "UpstreamInvert": 225.698,
+        "DownstreamInvert": 225.509,
+        "DropStructureInvert": 0.0,
+        "Slope": 0.16,
+        "AverageDepth": 8.5,
+        "MaximumDepth": 10.1,
+        "PDC_Count": 0.0,
+        "ConstructionDate": "1962-04-01T00:00:00Z",
+        "Ownership": "CITY",
+        "Assumed": 1,
+        "Combined": 0,
+        "Relief": 0,
+        "Trunk": 1,
+        "LastEditDate": "2022-03-24T15:58:41Z",
+        "Abandoned": 0,
+        "Grouted": 0,
+        "Diameter": 1200,
+        "CCTVInspectionDate": "2021-07-28T00:00:00Z",
+        "ShapeSTLength": 119.11199906713848
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            -81.2756664244911,
+            42.97868982434971
+          ],
+          [
+            -81.27675273044588,
+            42.9779726792299
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "OBJECTID": 130779,
+        "GIS_ID": 26160541,
+        "GIS_FeatureKey": "26160541",
+        "FlowType": "SAN",
+        "StreetName": null,
+        "Location": "Easement",
+        "UpstreamID": "OK0331",
+        "DownstreamID": "OK0332",
+        "Length": 84.1,
+        "PipeShape": "R",
+        "Height": 1050,
+        "Width": 1050,
+        "Material": "CONC",
+        "MaterialClass": "V",
+        "UpstreamInvert": 227.594,
+        "DownstreamInvert": 227.372,
+        "DropStructureInvert": 0.0,
+        "Slope": 0.27,
+        "AverageDepth": 6.6,
+        "MaximumDepth": 7.1,
+        "PDC_Count": 4.0,
+        "ConstructionDate": "1965-01-01T00:00:00Z",
+        "Ownership": "CITY",
+        "Assumed": 1,
+        "Combined": 0,
+        "Relief": 0,
+        "Trunk": 1,
+        "LastEditDate": "2022-03-24T15:58:41Z",
+        "Abandoned": 0,
+        "Grouted": 0,
+        "Diameter": 1050,
+        "CCTVInspectionDate": "2017-03-09T00:00:00Z",
+        "ShapeSTLength": 84.22554674313488
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            -81.28962082695858,
+            42.97784062412191
+          ],
+          [
+            -81.28925433007127,
+            42.977131512502325
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "OBJECTID": 130853,
+        "GIS_ID": 26061005,
+        "GIS_FeatureKey": "26061005",
+        "FlowType": "SAN",
+        "StreetName": null,
+        "Location": "Easement",
+        "UpstreamID": "OK0451",
+        "DownstreamID": "WT1763",
+        "Length": 21.7,
+        "PipeShape": "R",
+        "Height": 1050,
+        "Width": 1050,
+        "Material": "CONC",
+        "MaterialClass": "V",
+        "UpstreamInvert": 227.146,
+        "DownstreamInvert": 227.11,
+        "DropStructureInvert": 0.0,
+        "Slope": 0.2,
+        "AverageDepth": 0.0,
+        "MaximumDepth": 0.0,
+        "PDC_Count": 0.0,
+        "ConstructionDate": "1985-01-01T00:00:00Z",
+        "Ownership": "CITY",
+        "Assumed": 1,
+        "Combined": 0,
+        "Relief": 0,
+        "Trunk": 1,
+        "LastEditDate": "2022-03-24T15:58:41Z",
+        "Abandoned": 0,
+        "Grouted": 0,
+        "Diameter": 1050,
+        "CCTVInspectionDate": "2021-07-26T00:00:00Z",
+        "ShapeSTLength": 17.68936362478877
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            -81.28890887263834,
+            42.97644481969613
+          ],
+          [
+            -81.28881964589715,
+            42.976299622969606
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "OBJECTID": 131216,
+        "GIS_ID": 30013807,
+        "GIS_FeatureKey": "30013807",
+        "FlowType": "SAN",
+        "StreetName": null,
+        "Location": "Easement",
+        "UpstreamID": "WT1764",
+        "DownstreamID": "WT1765",
+        "Length": 95.9,
+        "PipeShape": "R",
+        "Height": 1050,
+        "Width": 1050,
+        "Material": "CONC",
+        "MaterialClass": "CL100",
+        "UpstreamInvert": 226.65,
+        "DownstreamInvert": 226.393,
+        "DropStructureInvert": 0.0,
+        "Slope": 0.27,
+        "AverageDepth": 0.0,
+        "MaximumDepth": 0.0,
+        "PDC_Count": 1.0,
+        "ConstructionDate": "1997-10-01T00:00:00Z",
+        "Ownership": "CITY",
+        "Assumed": 1,
+        "Combined": 0,
+        "Relief": 0,
+        "Trunk": 1,
+        "LastEditDate": "2022-03-24T15:58:41Z",
+        "Abandoned": 0,
+        "Grouted": 0,
+        "Diameter": 1050,
+        "CCTVInspectionDate": "2021-07-26T00:00:00Z",
+        "ShapeSTLength": 95.39867356567386
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            -81.28778180004606,
+            42.97640226319157
+          ],
+          [
+            -81.28662156197811,
+            42.97651279005978
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "OBJECTID": 131478,
+        "GIS_ID": 25907069,
+        "GIS_FeatureKey": "25907069",
+        "FlowType": "SAN",
+        "StreetName": null,
+        "Location": "Easement",
+        "UpstreamID": "OS1138",
+        "DownstreamID": "OS1139",
+        "Length": 76.2,
+        "PipeShape": "R",
+        "Height": 1200,
+        "Width": 1200,
+        "Material": "CONC",
+        "MaterialClass": "IV",
+        "UpstreamInvert": 226.829,
+        "DownstreamInvert": 226.707,
+        "DropStructureInvert": 0.0,
+        "Slope": 0.16,
+        "AverageDepth": 3.4,
+        "MaximumDepth": 3.4,
+        "PDC_Count": 0.0,
+        "ConstructionDate": "1962-04-01T00:00:00Z",
+        "Ownership": "CITY",
+        "Assumed": 1,
+        "Combined": 0,
+        "Relief": 0,
+        "Trunk": 1,
+        "LastEditDate": "2022-03-24T15:58:41Z",
+        "Abandoned": 0,
+        "Grouted": 0,
+        "Diameter": 1200,
+        "CCTVInspectionDate": "2021-07-26T00:00:00Z",
+        "ShapeSTLength": 75.00639158431767
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            -81.26921968608437,
+            42.97876681422363
+          ],
+          [
+            -81.27012587229092,
+            42.97865059251552
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "OBJECTID": 131483,
+        "GIS_ID": 30013811,
+        "GIS_FeatureKey": "30013811",
+        "FlowType": "SAN",
+        "StreetName": null,
+        "Location": "Easement",
+        "UpstreamID": "WT1768",
+        "DownstreamID": "WT1769",
+        "Length": 81.2,
+        "PipeShape": "R",
+        "Height": 1050,
+        "Width": 1050,
+        "Material": "CONC",
+        "MaterialClass": "CL100",
+        "UpstreamInvert": 225.47,
+        "DownstreamInvert": 225.35,
+        "DropStructureInvert": 0.0,
+        "Slope": 0.15,
+        "AverageDepth": 0.0,
+        "MaximumDepth": 0.0,
+        "PDC_Count": 0.0,
+        "ConstructionDate": "1997-10-01T00:00:00Z",
+        "Ownership": "CITY",
+        "Assumed": 1,
+        "Combined": 0,
+        "Relief": 0,
+        "Trunk": 1,
+        "LastEditDate": "2022-03-24T15:58:41Z",
+        "Abandoned": 0,
+        "Grouted": 0,
+        "Diameter": 1050,
+        "CCTVInspectionDate": "2021-07-26T00:00:00Z",
+        "ShapeSTLength": 80.33498724130104
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            -81.28314163016795,
+            42.97690326459333
+          ],
+          [
+            -81.28218775460088,
+            42.97708431868207
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "OBJECTID": 131757,
+        "GIS_ID": 30018731,
+        "GIS_FeatureKey": "30018731",
+        "FlowType": "SAN",
+        "StreetName": null,
+        "Location": "Easement",
+        "UpstreamID": "OS1415",
+        "DownstreamID": "WT1770",
+        "Length": 122.6,
+        "PipeShape": "R",
+        "Height": 1200,
+        "Width": 1200,
+        "Material": "CONC",
+        "MaterialClass": "IV",
+        "UpstreamInvert": 224.973,
+        "DownstreamInvert": 224.76,
+        "DropStructureInvert": 0.0,
+        "Slope": 0.16,
+        "AverageDepth": 0.0,
+        "MaximumDepth": 0.0,
+        "PDC_Count": 0.0,
+        "ConstructionDate": "1962-04-01T00:00:00Z",
+        "Ownership": "CITY",
+        "Assumed": 1,
+        "Combined": 0,
+        "Relief": 0,
+        "Trunk": 1,
+        "LastEditDate": "2022-03-24T15:58:41Z",
+        "Abandoned": 0,
+        "Grouted": 0,
+        "Diameter": 1200,
+        "CCTVInspectionDate": "2021-07-28T00:00:00Z",
+        "ShapeSTLength": 116.33839118017548
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            -81.27942616614932,
+            42.97758456602995
+          ],
+          [
+            -81.28068015368719,
+            42.977342353472594
+          ],
+          [
+            -81.28069770054239,
+            42.97733896053916
+          ],
+          [
+            -81.2807148010243,
+            42.97733449888947
+          ],
+          [
+            -81.28073132773373,
+            42.97732900125461
+          ],
+          [
+            -81.28074717289402,
+            42.977322500317555
+          ],
+          [
+            -81.28076053967645,
+            42.97731362000108
+          ],
+          [
+            -81.28078200760069,
+            42.97728925261639
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "OBJECTID": 131775,
+        "GIS_ID": 30013806,
+        "GIS_FeatureKey": "30013806",
+        "FlowType": "SAN",
+        "StreetName": null,
+        "Location": "Easement",
+        "UpstreamID": "WT1763",
+        "DownstreamID": "WT1764",
+        "Length": 84.6,
+        "PipeShape": "R",
+        "Height": 1050,
+        "Width": 1050,
+        "Material": "CONC",
+        "MaterialClass": "CL100",
+        "UpstreamInvert": 226.77,
+        "DownstreamInvert": 226.65,
+        "DropStructureInvert": 0.0,
+        "Slope": 0.14,
+        "AverageDepth": 0.0,
+        "MaximumDepth": 0.0,
+        "PDC_Count": 0.0,
+        "ConstructionDate": "1997-10-01T00:00:00Z",
+        "Ownership": "CITY",
+        "Assumed": 1,
+        "Combined": 0,
+        "Relief": 0,
+        "Trunk": 1,
+        "LastEditDate": "2022-03-24T15:58:41Z",
+        "Abandoned": 0,
+        "Grouted": 0,
+        "Diameter": 1050,
+        "CCTVInspectionDate": "2021-07-26T00:00:00Z",
+        "ShapeSTLength": 85.39023612439539
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            -81.28881964589715,
+            42.976299622969606
+          ],
+          [
+            -81.28778180004606,
+            42.97640226319157
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "OBJECTID": 131776,
+        "GIS_ID": 30013812,
+        "GIS_FeatureKey": "30013812",
+        "FlowType": "SAN",
+        "StreetName": null,
+        "Location": "Easement",
+        "UpstreamID": "WT1769",
+        "DownstreamID": "WT1770",
+        "Length": 101.9,
+        "PipeShape": "R",
+        "Height": 1050,
+        "Width": 1050,
+        "Material": "CONC",
+        "MaterialClass": "CL100",
+        "UpstreamInvert": 225.35,
+        "DownstreamInvert": 225.06,
+        "DropStructureInvert": 0.0,
+        "Slope": 0.28,
+        "AverageDepth": 0.0,
+        "MaximumDepth": 0.0,
+        "PDC_Count": 0.0,
+        "ConstructionDate": "1997-10-01T00:00:00Z",
+        "Ownership": "CITY",
+        "Assumed": 1,
+        "Combined": 0,
+        "Relief": 0,
+        "Trunk": 1,
+        "LastEditDate": "2022-03-24T15:58:41Z",
+        "Abandoned": 0,
+        "Grouted": 0,
+        "Diameter": 1050,
+        "CCTVInspectionDate": "2021-07-26T00:00:00Z",
+        "ShapeSTLength": 116.8605694766203
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            -81.28218775460088,
+            42.97708431868207
+          ],
+          [
+            -81.28078200760069,
+            42.97728925261639
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "OBJECTID": 131896,
+        "GIS_ID": 25906527,
+        "GIS_FeatureKey": "25906527",
+        "FlowType": "SAN",
+        "StreetName": null,
+        "Location": "Easement",
+        "UpstreamID": "OS1137",
+        "DownstreamID": "OS1138",
+        "Length": 77.4,
+        "PipeShape": "R",
+        "Height": 1200,
+        "Width": 1200,
+        "Material": "CONC",
+        "MaterialClass": "IV",
+        "UpstreamInvert": 226.978,
+        "DownstreamInvert": 226.853,
+        "DropStructureInvert": 0.0,
+        "Slope": 0.16,
+        "AverageDepth": 3.2,
+        "MaximumDepth": 3.3,
+        "PDC_Count": 0.0,
+        "ConstructionDate": "1962-04-01T00:00:00Z",
+        "Ownership": "CITY",
+        "Assumed": 1,
+        "Combined": 0,
+        "Relief": 0,
+        "Trunk": 1,
+        "LastEditDate": "2022-03-24T15:58:41Z",
+        "Abandoned": 0,
+        "Grouted": 0,
+        "Diameter": 1200,
+        "CCTVInspectionDate": "2021-07-26T00:00:00Z",
+        "ShapeSTLength": 78.59481288386658
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            -81.26826886879225,
+            42.97888310545193
+          ],
+          [
+            -81.26921968608437,
+            42.97876681422363
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "OBJECTID": 131897,
+        "GIS_ID": 25909779,
+        "GIS_FeatureKey": "25909779",
+        "FlowType": "SAN",
+        "StreetName": null,
+        "Location": "Easement",
+        "UpstreamID": "OS1142",
+        "DownstreamID": "OS1143",
+        "Length": 115.8,
+        "PipeShape": "R",
+        "Height": 1200,
+        "Width": 1200,
+        "Material": "CONC",
+        "MaterialClass": "IV",
+        "UpstreamInvert": 226.085,
+        "DownstreamInvert": 225.899,
+        "DropStructureInvert": 0.0,
+        "Slope": 0.16,
+        "AverageDepth": 4.8,
+        "MaximumDepth": 5.0,
+        "PDC_Count": 0.0,
+        "ConstructionDate": "1962-04-01T00:00:00Z",
+        "Ownership": "CITY",
+        "Assumed": 1,
+        "Combined": 0,
+        "Relief": 0,
+        "Trunk": 1,
+        "LastEditDate": "2022-03-24T15:58:41Z",
+        "Abandoned": 0,
+        "Grouted": 0,
+        "Diameter": 1200,
+        "CCTVInspectionDate": "2021-07-26T00:00:00Z",
+        "ShapeSTLength": 116.14768705264864
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            -81.27371748899122,
+            42.97908795219141
+          ],
+          [
+            -81.27508856458887,
+            42.9788042387183
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "OBJECTID": 132379,
+        "GIS_ID": 30013809,
+        "GIS_FeatureKey": "30013809",
+        "FlowType": "SAN",
+        "StreetName": null,
+        "Location": "Easement",
+        "UpstreamID": "WT1766",
+        "DownstreamID": "WT1767",
+        "Length": 98.1,
+        "PipeShape": "R",
+        "Height": 1050,
+        "Width": 1050,
+        "Material": "CONC",
+        "MaterialClass": "CL100",
+        "UpstreamInvert": 226.07,
+        "DownstreamInvert": 225.8,
+        "DropStructureInvert": 0.0,
+        "Slope": 0.28,
+        "AverageDepth": 0.0,
+        "MaximumDepth": 0.0,
+        "PDC_Count": 1.0,
+        "ConstructionDate": "1997-10-01T00:00:00Z",
+        "Ownership": "CITY",
+        "Assumed": 1,
+        "Combined": 0,
+        "Relief": 0,
+        "Trunk": 1,
+        "LastEditDate": "2022-03-24T15:58:41Z",
+        "Abandoned": 0,
+        "Grouted": 0,
+        "Diameter": 1050,
+        "CCTVInspectionDate": "2021-07-26T00:00:00Z",
+        "ShapeSTLength": 99.62504298759424
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            -81.28535254822555,
+            42.97655978231256
+          ],
+          [
+            -81.28414699512433,
+            42.97670558636827
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "OBJECTID": 140233,
+        "GIS_ID": 25905985,
+        "GIS_FeatureKey": "25905985",
+        "FlowType": "SAN",
+        "StreetName": null,
+        "Location": "Easement",
+        "UpstreamID": "OS1136",
+        "DownstreamID": "OS1137",
+        "Length": 85.3,
+        "PipeShape": "R",
+        "Height": 1200,
+        "Width": 1200,
+        "Material": "CONC",
+        "MaterialClass": "IV",
+        "UpstreamInvert": 227.161,
+        "DownstreamInvert": 227.024,
+        "DropStructureInvert": 0.0,
+        "Slope": 0.16,
+        "AverageDepth": 3.1,
+        "MaximumDepth": 3.1,
+        "PDC_Count": 0.0,
+        "ConstructionDate": "1962-04-01T00:00:00Z",
+        "Ownership": "CITY",
+        "Assumed": 1,
+        "Combined": 0,
+        "Relief": 0,
+        "Trunk": 1,
+        "LastEditDate": "2022-03-24T15:58:41Z",
+        "Abandoned": 0,
+        "Grouted": 0,
+        "Diameter": 1200,
+        "CCTVInspectionDate": "2021-07-26T00:00:00Z",
+        "ShapeSTLength": 83.48631554745963
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            -81.26736628447232,
+            42.97923808735714
+          ],
+          [
+            -81.26826886879225,
+            42.97888310545193
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "OBJECTID": 140270,
+        "GIS_ID": 26062101,
+        "GIS_FeatureKey": "26062101",
+        "FlowType": "SAN",
+        "StreetName": null,
+        "Location": "Easement",
+        "UpstreamID": "OS1162",
+        "DownstreamID": "OS1415",
+        "Length": 136.6,
+        "PipeShape": "R",
+        "Height": 1200,
+        "Width": 1200,
+        "Material": "CONC",
+        "MaterialClass": "IV",
+        "UpstreamInvert": 225.217,
+        "DownstreamInvert": 224.997,
+        "DropStructureInvert": 0.0,
+        "Slope": 0.16,
+        "AverageDepth": 8.6,
+        "MaximumDepth": 8.6,
+        "PDC_Count": 0.0,
+        "ConstructionDate": "1962-04-01T00:00:00Z",
+        "Ownership": "CITY",
+        "Assumed": 1,
+        "Combined": 0,
+        "Relief": 0,
+        "Trunk": 1,
+        "LastEditDate": "2022-03-24T15:58:41Z",
+        "Abandoned": 0,
+        "Grouted": 0,
+        "Diameter": 1200,
+        "CCTVInspectionDate": "2021-07-28T00:00:00Z",
+        "ShapeSTLength": 132.2789896025064
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            -81.27783064327299,
+            42.97780006569298
+          ],
+          [
+            -81.27942616614932,
+            42.97758456602995
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "OBJECTID": 144437,
+        "GIS_ID": 30033935,
+        "GIS_FeatureKey": "30033935",
+        "FlowType": "SAN",
+        "StreetName": null,
+        "Location": "Easement",
+        "UpstreamID": "OS2290",
+        "DownstreamID": "OS1136",
+        "Length": 38.2,
+        "PipeShape": "R",
+        "Height": 1200,
+        "Width": 1200,
+        "Material": "CONC",
+        "MaterialClass": "IV",
+        "UpstreamInvert": 227.248,
+        "DownstreamInvert": 227.186,
+        "DropStructureInvert": 0.0,
+        "Slope": 0.16,
+        "AverageDepth": 3.0,
+        "MaximumDepth": 3.0,
+        "PDC_Count": 0.0,
+        "ConstructionDate": "1962-04-01T00:00:00Z",
+        "Ownership": "CITY",
+        "Assumed": 1,
+        "Combined": 0,
+        "Relief": 0,
+        "Trunk": 1,
+        "LastEditDate": "2022-11-09T19:12:50Z",
+        "Abandoned": 0,
+        "Grouted": 0,
+        "Diameter": 1200,
+        "CCTVInspectionDate": null,
+        "ShapeSTLength": 39.218669403741885
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            -81.2669406337739,
+            42.97940256332685
+          ],
+          [
+            -81.26736628447232,
+            42.97923808735714
+          ]
+        ]
+      }
+    }
+  ]
+}
