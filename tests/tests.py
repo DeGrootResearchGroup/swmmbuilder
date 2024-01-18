@@ -5,13 +5,17 @@ import pytest
 
 @pytest.fixture
 def geojson_file_path():
-    return f'./Testing_file.geojson'
+    return f'../examples/geojson_test_data/test_data_small.geojson'
+
+@pytest.fixture
+def inp_file_path():
+    return f'./examples/inp_test_file/test.inp'
 
 
 @pytest.fixture
-def swmm_simulation():
+def swmm_simulation(inp_file_path):
     # Initialize the PySWMM model
-    simulation = Simulation('London_branch1.inp')
+    simulation = Simulation(inp_file_path)
     return simulation
 
 
