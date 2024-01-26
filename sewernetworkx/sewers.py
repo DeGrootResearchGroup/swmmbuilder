@@ -286,15 +286,19 @@ class SubNetwork(Network):
             content = file.read()
 
         nodes_content = ""
-
+        outfall_content = ""
         # Iterate through the nodes in the graph and build the content
         for node in self.subgraph.nodes:
-            upstream_invert = self.get_upstream_invert(node)
-            nodes_content += (f"{node:<16} {upstream_invert:<11} {max_depth:<11} {init_depth:<11}"
-                              f"{surcharge_depth:<11} {ponding_area:<11}\n")
+            if node in self.outfall_node:
+                upstream_invert = self.get_upstream_invert(node)
+                outfall_content += f"{node:<16} {upstream_invert:<11}  {self.outfall_node_type:<28} {'NO':<10}\n"
+            else:
+                upstream_invert = self.get_upstream_invert(node)
+                nodes_content += (f"{node:<16} {upstream_invert:<11} {max_depth:<11} {init_depth:<11}"
+                                  f"{surcharge_depth:<11} {ponding_area:<11}\n")
 
         # Replace {nodes} placeholder with the built nodes content
-        modified_content = content.replace('{nodes}', nodes_content)
+        modified_content = content.replace('{nodes}', nodes_content).replace('{outfalls}', outfall_content)
 
         # Write the modified content back to the file
         with open(pyswmm_file, 'w') as file:
