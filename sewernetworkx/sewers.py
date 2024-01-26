@@ -99,7 +99,7 @@ class SubNetwork(Network):
                 Path to GeoJSON file.
             """
 
-        def __init__(self, full_network, start_node, outfall_node, outfall_node_type='FREE', depth=None, file_path=None):
+    def __init__(self, full_network, start_node, outfall_node, outfall_node_type='FREE', depth=None, file_path=None):
         """Class initialization"""
 
         if file_path:
