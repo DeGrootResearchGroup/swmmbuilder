@@ -105,7 +105,7 @@ class SubNetwork(Network):
         if file_path:
             super().__init__(file_path)
         self.network_data = {}
-        self.start = node
+        self.start = start_node
         self.depth = depth
         self.subgraph = nx.DiGraph()
         self.outfall_node = outfall_node
