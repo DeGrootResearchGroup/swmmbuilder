@@ -53,7 +53,7 @@ DRY_ONLY     NO
 ;;               Invert     Outfall      Stage/Table      Tide
 ;;Name           Elev.      Type         Time Series      Gate Route To
 ;;-------------- ---------- ------------ ---------------- ---- ----------------
-
+{outfalls}
 
 [CONDUITS]
 ;;               Inlet            Outlet                      Manning    Inlet      Outlet     Init.      Max.
