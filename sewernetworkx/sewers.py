@@ -99,7 +99,7 @@ class SubNetwork(Network):
                 Path to GeoJSON file.
             """
 
-    def __init__(self, full_network, node, depth=None, file_path=None):
+        def __init__(self, full_network, start_node, outfall_node, outfall_node_type='FREE', depth=None, file_path=None):
         """Class initialization"""
 
         if file_path:
@@ -108,6 +108,8 @@ class SubNetwork(Network):
         self.start = node
         self.depth = depth
         self.subgraph = nx.DiGraph()
+        self.outfall_node = outfall_node
+        self.outfall_node_type = outfall_node_type
 
         print("Removing Unnecessary Entries")
         keys_to_remove = ["GIS_ID", "GIS_FeatureKey", "FlowType", "StreetName", "Location",
