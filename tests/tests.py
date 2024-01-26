@@ -27,6 +27,13 @@ def level_2_model(geojson_file_path):
     subnetwork = SubNetwork(network, starting_node, levels)
     return subnetwork
 
+@pytest.fixture
+def create_pyswmm_file(level_2_model):
+    level_2_model.write_pyswmm('pytest.inp')
+    file_path = f'./pytest.inp'
+    assert os.path.exists(file_path)
+    yield file_path
+    os.remove(file_path)
 
 # Test if a Network class will be initialized
 def test_init_network_with_geojson(geojson_file_path):
@@ -58,3 +65,6 @@ def test_pyswmm_model(swmm_simulation):
         swmm_simulation.execute()
     except Exception as e:
         pytest.fail(f"pyswmm model execution failed with error: {e}")
+
+def test_pyswmm_write(create_pyswmm_file):
+    assert os.path.exists(create_pyswmm_file)
