@@ -48,7 +48,6 @@ DRY_ONLY     NO
 ;;-------------- ---------- ---------- ---------- ---------- ----------
 {nodes}
 
-
 [OUTFALLS]
 ;;               Invert     Outfall      Stage/Table      Tide
 ;;Name           Elev.      Type         Time Series      Gate Route To
@@ -65,6 +64,11 @@ DRY_ONLY     NO
 ;;Link           Shape        Geom1            Geom2      Geom3      Geom4      Barrels
 ;;-------------- ------------ ---------------- ---------- ---------- ---------- ----------
 {xsections}
+
+[PUMPS]
+;;Name           Node1        Node2            Pcurve      Status    Startup    Shutoff
+;;-------------- ------------ ---------------- ---------- ---------- ---------- ----------
+{pumps}
 
 [LOSSES]
 ;;Link           Inlet      Outlet     Average    Flap Gate  SeepageRate
