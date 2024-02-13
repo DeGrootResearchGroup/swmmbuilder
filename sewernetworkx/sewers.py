@@ -392,7 +392,7 @@ class SubNetwork(Network):
     def write_pyswmm(self, output_file_path,
                      max_depth=0.0, init_depth=0.0, surcharge_depth=0.0, ponding_area=0.0,
                      manning_n = 0.01, inlet_offset = 0.0, outlet_offset = 0.0,
-                     init_flow = 0.0, max_flow = 0.0, barrels = 0.0, template_path="template.inp"):
+                     init_flow = 0.0, max_flow = 0.0, barrels = 0.0, template_path="./examples/pyswmm_template/template.inp"):
         """Generate a PySWMM input file based on a networkx digraph and GeoPandas DataFrame.
 
             Parameters
