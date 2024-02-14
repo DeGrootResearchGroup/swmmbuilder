@@ -10,6 +10,7 @@ import networkx as nx
 import matplotlib.pyplot as plt
 import shutil
 from pyswmm import Simulation, Nodes, Subcatchments
+import pkg_resources
 
 class Network:
     """Class used to represent an entire cities sewer network
@@ -389,19 +390,19 @@ class SubNetwork(Network):
             file.write(modified_content)
 
 
-    def write_pyswmm(self, output_file_path,
+    def write_pyswmm(self, output_file,
                      max_depth=0.0, init_depth=0.0, surcharge_depth=0.0, ponding_area=0.0,
                      manning_n = 0.01, inlet_offset = 0.0, outlet_offset = 0.0,
-                     init_flow = 0.0, max_flow = 0.0, barrels = 0.0, template_path="./examples/pyswmm_template/template.inp"):
+                     init_flow = 0.0, max_flow = 0.0, barrels = 0.0, template_path=None, output_folder=None):
         """Generate a PySWMM input file based on a networkx digraph and GeoPandas DataFrame.
 
             Parameters
             ---------_
 
-            output_file_path : str
-                Path to the write out PySWMM input file (.inp).
+            output_file : str
+                Name of new pyswmm input file (.inp).
 
-            max_depth : float)
+            max_depth : float
                 Maximum depth for node (default is 0.0).
 
             init_depth : float
@@ -433,10 +434,25 @@ class SubNetwork(Network):
 
             template_path : str
                 Path to the pyswmm model template file (default is "template.inp").
+
+            output_folder : str
+                Path to were the new .inp file will be written.
             """
 
-        # Create a copy of the template file
-        shutil.copy(template_path, output_file_path)
+        if output_file is None:
+            raise ValueError("The 'output_file_path' must be specified.")
+
+        if template_path is None:
+            # Get the package directory and construct the path to the template file
+            package_dir = pkg_resources.resource_filename(__name__, '')
+            template_path = os.path.join(package_dir, "examples", "pyswmm_template", "template.inp")
+
+        if output_folder is not None:
+            # Create a copy of the template file with the specified name in the output folder
+            output_file_path = os.path.join(output_folder, output_file)
+            shutil.copy(template_path, output_file_path)
+        else:
+            output_file_path = os.path.join(os.getcwd(), output_file)
 
         # Write nodes to pyswmm .inp file
         self.write_nodes_pyswmm(output_file_path, max_depth, init_depth,
