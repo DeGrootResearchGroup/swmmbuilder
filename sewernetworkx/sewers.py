@@ -369,11 +369,11 @@ class SubNetwork(Network):
 
                 if geo_pipe_down.iloc[0]["PipeShape"] == 'R':
                     shape = 'RECT_CLOSED'
-                    height = geo_pipe_down.iloc[0]["Height"]
-                    width = geo_pipe_down.iloc[0]["Width"]
+                    height = geo_pipe_down.iloc[0]["Height"] / 1000
+                    width = geo_pipe_down.iloc[0]["Width"] / 1000
                 elif geo_pipe_down.iloc[0]["PipeShape"] == 'Round':
                     shape = 'CIRCULAR'
-                    height = geo_pipe_down.iloc[0]["Height"]
+                    height = geo_pipe_down.iloc[0]["Height"] / 1000
                     width = '0.0'
 
                 conduits_content += (f"{name:<16} {inlet:<16} {start_node:<16}"
