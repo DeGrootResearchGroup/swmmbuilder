@@ -11,6 +11,7 @@ import matplotlib.pyplot as plt
 import shutil
 from pyswmm import Simulation, Nodes, Subcatchments
 import pkg_resources
+import os
 
 class Network:
     """Class used to represent an entire cities sewer network
