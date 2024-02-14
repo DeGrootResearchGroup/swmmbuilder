@@ -391,7 +391,7 @@ class SubNetwork(Network):
             file.write(modified_content)
 
 
-    def write_pyswmm(self, output_file,
+    def write_pyswmm(self, output_file=None,
                      max_depth=0.0, init_depth=0.0, surcharge_depth=0.0, ponding_area=0.0,
                      manning_n = 0.01, inlet_offset = 0.0, outlet_offset = 0.0,
                      init_flow = 0.0, max_flow = 0.0, barrels = 0.0, template_path=None, output_folder=None):
@@ -440,8 +440,8 @@ class SubNetwork(Network):
                 Path to were the new .inp file will be written.
             """
 
-        if output_file_path is None:
-        raise ValueError("The 'output_file_path' must be specified.")
+        if output_file is None:
+            raise ValueError("The 'output_path' must be specified.")
 
         if template_path is None:
             # Get the package directory and construct the path to the template file
@@ -453,10 +453,10 @@ class SubNetwork(Network):
 
         # Always create a copy of the template file
         if output_folder is not None:
-            output_file_path = os.path.join(output_folder, output_file_path)
+            output_file_path = os.path.join(output_folder, output_file)
         else:
             # If output_folder is None, create a copy in the current working directory
-            output_file_path = os.path.join(os.getcwd(), output_file_path)
+            output_file_path = os.path.join(os.getcwd(), output_file)
 
         shutil.copy(template_path, output_file_path)
         print(f"Template file copied to: {output_file_path}")
