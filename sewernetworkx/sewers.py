@@ -440,20 +440,26 @@ class SubNetwork(Network):
                 Path to were the new .inp file will be written.
             """
 
-        if output_file is None:
-            raise ValueError("The 'output_file_path' must be specified.")
+        if output_file_path is None:
+        raise ValueError("The 'output_file_path' must be specified.")
 
         if template_path is None:
             # Get the package directory and construct the path to the template file
             package_dir = pkg_resources.resource_filename(__name__, '')
             template_path = os.path.join(package_dir, "examples", "pyswmm_template", "template.inp")
 
+        if not os.path.exists(template_path):
+            raise FileNotFoundError(f"The template file does not exist at the specified path: {template_path}")
+
+        # Always create a copy of the template file
         if output_folder is not None:
-            # Create a copy of the template file with the specified name in the output folder
-            output_file_path = os.path.join(output_folder, output_file)
-            shutil.copy(template_path, output_file_path)
+            output_file_path = os.path.join(output_folder, output_file_path)
         else:
-            output_file_path = os.path.join(os.getcwd(), output_file)
+            # If output_folder is None, create a copy in the current working directory
+            output_file_path = os.path.join(os.getcwd(), output_file_path)
+
+        shutil.copy(template_path, output_file_path)
+        print(f"Template file copied to: {output_file_path}")
 
         # Write nodes to pyswmm .inp file
         self.write_nodes_pyswmm(output_file_path, max_depth, init_depth,
