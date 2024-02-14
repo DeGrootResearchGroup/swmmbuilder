@@ -6,7 +6,7 @@ license = {file = "LICENCE"}
 authors = [{name = "Anthony Sherratt", email="asherra@uwo.ca"}, {name = "Christopher DeGroot", email="christopher.degroot@uwo.ca"},]
 maintainers = [{name = "Anthony Sherratt", email="asherra@uwo.ca"}, {name = "Christopher DeGroot", email="christopher.degroot@uwo.ca"},]
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.8"
 dependencies = [
   "geopandas",
   "networkx",
