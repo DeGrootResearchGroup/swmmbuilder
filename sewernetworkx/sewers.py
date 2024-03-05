@@ -219,6 +219,87 @@ class SubNetwork(Network):
                 pos[upstream_id] = (coordinates[0] * scale, coordinates[1] * scale)
         return pos
 
+    def explore_nodes(self, G, direction):
+        connected_subgraph = {self.start}
+        current_depth = 0
+        opposite_direction = 'successors' if direction == 'predecessors' else 'predecessors'
+
+        while current_depth < self.depth:
+            new_nodes = set()
+            for node in list(connected_subgraph):
+                # Find the next node in the sewer network
+                next_nodes = set(getattr(G, direction)(node))
+                if all(not
+                       any(n in node_set for n in next_nodes)
+                       for node_set in connected_subgraph
+                       ):
+                    if len(next_nodes) > 1:
+                        print(f'Branch Detected at node: {node}')
+                        branch_nodes = self.explore_branch(next_nodes, new_nodes, G, direction,
+                                                           opposite_direction)
+                        new_nodes.update(branch_nodes)
+                        current_depth += 1
+                    elif len(next_nodes) == 1:
+                        new_nodes.update(next_nodes)
+                        opposite_nodes = set(getattr(G, opposite_direction)(next(iter(next_nodes))))
+                        print(f'Checking {opposite_direction.capitalize()} of {next_nodes}: {opposite_nodes}')
+                        if next(iter(opposite_nodes)) == node and len(opposite_nodes) == 1:
+                            break
+                        else:
+
+                            print(f'Possible branch detected at: {next_nodes}')
+                            if next_nodes in connected_subgraph:
+                                break
+                            else:
+                                current_depth += 1
+                                inner_depth = current_depth
+                                while inner_depth < self.depth:
+                                    branch_nodes = self.explore_branch(opposite_nodes, new_nodes, G, opposite_direction,
+                                                                       direction)
+                                    new_nodes.update(branch_nodes)
+                                    inner_depth += 1
+
+                    elif len(next_nodes) == 0:
+                        print('Endpoint reached')
+                        new_nodes.update(next_nodes)
+                        current_depth += 1
+                        break
+
+            connected_subgraph.update(new_nodes)
+
+        return connected_subgraph
+
+    def explore_branch(self, branch_nodes, new_nodes, G, direction, opposite_direction):
+        for branch in list(branch_nodes):
+            print(f'Exploring branch from node: {branch}')
+            new_nodes.add(branch)
+            # print(f'{direction.capitalize()} of {branch} is: {list(getattr(G, direction)(branch))}')
+            branch_next = set(getattr(G, direction)(branch))
+
+            new_nodes.update(branch_next)
+            while len(branch_next) == 1:
+                next_node = next(iter(branch_next))
+                branch_next = set(getattr(G, direction)(next_node))
+                if len(branch_next) >= 2:
+                    print(f'New branch detected at {next_node}')
+                    break
+                elif len(branch_next) == 0:
+                    print(f'Endpoint reached at {next_node}')
+                    new_nodes.add(next_node)
+                    new_nodes.update(branch_next)
+
+                    # Check for successors or predecessors based on the current direction
+                    opposite_nodes = set(getattr(G, opposite_direction)(next_node))
+                    print(f'Checking {opposite_direction.capitalize()} of {next_node}: '
+                          f'{opposite_nodes}')
+                    break
+                elif branch_next == 'Abandoned':
+                    print('Reached abandoned node.')
+                    break
+                else:
+                    new_nodes.update(branch_next)
+        return new_nodes
+
     # Probably need to come up with better names for this... as they are used above
     def trim_subnetwork(self, network_nodes, trim_node):
         trimmed_graph = network_nodes.copy()
