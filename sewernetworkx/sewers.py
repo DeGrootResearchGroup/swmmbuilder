@@ -532,4 +532,4 @@ class SubNetwork(Network):
 
         # Write conduits to pyswmm inp file
         self.write_conduits_pyswmm(output_file_path, manning_n, inlet_offset,
-                                   outlet_offset, init_flow, max_flow, barrels)                                   outlet_offset, init_flow, max_flow, barrels)
+                                   outlet_offset, init_flow, max_flow, barrels)
