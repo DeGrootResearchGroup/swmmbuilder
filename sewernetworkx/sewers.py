@@ -155,50 +155,14 @@ class SubNetwork(Network):
         # Add edges from network_data
         G.add_edges_from(self.network_data.values())
 
-        # Extract the connected subgraph starting from the specified node with limited depth
-        if self.depth is not None:
-            connected_subgraph = {self.start}
-            current_depth = 0
-            while current_depth < self.depth:
-                # Create set to ensure no duplicates
-                new_nodes = set()
-                for nodes in list(connected_subgraph):
+        # Explore nodes for graph
+        print('Checking successor nodes')
+        successors_subgraph = self.explore_nodes(G, direction='successors')
 
-                    if len(connected_subgraph) == 1:
-                        connected_subgraph.update(G.successors(nodes))
-                    else:
-                        next_node = set(G.successors(nodes))
-                        # Check if next_node is already in connect_graph list
-                        if all(not any(node in node_set for node in next_node) for node_set in connected_subgraph):
-                            if len(next_node) > 1:
-                                print(f'Branch Detected at node: {nodes}')
-                                for branch in list(next_node):
-                                    print(f'Exploring branch from node: {branch}')
-                                    new_nodes.add(branch)
-                                    # print(f'Successor of {branch} is: {list(G.successors(branch))}')
-                                    branch_next = set(G.successors(branch))
-                                    new_nodes.update(branch_next)
-                                    while len(branch_next) == 1:
-                                        next_node = next(iter(branch_next))
-                                        branch_next = set(G.successors(next_node))
-                                        # print(branch_next)
-                                        if len(branch_next) >= 2:
-                                            # print(f'New branch detected at {next_node}')
-                                            break
-                                        elif len(branch_next) == 0:
-                                            # print(f'End point reached at {next_node}')
-                                            new_nodes.update(branch_next)
-                                            break
-                                        new_nodes.update(branch_next)
+        print('Checking predecessor nodes')
+        predecessors_subgraph = self.explore_nodes(G, direction='predecessors')
 
-                                current_depth += 1
-                            elif len(next_node) == 1:
-                                new_nodes.update(next_node)
-
-                connected_subgraph.update(new_nodes)
-
-        else:
-            connected_subgraph = nx.descendants(G, self.start).union([self.start])
+        connected_subgraph = successors_subgraph | predecessors_subgraph
 
         # Create a subgraph from the connected nodes
         self.subgraph = G.subgraph(connected_subgraph)
