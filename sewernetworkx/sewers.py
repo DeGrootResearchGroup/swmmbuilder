@@ -13,6 +13,7 @@ from pyswmm import Simulation, Nodes, Subcatchments
 import pkg_resources
 import os
 
+
 class Network:
     """Class used to represent an entire cities sewer network
 
@@ -40,6 +41,7 @@ class Network:
             key = "FlowType"
             condition = Network.full_data[key] != "STM"
             Network.full_data = Network.full_data[condition]
+
     """
     # Needs to be updated
     def filter_data_gisid(self, network_data, ppty):
@@ -77,7 +79,7 @@ class Network:
             float or None
                 The corresponding UpstreamInvert value if found, else None.
             """
-        if  not isinstance(upstream_id, str):
+        if not isinstance(upstream_id, str):
             raise TypeError("Input must be a string")
 
         row = self.full_data[self.full_data['UpstreamID'] == upstream_id]
@@ -85,6 +87,7 @@ class Network:
             return row.iloc[0]['UpstreamInvert']
         else:
             return None  # Handle the case where UpstreamID is not found
+
 
 class SubNetwork(Network):
     """Class used to represent an entire cities sewer network
@@ -127,7 +130,6 @@ class SubNetwork(Network):
                 self.reduced_keys_data.drop(keys, axis=1, inplace=True)
 
         print("Creating Pipes")
-
         for index, pipe in self.reduced_keys_data.iterrows():
             if pipe['UpstreamID'] is not None and pipe['DownstreamID'] is not None:
                 self.network_data[pipe['OBJECTID']] = (pipe['DownstreamID'], pipe['UpstreamID'])
@@ -390,7 +392,6 @@ class SubNetwork(Network):
         with open(pyswmm_file, 'w') as file:
             file.write(modified_content)
 
-
     def write_pyswmm(self, output_file=None,
                      max_depth=0.0, init_depth=0.0, surcharge_depth=0.0, ponding_area=0.0,
                      manning_n = 0.01, inlet_offset = 0.0, outlet_offset = 0.0,
@@ -467,4 +468,4 @@ class SubNetwork(Network):
 
         # Write conduits to pyswmm inp file
         self.write_conduits_pyswmm(output_file_path, manning_n, inlet_offset,
-                                   outlet_offset, init_flow, max_flow, barrels)
+                                   outlet_offset, init_flow, max_flow, barrels)                                   outlet_offset, init_flow, max_flow, barrels)
