@@ -217,6 +217,24 @@ class SubNetwork(Network):
                 # print('Found upstream node')
                 coordinates = row['geometry'].coords[0]
                 pos[upstream_id] = (coordinates[0] * scale, coordinates[1] * scale)
+
+        # Check if each node in network_nodes has a position in pos
+        missing_nodes = set(network_nodes) - set(pos.keys())
+        if missing_nodes:
+            print(f"Warning: Nodes {missing_nodes} do not have positions. "
+                  f"Attempting to find positions for missing nodes.")
+
+            for index, row in self.reduced_keys_data.iterrows():
+                downstream_id = row['DownstreamID']
+
+                if downstream_id in missing_nodes:
+                    coordinates = row['geometry'].coords[1]
+                    pos[downstream_id] = (coordinates[0] * scale, coordinates[1] * scale)
+                    missing_nodes.remove(downstream_id)
+
+        if missing_nodes:
+            print(f"Error: Positions for nodes {missing_nodes} could not be found.")
+
         return pos
 
     def explore_nodes(self, G, direction):
