@@ -132,7 +132,8 @@ class SubNetwork(Network):
         print("Creating Pipes")
         for index, pipe in self.reduced_keys_data.iterrows():
             if pipe['UpstreamID'] is not None and pipe['DownstreamID'] is not None:
-                self.network_data[pipe['OBJECTID']] = (pipe['DownstreamID'], pipe['UpstreamID'])
+                if pipe['UpstreamID'] != 'Abandoned' and pipe['DownstreamID'] != 'Abandoned':
+                    self.network_data[pipe['OBJECTID']] = (pipe['DownstreamID'], pipe['UpstreamID'])
 
     def create_sub_network(self):
         """Create subnetwork based on starting node and depth.
