@@ -59,7 +59,7 @@ class Network:
                 -------
                 str
                     The GIS_ID of the filtered data
-                
+
         if not isinstance(ppty, str):
             raise TypeError("Input must be a string.")
 
