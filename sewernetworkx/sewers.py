@@ -183,6 +183,7 @@ class SubNetwork(Network):
         # Create a subgraph from the connected nodes
         self.subgraph = G.subgraph(connected_subgraph)
         self._colouring()
+        self._coordinates()
 
     def _colouring(self):
 
@@ -196,61 +197,35 @@ class SubNetwork(Network):
             else:
                 self.node_colour.append('blue')
 
-
-    def node_coordinates(self, network_nodes, scale, plant_node=False):
-        """Create subnetwork based on starting node and depth.
-
-        Parameters
-        ----------
-        network_nodes : networkx.DiGraph
-            The original network graph.
-
-        scale : int
-            Scaling factor for node coordinates.
-
-        plant_node : str
-            The starting node for graphing.
-
-        Returns
-        -------
-        subgraph : networkx.DiGraph
-            Graph of the subnetwork.
-
-        node_colour : str
-            Colour of each node in the subgraph.
-        """
-
-        pos = {}
+    def _coordinates(self):
         for index, row in self.reduced_keys_data.iterrows():
             upstream_id = row['UpstreamID']
             downstream_id = row['DownstreamID']
-            if plant_node and upstream_id == self.start:
+            if upstream_id == self.start:
                 # print('Plant node')
                 coordinates = row['geometry'].coords[0]
-                pos[downstream_id] = (coordinates[0] * scale, coordinates[1] * scale)
-            elif upstream_id in network_nodes:
+                self.coords[downstream_id] = (coordinates[0] * self.scale, coordinates[1] * self.scale)
+            elif upstream_id in self.subgraph.nodes():
                 # print('Found upstream node')
                 coordinates = row['geometry'].coords[0]
-                pos[upstream_id] = (coordinates[0] * scale, coordinates[1] * scale)
+                self.coords[upstream_id] = (coordinates[0] * self.scale, coordinates[1] * self.scale)
 
         # Check if each node in network_nodes has a position in pos
-        missing_nodes = set(network_nodes) - set(pos.keys())
+        missing_nodes = set(self.subgraph.nodes()) - set(self.coords.keys())
         if missing_nodes:
-            print(f"Warning: Nodes {missing_nodes} do not have positions. "
-                  f"Attempting to find positions for missing nodes.")
+            print(
+                f"Warning: Nodes {missing_nodes} do not have positions. Attempting to find positions for missing nodes.")
 
             for index, row in self.reduced_keys_data.iterrows():
                 downstream_id = row['DownstreamID']
 
                 if downstream_id in missing_nodes:
                     coordinates = row['geometry'].coords[1]
-                    pos[downstream_id] = (coordinates[0] * scale, coordinates[1] * scale)
+                    self.coords[downstream_id] = (coordinates[0] * self.scale, coordinates[1] * self.scale)
                     missing_nodes.remove(downstream_id)
 
         if missing_nodes:
-            print(f"Error: Positions for nodes {missing_nodes} could not be found.")
-
-        return pos
+            print(f"Error: Positions for nodes {missing_nodes} could not be found.") 
 
     def explore_nodes(self, G, direction):
         connected_subgraph = {self.start}
