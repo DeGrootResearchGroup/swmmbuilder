@@ -146,7 +146,7 @@ class SubNetwork(Network):
                 if pipe['UpstreamID'] != 'Abandoned' and pipe['DownstreamID'] != 'Abandoned':
                     self.network_data[pipe['OBJECTID']] = (pipe['DownstreamID'], pipe['UpstreamID'])
 
-    def create_sub_network(self):
+    def create_sub_network(self, ignore_successors=False, ignore_predecessors=False):
         """Create subnetwork based on starting node and depth.
 
         Returns
@@ -225,7 +225,7 @@ class SubNetwork(Network):
                     missing_nodes.remove(downstream_id)
 
         if missing_nodes:
-            print(f"Error: Positions for nodes {missing_nodes} could not be found.") 
+            print(f"Error: Positions for nodes {missing_nodes} could not be found.")
 
     def explore_nodes(self, G, direction):
         connected_subgraph = {self.start}
@@ -277,7 +277,7 @@ class SubNetwork(Network):
 
         return connected_subgraph
 
-    @staticmethod    
+    @staticmethod
     def explore_branch(branch_nodes, new_nodes, G, direction, opposite_direction):
         for branch in list(branch_nodes):
             print(f'Exploring branch from node: {branch}')
@@ -310,7 +310,7 @@ class SubNetwork(Network):
         return new_nodes
 
     # Probably need to come up with better names for this... as they are used above
-    def trim_subnetwork(self, network_nodes, trim_node, direction, copy = True):
+    def trim_subnetwork(self, network_nodes, trim_nodes, direction, copy=True):
         if direction not in ['successors', 'predecessors']:
             raise ValueError("Invalid direction. Use 'successors' or 'predecessors'.")
 
