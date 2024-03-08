@@ -173,7 +173,12 @@ class SubNetwork(Network):
         print('Checking predecessor nodes')
         predecessors_subgraph = self.explore_nodes(G, direction='predecessors')
 
-        connected_subgraph = successors_subgraph | predecessors_subgraph
+        if ignore_successors:
+            connected_subgraph = predecessors_subgraph
+        elif ignore_predecessors:
+            connected_subgraph = successors_subgraph
+        else:
+            connected_subgraph = successors_subgraph | predecessors_subgraph
 
         # Create a subgraph from the connected nodes
         self.subgraph = G.subgraph(connected_subgraph)
