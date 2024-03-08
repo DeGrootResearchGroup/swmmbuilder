@@ -310,13 +310,28 @@ class SubNetwork(Network):
         return new_nodes
 
     # Probably need to come up with better names for this... as they are used above
-    def trim_subnetwork(self, network_nodes, trim_node):
-        trimmed_graph = network_nodes.copy()
-        for trimming in set(trim_node):
-            successor_nodes_to_remove = list(trimmed_graph.successors(trimming))
-            trimmed_graph.remove_nodes_from(successor_nodes_to_remove)
+    def trim_subnetwork(self, network_nodes, trim_node, direction, copy = True):
+        if direction not in ['successors', 'predecessors']:
+            raise ValueError("Invalid direction. Use 'successors' or 'predecessors'.")
 
-        return trimmed_graph
+        if len(trim_nodes) == 0:
+            raise ValueError("No nodes listed to trim. At least 1 node needs to be provided.")
+
+        if copy:
+            trimmed_graph = self.subgraph.copy()
+            for nodes in trim_nodes:
+                remove_nodes = set(getattr(trimmed_graph, direction)(nodes))
+                remove_nodes.update(trim_nodes)
+                trimmed_graph.remove_nodes_from(remove_nodes)
+            return trimmed_graph
+        else:
+            for nodes in trim_nodes:
+                remove_nodes = set(getattr(self.subgraph, direction)(nodes))
+                remove_nodes.update(trim_nodes)
+                self.subgraph.remove_nodes_from(remove_nodes)
+
+    def extend_network(self):
+        return self.subgraph
 
     def write_nodes_pyswmm(self, pyswmm_file, max_depth, init_depth, surcharge_depth, ponding_area):
         """ Add subnetwork data into the Nodes section of a .inp file.
