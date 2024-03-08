@@ -386,7 +386,7 @@ class SubNetwork(Network):
 
         output_file_path : str
             Path to the write out PySWMM input file (.inp).
-        
+
         manning_n : float
             Manning N coefficient for conduit (default is 0.01).
 
