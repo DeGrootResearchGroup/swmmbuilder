@@ -134,7 +134,7 @@ class SubNetwork(Network):
                           "Relief", "LastEditDate", "Abandoned", "Grouted", "CCTVInspectionDate",
                           "ShapeSTLength"]
 
-        self.reduced_keys_data = full_network.full_data.copy()
+        self.reduced_keys_data = subnetwork_data['network_data'].full_data.copy()
 
         for keys in keys_to_remove:
             if keys in self.reduced_keys_data.columns:
