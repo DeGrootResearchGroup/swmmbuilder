@@ -104,17 +104,28 @@ class SubNetwork(Network):
                 Path to GeoJSON file.
             """
 
-    def __init__(self, full_network, start_node, outfall_node, outfall_node_type='FREE', depth=None, file_path=None):
-        """Class initialization"""
-
+    def __init__(self, subnetwork_data, file_path=None):
         if file_path:
             super().__init__(file_path)
+
+        required_keys = ['network_data', 'starting_node', 'outfall_node', 'outfall_node_type', 'depth', 'scale']
+        # Ensure all keys are being specified
+        missing_keys = [key for key in required_keys if key not in subnetwork_data]
+        if missing_keys:
+            raise ValueError(f"Missing the following keys: {', '.join(missing_keys)}")
+
         self.network_data = {}
-        self.start = start_node
-        self.depth = depth
+        self.start = subnetwork_data['starting_node']
+        self.depth = subnetwork_data['depth']
+        self.outfall_node = subnetwork_data['outfall_node']
+        self.outfall_node_type = subnetwork_data['outfall_node_type']
+        self.scale = subnetwork_data['scale']
         self.subgraph = nx.DiGraph()
-        self.outfall_node = outfall_node
-        self.outfall_node_type = outfall_node_type
+        self.node_colour = []
+        self.coords = {}
+
+        if len(self.outfall_node) != len(self.outfall_node_type):
+            raise ValueError(f'Length of {self.outfall_node} and {self.outfall_node_type} are not the same.')
 
         print("Removing Unnecessary Entries")
         keys_to_remove = ["GIS_ID", "GIS_FeatureKey", "FlowType", "StreetName", "Location",
