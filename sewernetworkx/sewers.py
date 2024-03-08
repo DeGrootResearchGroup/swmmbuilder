@@ -277,7 +277,8 @@ class SubNetwork(Network):
 
         return connected_subgraph
 
-    def explore_branch(self, branch_nodes, new_nodes, G, direction, opposite_direction):
+    @staticmethod    
+    def explore_branch(branch_nodes, new_nodes, G, direction, opposite_direction):
         for branch in list(branch_nodes):
             print(f'Exploring branch from node: {branch}')
             new_nodes.add(branch)
