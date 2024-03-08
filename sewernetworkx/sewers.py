@@ -182,21 +182,20 @@ class SubNetwork(Network):
 
         # Create a subgraph from the connected nodes
         self.subgraph = G.subgraph(connected_subgraph)
+        self._colouring()
 
-        # Add colouring
-        node_colour = []
+    def _colouring(self):
 
         for node in self.subgraph.nodes:
-            if node == self.start:
-                node_colour.append('green')
+            if node == self.start or node == self.outfall_node:
+                self.node_colour.append('green')
             elif len(list(self.subgraph.successors(node))) > 1:
-                node_colour.append('red')
+                self.node_colour.append('red')
             elif len(list(self.subgraph.successors(node))) == 0:
-                node_colour.append('orange')
+                self.node_colour.append('orange')
             else:
-                node_colour.append('blue')
+                self.node_colour.append('blue')
 
-        return self.subgraph, node_colour
 
     def node_coordinates(self, network_nodes, scale, plant_node=False):
         """Create subnetwork based on starting node and depth.
