@@ -325,6 +325,30 @@ class SubNetwork(Network):
 
     @staticmethod
     def explore_branch(branch_nodes, new_nodes, G, direction, opposite_direction):
+        """ Exploring branches found in explore_nodes function
+
+        Parameters
+        ----------
+        branch_nodes : set
+            nodes where a branch is found
+
+        new_nodes : set
+            nodes that will be added to subnetwork
+
+        G : networkx.digraph(),
+            data from Network class
+
+        direction : str
+            specifying successor or predecessor
+
+        opposite_direction : str
+            value opposite to direction
+
+        Return
+        ----------
+        new_nodes : set
+            nodes to be added to the subnetwork from branches
+        """
         for branch in list(branch_nodes):
             print(f'Exploring branch from node: {branch}')
             new_nodes.add(branch)
