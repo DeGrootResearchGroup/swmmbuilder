@@ -379,31 +379,96 @@ class SubNetwork(Network):
                     new_nodes.update(branch_next)
         return new_nodes
 
-    # Probably need to come up with better names for this... as they are used above
-    def trim_subnetwork(self, network_nodes, trim_nodes, direction, copy=True):
-        if direction not in ['successors', 'predecessors']:
-            raise ValueError("Invalid direction. Use 'successors' or 'predecessors'.")
+    def manipulate_network(self, operation, direction, start_nodes, copy=False):
+        """ Manipulate graph based on specified operation
 
-        if len(trim_nodes) == 0:
+        Parameters
+        ----------
+        operation : str
+            operation to perform.
+            options: trim, extend
+
+        direction : str
+            direction to trim or extend.
+
+        start_nodes: list
+            node(s) to start trimming or extending direction.
+
+        copy : bool, optional
+            manipulate existing graph or return a new one.
+
+        Returns
+        ----------
+        nx.Digraph
+        """
+
+        G = self._initialize_digraph()
+
+        if len(start_nodes) == 0:
             raise ValueError("No nodes listed to trim. At least 1 node needs to be provided.")
 
-        if copy:
-            trimmed_graph = self.subgraph.copy()
-            for nodes in trim_nodes:
-                remove_nodes = set(getattr(trimmed_graph, direction)(nodes))
-                remove_nodes.update(trim_nodes)
-                trimmed_graph.remove_nodes_from(remove_nodes)
-            return trimmed_graph
+        self.validate_direction(direction)
+
+        #if tuple(str(start_nodes)) not in self.subgraph.nodes():
+        #    print(f"Node {start_nodes} is not in the current graph. Exiting manipulate_subnetwork.")
+        #    return
+
+        if operation == 'trim':
+
+            if copy:
+                trimmed_graph = self.subgraph.copy()
+                for nodes in start_nodes:
+                    remove_nodes = set(getattr(trimmed_graph, direction)(nodes))
+                    remove_nodes.update(start_nodes)
+                    trimmed_graph.remove_nodes_from(remove_nodes)
+                return trimmed_graph
+            else:
+                self.subgraph = nx.DiGraph(self.subgraph)
+                remove_nodes = set()
+                for nodes in start_nodes:
+                    remove_nodes = set(getattr(self.subgraph, direction)(nodes))
+                    remove_nodes.update(start_nodes)
+                    self.subgraph.remove_nodes_from(remove_nodes)
+
+        elif operation == 'extend':
+
+            if copy:
+                extended_graph = self.subgraph.copy()
+                for nodes in start_nodes:
+                    add_nodes = set(getattr(G, direction)(nodes))
+                    add_nodes.update(start_nodes)
+                    extended_graph.update(add_nodes)
+                return extended_graph
+            else:
+                self.subgraph = nx.DiGraph(self.subgraph)
+                for nodes in start_nodes:
+                    neighbour = getattr(G, direction)(nodes)
+                    add_nodes = set(neighbour)
+                    add_nodes.update(start_nodes)
+                    print(add_nodes)
+                    self.subgraph.add_nodes_from(add_nodes)
         else:
-            for nodes in trim_nodes:
-                remove_nodes = set(getattr(self.subgraph, direction)(nodes))
-                remove_nodes.update(trim_nodes)
-                self.subgraph.remove_nodes_from(remove_nodes)
+            raise ValueError("Invalid operation specified. Must be: extend or trim")
 
-    def extend_network(self):
-        return self.subgraph
+        # Add the ability to trim / extend branches now
 
-    def write_nodes_pyswmm(self, pyswmm_file, max_depth, init_depth, surcharge_depth, ponding_area):
+    @staticmethod
+    def validate_direction(direction):
+        """Validate the direction parameter.
+
+        Parameters:
+        ----------
+        direction : str
+            The direction parameter to be validated.
+
+        Raises
+        ----------
+        ValueError
+            If the direction is not 'successors' or 'predecessors'.
+        """
+
+        if direction not in ['successors', 'predecessors']:
+            raise ValueError("Invalid direction. Use 'successors' or 'predecessors'.")
         """ Add subnetwork data into the Nodes section of a .inp file.
 
         Parameters
