@@ -260,6 +260,20 @@ class SubNetwork(Network):
             print(f"Error: Positions for nodes {missing_nodes} could not be found.")
 
     def explore_nodes(self, G, direction):
+        """ Generate sewer network based on supplied direction
+
+        Parameters
+        ----------
+        G : networkx.digraph(),
+            data from Network class
+
+        direction : str
+            specifying successor or predecessor
+
+        Return
+        ----------
+        None
+        """
         connected_subgraph = {self.start}
         current_depth = 0
         opposite_direction = 'successors' if direction == 'predecessors' else 'predecessors'
