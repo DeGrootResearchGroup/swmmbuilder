@@ -157,17 +157,16 @@ class SubNetwork(Network):
                     self.network_data[pipe['OBJECTID']] = (pipe['DownstreamID'], pipe['UpstreamID'])
 
     def create_sub_network(self, ignore_successors=False, ignore_predecessors=False):
-        """Create subnetwork based on starting node and depth.
+        """Create subnetwork, generate node colouring, and generate node locations.
 
         Returns
         ----------
-        subgraph : networkx.DiGraph
-            Graph of the subnetwork
+        ignore_successors : bool
+            ignore successor branch from starting node
 
-        node_colour : str
-            Colour of each node if subgraph
+        ignore_predecessors : bool
+            ignore predecessors from starting node
         """
-
         print("Creating subnetwork for plotting")
 
         # Initialize Networkx graph
