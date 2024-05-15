@@ -169,11 +169,7 @@ class SubNetwork(Network):
         """
         print("Creating subnetwork for plotting")
 
-        # Initialize Networkx graph
-        G = nx.DiGraph()
-
-        # Add edges from network_data
-        G.add_edges_from(self.network_data.values())
+        G = self._initialize_digraph()
 
         # Explore nodes for graph
         print('Checking successor nodes')
@@ -194,7 +190,15 @@ class SubNetwork(Network):
         self._colouring()
         self._coordinates()
 
-    def _colouring(self):
+    def _initialize_digraph(self):
+        # Initialize Networkx graph
+        G = nx.DiGraph()
+
+        # Add edges from network_data
+        G.add_edges_from(self.network_data.values())
+
+        return G
+
 
         for node in self.subgraph.nodes:
             if node == self.start or node == self.outfall_node:
