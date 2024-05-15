@@ -533,7 +533,7 @@ class SubNetwork(Network):
         Parameters
         ----------
 
-        output_file_path : str
+        pyswmm_file : str
             Path to the write out PySWMM input file (.inp).
 
         manning_n : float
@@ -566,44 +566,31 @@ class SubNetwork(Network):
         for edges in self.subgraph.edges:
             start_node, end_node = edges
 
-            # Find the corresponding conduit in the GeoPandas DataFrame
-            # note that given the order of the nx.digraph, it can be either upstream or downstream node
-            geo_pipe_up = self.full_data[self.full_data['UpstreamID'] == start_node]
-            geo_pipe_down = self.full_data[self.full_data['DownstreamID'] == start_node]
+            for index, row in self.full_data.iterrows():
+                if row["UpstreamID"] == end_node and row["DownstreamID"] == start_node:
+                    print('Found pair')
 
-            if geo_pipe_up.iloc[0]["DownstreamID"] == end_node:
+                    name = row["OBJECTID"]
+                    inlet = row["UpstreamID"]
+                    outlet = row['DownstreamID']
+                    length = row["Length"]
 
-                name = geo_pipe_up.iloc[0]["OBJECTID"]
-                outlet = geo_pipe_up.iloc[0]["DownstreamID"]
-                length = geo_pipe_up.iloc[0]["Length"]
+                    if row["PipeShape"] == 'R':
+                        shape = 'RECT_CLOSED'
+                        height = row["Height"] / 1000
+                        width = row["Width"] / 1000
+                    elif row["PipeShape"] == 'Round':
+                        shape = 'CIRCULAR'
+                        height = row["Height"] / 1000
+                        width = '0.0'
 
-                conduits_content += (f"{name:<16} {start_node:<16} {outlet:<16}"
-                                     f"{length:<11} {manning_n:<11} "
-                                     f"{inlet_offset:<11} {outlet_offset:<11} "
-                                     f"{init_flow:<11} {max_flow:<11}\n")
+                    conduits_content += (f"{name:<16} {inlet:<16} {outlet:<16}"
+                                         f"{length:<11} {manning_n:<11} "
+                                         f"{inlet_offset:<11} {outlet_offset:<11}"
+                                         f"{init_flow:<11} {max_flow:<11}\n")
 
-            elif geo_pipe_down.iloc[0]["UpstreamID"] == end_node:
-
-                name = geo_pipe_down.iloc[0]["OBJECTID"]
-                inlet = geo_pipe_down.iloc[0]["UpstreamID"]
-                length = geo_pipe_down.iloc[0]["Length"]
-
-                if geo_pipe_down.iloc[0]["PipeShape"] == 'R':
-                    shape = 'RECT_CLOSED'
-                    height = geo_pipe_down.iloc[0]["Height"] / 1000
-                    width = geo_pipe_down.iloc[0]["Width"] / 1000
-                elif geo_pipe_down.iloc[0]["PipeShape"] == 'Round':
-                    shape = 'CIRCULAR'
-                    height = geo_pipe_down.iloc[0]["Height"] / 1000
-                    width = '0.0'
-
-                conduits_content += (f"{name:<16} {inlet:<16} {start_node:<16}"
-                                     f"{length:<11} {manning_n:<11} "
-                                     f"{inlet_offset:<11} {outlet_offset:<11}"
-                                     f"{init_flow:<11} {max_flow:<11}\n")
-
-                xsection_content += (f"{name:<16} {shape:<16} {height:<16}"
-                                     f"{width:<11} {0.0:<11} {0.0:<11} {barrels:<11}\n")
+                    xsection_content += (f"{name:<16} {shape:<16} {height:<16}"
+                                         f"{width:<11} {0.0:<11} {0.0:<11} {barrels:<11}\n")
 
         # Replace variable in template file with conduit information
         modified_content = content.replace('{conduits}', conduits_content).replace('{xsections}', xsection_content)
