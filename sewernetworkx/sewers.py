@@ -469,12 +469,14 @@ class SubNetwork(Network):
 
         if direction not in ['successors', 'predecessors']:
             raise ValueError("Invalid direction. Use 'successors' or 'predecessors'.")
+
+    def write_nodes_pyswmm(self, pyswmm_file, max_depth, init_depth, surcharge_depth,
+                           ponding_area, height_correction):
         """ Add subnetwork data into the Nodes section of a .inp file.
 
         Parameters
         ----------
-
-        output_file_path : str
+        pyswmm_file : str
             Path to the write out PySWMM input file (.inp).
 
         max_depth : float)
@@ -489,6 +491,9 @@ class SubNetwork(Network):
         ponding_area : float
             Ponding area for node (default is 0.0).
 
+        height_correction : dict
+            User defined height correction in the case that the inv. elev. is not correct in geojson file.
+
         """
 
         with open(pyswmm_file, 'r') as file:
@@ -498,13 +503,21 @@ class SubNetwork(Network):
         outfall_content = ""
         # Iterate through the nodes in the graph and build the content
         for node in self.subgraph.nodes:
-            if node in self.outfall_node:
-                upstream_invert = self.get_upstream_invert(node)
-                outfall_content += f"{node:<16} {upstream_invert:<11}  {self.outfall_node_type:<28} {'NO':<10}\n"
-            else:
-                upstream_invert = self.get_upstream_invert(node)
+            if height_correction is not None and node in height_correction:
+                upstream_invert = height_correction[node]
                 nodes_content += (f"{node:<16} {upstream_invert:<11} {max_depth:<11} {init_depth:<11}"
                                   f"{surcharge_depth:<11} {ponding_area:<11}\n")
+                print(f"Node {node}: Updating upstream_invert value to: {upstream_invert}")
+            else:
+                if node in self.outfall_node:
+                    for idx, outfall_node in enumerate(self.outfall_node):
+                        upstream_invert = self.get_upstream_invert(outfall_node)
+                        outfall_node_type = self.outfall_node_type[idx]
+                        outfall_content += f"{node:<16} {upstream_invert:<11}  {outfall_node_type:<28} {'NO':<10}\n"
+                else:
+                    upstream_invert = self.get_upstream_invert(node)
+                    nodes_content += (f"{node:<16} {upstream_invert:<11} {max_depth:<11} {init_depth:<11}"
+                                      f"{surcharge_depth:<11} {ponding_area:<11}\n")
 
         # Replace {nodes} placeholder with the built nodes content
         modified_content = content.replace('{nodes}', nodes_content).replace('{outfalls}', outfall_content)
@@ -512,6 +525,7 @@ class SubNetwork(Network):
         # Write the modified content back to the file
         with open(pyswmm_file, 'w') as file:
             file.write(modified_content)
+
 
     def write_conduits_pyswmm(self, pyswmm_file, manning_n, inlet_offset, outlet_offset, init_flow, max_flow, barrels):
         """Add subnetwork data into the Conduits and XSection section of a .inp file.
