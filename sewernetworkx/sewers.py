@@ -171,10 +171,11 @@ class SubNetwork(Network):
 
         G = self._initialize_digraph()
 
-        # Explore nodes for graph
+        # Generate subnetwork starting with successors of starting node
         print('Checking successor nodes')
         successors_subgraph = self.explore_nodes(G, direction='successors')
 
+        # Generate subnetwork with predecessors of starting node
         print('Checking predecessor nodes')
         predecessors_subgraph = self.explore_nodes(G, direction='predecessors')
 
