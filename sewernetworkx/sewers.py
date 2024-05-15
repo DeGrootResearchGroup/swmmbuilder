@@ -97,17 +97,22 @@ class Network:
 class SubNetwork(Network):
     """Class used to represent an entire cities sewer network
 
-            Parameters
-            ----------
-            node : str
-                Starting node of the subnetwork.
+        Parameters
+        ----------
+        subnetwork_data : dict
+            dict containing all required information to generate subnetwork.
+            Required entries:
 
+            network_data : geoDataFrame
+            starting_node : str
+            outfall_node : list, str
+            outfall_node_type : list, str
             depth : int
-                Number of branches to be contained within subnetwork.
+            scale : int
 
-            file_path : str, Path
-                Path to GeoJSON file.
-            """
+        file_path : str, Path
+            Path to GeoJSON file.
+        """
 
     def __init__(self, subnetwork_data, file_path=None):
         if file_path:
