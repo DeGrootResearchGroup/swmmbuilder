@@ -82,11 +82,16 @@ class Network:
         if not isinstance(upstream_id, str):
             raise TypeError("Input must be a string")
 
+        # row = self.full_data[self.full_data['UpstreamID'] == upstream_id]
         row = self.full_data[self.full_data['UpstreamID'] == upstream_id]
         if not row.empty:
             return row.iloc[0]['UpstreamInvert']
         else:
-            return None  # Handle the case where UpstreamID is not found
+            row = self.full_data[self.full_data['DownstreamID'] == upstream_id]
+            if not row.empty:
+                return row.iloc[0]['DownstreamInvert']
+            else:
+                raise TypeError('Cant find either upstreaminvert of downstreaminvert')
 
 
 class SubNetwork(Network):
