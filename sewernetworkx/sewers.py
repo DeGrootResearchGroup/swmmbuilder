@@ -188,8 +188,6 @@ class SubNetwork(Network):
 
         # Create a subgraph from the connected nodes
         self.subgraph = G.subgraph(connected_subgraph)
-        self._colouring()
-        self._coordinates()
 
     def _initialize_digraph(self):
         # Initialize Networkx graph
@@ -200,6 +198,16 @@ class SubNetwork(Network):
 
         return G
 
+    def add_colouring(self):
+        """ Apply colouring for subnetwork nodes.
+
+        Note: This method is intended for internal use and should not be called directly
+        by external code.
+
+        Returns
+        ----------
+        None
+        """
 
         for node in self.subgraph.nodes:
             if node == self.start or node == self.outfall_node:
@@ -211,7 +219,17 @@ class SubNetwork(Network):
             else:
                 self.node_colour.append('blue')
 
-    def _coordinates(self):
+    def add_coordinates(self):
+        """ Apply node coordinates for subnetwork nodes.
+
+        Note: This method is intended for internal use and should not be called directly
+        by external code.
+
+        Returns
+        ----------
+        None
+        """
+
         for index, row in self.reduced_keys_data.iterrows():
             upstream_id = row['UpstreamID']
             downstream_id = row['DownstreamID']
