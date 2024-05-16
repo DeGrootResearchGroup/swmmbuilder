@@ -12,6 +12,7 @@ import shutil
 from pyswmm import Simulation, Nodes, Subcatchments
 import pkg_resources
 import os
+import gmplot
 
 
 class Network:
@@ -678,3 +679,41 @@ class SubNetwork(Network):
         # Write conduits to pyswmm inp file
         self.write_conduits_pyswmm(output_file_path, manning_n, inlet_offset,
                                    outlet_offset, init_flow, max_flow, barrels)
+
+    def generate_gmap(self, file_name, scale=1, origin=None):
+        """ Generate an hmtl file to show the sewer network overlaid on Google Maps.
+
+        Parameters
+        ----------
+        file_name : str
+            Name of the html file
+
+        scale : int
+            Value to scale coordinate data by. Default value is 1.
+
+        origin : list
+            Location of centre for the overlaid map.
+        """
+
+        if origin is not None:
+            gmap = gmplot.GoogleMapPlotter(origin[0], origin[1], zoom=18)
+        else:
+            if not self.coords:
+                raise ValueError("Coordinates have not been generated for this graph. "
+                                 "You must run the function '.add_coordinates' prior to "
+                                 "running 'generate.gmap'.")
+
+            node, coords = list(self.coords.items())[0]
+            gmap = gmplot.GoogleMapPlotter(coords[1] / scale, coords[0] / scale, zoom=18)
+
+        for node, coords in self.coords.items():
+            gmap.marker(coords[1] / 10, coords[0] / 10, 'cornflowerblue', label=str(node))
+
+        for edge in self.subgraph.edges():
+            start_node_pos = self.coords[edge[0]]
+            end_node_pos = self.coords[edge[1]]
+            gmap.plot([start_node_pos[1] / 10, end_node_pos[1] / 10],
+                      [start_node_pos[0] / 10, end_node_pos[0] / 10],
+                      'red', edge_width=2)
+
+        gmap.draw(file_name)
