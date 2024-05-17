@@ -695,6 +695,8 @@ class SubNetwork(Network):
             Location of centre for the overlaid map.
         """
 
+        self.validate_file_extension(file_name, '.html')
+
         if origin is not None:
             gmap = gmplot.GoogleMapPlotter(origin[0], origin[1], zoom=18)
         else:
@@ -717,3 +719,10 @@ class SubNetwork(Network):
                       'red', edge_width=2)
 
         gmap.draw(file_name)
+
+    @staticmethod
+    def validate_file_extension(file_name, expected_extension):
+        _, file_extension = os.path.splitext(file_name)
+
+        if file_extension != expected_extension:
+            raise ValueError(f'Wrong file extension used. The proper extension is: {expected_extension}.')
