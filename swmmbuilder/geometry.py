@@ -1,8 +1,6 @@
 """Helpers for pipe geometries."""
 
-import geopandas as gpd
 import pandas as pd
-from shapely import Point
 
 
 def line_coords(geometry):
@@ -32,18 +30,13 @@ def node_positions(data, nodes):
     return {**downstream_ends, **upstream_ends}
 
 
-def to_geodataframe(pipes, positions, kind="pipes", values=None):
-    """GeoDataFrame of ``pipes`` (kind 'pipes') or of the nodes at ``positions`` (kind 'nodes'),
+def to_geodataframe(pipes, nodes, kind="pipes", values=None):
+    """``pipes`` indexed by pipe_id (kind 'pipes') or the ``nodes`` table (kind 'nodes'),
     optionally joined with ``values``; see :meth:`swmmbuilder.Network.to_geodataframe`."""
     if kind == "pipes":
         data = pipes.set_index("pipe_id")
     elif kind == "nodes":
-        ids = sorted(positions)
-        data = gpd.GeoDataFrame(
-            {"geometry": [Point(positions[n]) for n in ids]},
-            index=pd.Index(ids, name="node_id"),
-            crs=pipes.crs,
-        )
+        data = nodes
     else:
         raise ValueError(f"kind must be 'pipes' or 'nodes', not {kind!r}.")
     if values is None:

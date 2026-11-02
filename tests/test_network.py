@@ -29,13 +29,17 @@ def test_networks_are_independent():
 
 def test_flagged_abandoned_pipes_not_in_graph(network):
     assert "X1" not in network.graph
-    assert network.removed == {"flow_type": {"storm": 1}, "abandoned": 1}
+    assert network.removed == {
+        "flow_type": {"storm": 1},
+        "status": {"abandoned": 1},
+        "structure_type": {},
+    }
 
 
 def test_keep_abandoned():
     network = Network(str(FIXTURE), keep_abandoned=True)
     assert network.graph.has_edge("X1", "A2")
-    assert network.removed["abandoned"] == 0
+    assert network.removed["status"] == {}
 
 
 def test_flow_types_none_keeps_every_pipe():

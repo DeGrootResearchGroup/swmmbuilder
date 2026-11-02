@@ -1,0 +1,195 @@
+{
+ "type": "FeatureCollection",
+ "crs": {
+  "type": "name",
+  "properties": {
+   "name": "urn:ogc:def:crs:EPSG::32617"
+  }
+ },
+ "features": [
+  {
+   "type": "Feature",
+   "properties": {
+    "GIS_FeatureKey": "M1",
+    "LidElevation": 252.0,
+    "Depth": null,
+    "DropStructures": 0,
+    "Overflow": "N",
+    "Weir": "N",
+    "PipesIn": null,
+    "PipesOut": null,
+    "Location": "Road",
+    "Verified": "Y",
+    "FlowMonitor": 0
+   },
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     480000.0,
+     4760100.0
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "GIS_FeatureKey": "M2",
+    "LidElevation": null,
+    "Depth": 3.0,
+    "DropStructures": 0,
+    "Overflow": "N",
+    "Weir": "N",
+    "PipesIn": null,
+    "PipesOut": null,
+    "Location": "Road",
+    "Verified": "Y",
+    "FlowMonitor": 0
+   },
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     480050.0,
+     4760100.0
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "GIS_FeatureKey": "M3",
+    "LidElevation": 12.0,
+    "Depth": null,
+    "DropStructures": 0,
+    "Overflow": "N",
+    "Weir": "N",
+    "PipesIn": null,
+    "PipesOut": null,
+    "Location": "Road",
+    "Verified": "Y",
+    "FlowMonitor": 0
+   },
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     480150.0,
+     4760100.0
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "GIS_FeatureKey": "M4",
+    "LidElevation": 251.0,
+    "Depth": null,
+    "DropStructures": 0,
+    "Overflow": "N",
+    "Weir": "N",
+    "PipesIn": 3,
+    "PipesOut": 2,
+    "Location": "Road",
+    "Verified": "Y",
+    "FlowMonitor": 1
+   },
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     480200.0,
+     4760100.0
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "GIS_FeatureKey": "M5",
+    "LidElevation": 252.0,
+    "Depth": null,
+    "DropStructures": 0,
+    "Overflow": "N",
+    "Weir": "N",
+    "PipesIn": null,
+    "PipesOut": null,
+    "Location": "Road",
+    "Verified": "Y",
+    "FlowMonitor": 0
+   },
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     480050.0,
+     4760050.0
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "GIS_FeatureKey": "M7",
+    "LidElevation": 252.0,
+    "Depth": null,
+    "DropStructures": 0,
+    "Overflow": "N",
+    "Weir": "N",
+    "PipesIn": null,
+    "PipesOut": null,
+    "Location": "Road",
+    "Verified": "Y",
+    "FlowMonitor": 0
+   },
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     480350.0,
+     4760050.0
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "GIS_FeatureKey": "M8",
+    "LidElevation": 250.0,
+    "Depth": null,
+    "DropStructures": 0,
+    "Overflow": "N",
+    "Weir": "N",
+    "PipesIn": null,
+    "PipesOut": null,
+    "Location": "Road",
+    "Verified": "Y",
+    "FlowMonitor": 0
+   },
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     480100.0,
+     4760200.0
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "GIS_FeatureKey": "DUP1",
+    "LidElevation": 250.0,
+    "Depth": null,
+    "DropStructures": 0,
+    "Overflow": "N",
+    "Weir": "N",
+    "PipesIn": null,
+    "PipesOut": null,
+    "Location": "Road",
+    "Verified": "Y",
+    "FlowMonitor": 0
+   },
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     480150.0,
+     4760200.0
+    ]
+   }
+  }
+ ]
+}
