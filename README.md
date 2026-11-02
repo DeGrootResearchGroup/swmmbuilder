@@ -15,11 +15,39 @@ sub.validate(outfalls=["OUT"])                      # TopologyReport: splits, cy
 sub.to_inp("model.inp", outfalls=["OUT"])           # or {"OUT": "FIXED"} for other types
 model = swmm.build_model(sub, ["OUT"], manning_n_by_material={"PVC": 0.011})  # without a file
 sub.to_node_list("nodes.txt")                       # Subnetwork.from_node_list(net, "nodes.txt")
-maps.generate_gmap(sub, "map.html")                 # reprojected to WGS 84 for the map
+maps.to_leaflet(sub, "map.html")                    # interactive map; see Maps below
 ```
 
 A `Subnetwork`'s `graph` is a `networkx.MultiDiGraph` in the direction of flow, with one edge per
 pipe keyed by pipe ID, so parallel pipes are kept.
+
+## Maps
+
+`sewernetworkx.maps` draws values computed elsewhere (concentrations, flows, each upstream
+area's share of a pipe's load, ...) on the network: pandas Series or DataFrames indexed by pipe
+ID, node ID or group name. Static plots use matplotlib and draw in a metric CRS (the network's
+CRS if projected, else its UTM zone; see `maps.plot_crs`), so ribbon widths are in metres.
+
+```python
+import matplotlib.pyplot as plt
+
+fig, ax = plt.subplots()
+zones = maps.node_group_polygons(sub, {"north": ["A1", "A2"], "south": ["B1", "B2"]})
+maps.plot_groups(ax, zones, zone_values, hatch_groups=[["north", "south"]])
+maps.plot_pipes(ax, sub, concentration, norm="log", width=flow)   # missing values in grey
+maps.plot_ribbons(ax, sub, shares, width=10, top_k=4)             # pipes x areas, rows sum to 1
+maps.plot_markers(ax, sub, ["A1", "OUT"])
+maps.add_basemap(ax, sub)                       # web tiles; or layer="roads.gpkg" for offline
+
+maps.to_leaflet(sub, "map.html", [maps.PipeLayer(concentration, name="Concentration"),
+                                  maps.GroupLayer(zones), maps.MarkerLayer(["OUT"])])
+maps.to_geojson(sub, "pipes.geojson", values=concentration)
+sub.to_geodataframe("pipes", values=concentration)  # or "nodes"; also on Network
+```
+
+Web-tile basemaps and `to_leaflet` need the optional `maps` extra
+(`pip install "SewerNetworkx[maps]"`: contextily, xyzservices, folium). `generate_gmap`
+(Google Maps) is deprecated in favour of `to_leaflet`.
 
 ## Logging
 

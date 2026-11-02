@@ -8,6 +8,7 @@ import geopandas as gpd
 import networkx as nx
 import pandas as pd
 
+from .geometry import node_positions, to_geodataframe
 from .schema import LONDON_ON, as_schema
 from .subnetwork import Subnetwork
 
@@ -171,6 +172,27 @@ class Network:
                 selected.update(nx.dijkstra_path(self.graph, node, o, weight=self._pipe_length))
 
         return self.subnetwork(selected)
+
+    def node_positions(self, nodes=None):
+        """Unscaled (x, y) position of each node (default: every node of the graph), from the
+        pipe geometry; see :meth:`Subnetwork.node_positions`."""
+        return node_positions(self.full_data, self.graph.nodes if nodes is None else nodes)
+
+    def to_geodataframe(self, kind="pipes", values=None):
+        """The pipes or nodes as a GeoDataFrame, in the network's CRS, for plotting or export.
+
+        Parameters
+        ----------
+        kind : {'pipes', 'nodes'}
+            'pipes': the rows of ``full_data`` (geometry and canonical columns), indexed by
+            ``pipe_id``. 'nodes': a point per node (see :meth:`node_positions`), indexed by
+            ``node_id``.
+
+        values : pandas.Series, pandas.DataFrame or dict, optional
+            Values indexed by pipe or node ID, left-joined as extra columns (a Series by its
+            name, or 'value' if it has none). Pipes or nodes with no value get NaN.
+        """
+        return to_geodataframe(self.full_data, self.node_positions(), kind, values)
 
     def _check_nodes(self, nodes):
         missing = sorted(n for n in nodes if n not in self.graph)

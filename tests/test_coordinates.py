@@ -76,7 +76,8 @@ def test_generate_gmap(network, tmp_path, monkeypatch):
 
     monkeypatch.setattr(maps.gmplot, "GoogleMapPlotter", FakePlotter)
     sub = subnetwork(network, DENDRITIC)
-    maps.generate_gmap(sub, str(tmp_path / "map.html"))
+    with pytest.warns(DeprecationWarning, match="to_leaflet"):
+        maps.generate_gmap(sub, str(tmp_path / "map.html"))
     for node, (lat, lng) in calls["markers"].items():
         assert (lng, lat) == pytest.approx(NODES[node]), node
     first = next(iter(sub.node_positions()))

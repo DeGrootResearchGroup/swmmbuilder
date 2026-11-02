@@ -7,7 +7,7 @@ from pathlib import Path
 import networkx as nx
 
 from . import swmm
-from .geometry import line_coords
+from .geometry import node_positions, to_geodataframe
 
 
 @dataclass
@@ -119,17 +119,12 @@ class Subnetwork:
         A node is placed at the upstream end of a pipe of the network leaving it or, if no pipe
         leaves it, at the downstream end of a pipe entering it. Nodes with no pipe are left out.
         """
-        nodes = set(self.nodes if nodes is None else nodes)
-        upstream_ends, downstream_ends = {}, {}
-        data = self.network.full_data
-        for upstream_id, downstream_id, geometry in zip(
-            data["from_node"], data["to_node"], data["geometry"], strict=True
-        ):
-            if upstream_id in nodes and upstream_id not in upstream_ends:
-                upstream_ends[upstream_id] = line_coords(geometry)[0]
-            if downstream_id in nodes and downstream_id not in downstream_ends:
-                downstream_ends[downstream_id] = line_coords(geometry)[-1]
-        return {**downstream_ends, **upstream_ends}
+        return node_positions(self.network.full_data, self.nodes if nodes is None else nodes)
+
+    def to_geodataframe(self, kind="pipes", values=None):
+        """The subnetwork's pipes or nodes as a GeoDataFrame; see
+        :meth:`Network.to_geodataframe`."""
+        return to_geodataframe(self.pipes(), self.node_positions(), kind, values)
 
     def validate(self, outfalls=()):
         """Check the topology before the subnetwork is written to an .inp file.
