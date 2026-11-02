@@ -74,6 +74,56 @@ def line_coords(geometry):
     return [(c[0], c[1]) for part in parts for c in part.coords]
 
 
+# GIS PipeShape code -> SWMM cross-section. In the London GIS, 'R' means round; rectangular
+# pipes are 'REC'.
+PIPE_SHAPES = {
+    "R": "CIRCULAR",
+    "Round": "CIRCULAR",
+    "REC": "RECT_CLOSED",
+    "EGG": "EGG",
+    "ARC": "ARCH",
+    "ELH": "HORIZ_ELLIPSE",
+    "ELV": "VERT_ELLIPSE",
+}
+
+
+def xsection(pipe):
+    """SWMM cross-section of a pipe, from its GIS PipeShape and sizes (in mm).
+
+    CIRCULAR uses the Diameter and EGG the full Height; the other shapes use the full Height
+    and maximum Width.
+
+    Parameters
+    ----------
+    pipe : mapping
+        A row of the GIS data.
+
+    Returns
+    ----------
+    tuple or None
+        (shape, geom1, geom2), with geom1 and geom2 in m, or None if the PipeShape is unknown or
+        missing, or a size it needs is missing or not positive.
+    """
+    shape = PIPE_SHAPES.get(pipe.get("PipeShape"))
+    if shape is None:
+        return None
+    if shape == "CIRCULAR":
+        sizes = [pipe.get("Diameter")]
+    elif shape == "EGG":
+        sizes = [pipe.get("Height")]
+    else:
+        sizes = [pipe.get("Height"), pipe.get("Width")]
+    if any(pd.isna(s) or s <= 0 for s in sizes):
+        return None
+    geom = [s / 1000 for s in sizes] + [0.0] * (2 - len(sizes))
+    return shape, *geom
+
+
+def _invert(value):
+    """An invert elevation, or None if it is missing (NaN or 0, the GIS code for none)."""
+    return None if pd.isna(value) or value <= 0 else float(value)
+
+
 def _pipe_records(data):
     """Yield (OBJECTID, UpstreamID, DownstreamID, Length) for every pipe with two node IDs.
 
@@ -769,6 +819,93 @@ class SubNetwork(Network):
         if direction not in ["successors", "predecessors"]:
             raise ValueError("Invalid direction. Use 'successors' or 'predecessors'.")
 
+    def subnetwork_pipes(self):
+        """GIS rows of the pipes in ``subgraph`` (including parallel pipes), sorted by OBJECTID."""
+        edges = set(self.subgraph.edges)
+        data = self.full_data
+        mask = [
+            (down, up) in edges
+            for up, down in zip(data["UpstreamID"], data["DownstreamID"], strict=True)
+        ]
+        return data[mask].sort_values("OBJECTID")
+
+    def node_inverts(self, height_correction=None):
+        """Invert elevation of every node in ``subgraph``.
+
+        A node's invert is the lowest invert of the subnetwork pipes connected to it, including
+        the drop-structure inverts of the pipes entering it, so that every pipe sits at or above
+        its nodes (the pipes are then attached with offsets). A node with no subnetwork pipe takes
+        the lowest invert of the network pipes connected to it.
+
+        Parameters
+        ----------
+        height_correction : dict, optional
+            {node: invert} overriding the computed inverts.
+
+        Returns
+        ----------
+        dict
+            {node: invert}
+
+        Raises
+        ----------
+        ValueError
+            If a node has no pipe with an invert.
+        """
+        nodes = set(self.subgraph.nodes)
+        inverts = self._lowest_inverts(self.subnetwork_pipes(), nodes)
+        if nodes - set(inverts):
+            inverts.update(self._lowest_inverts(self.full_data, nodes - set(inverts)))
+        missing = sorted(nodes - set(inverts))
+        if missing:
+            raise ValueError(f"No pipe invert found for nodes: {', '.join(map(str, missing))}")
+        for node, invert in (height_correction or {}).items():
+            if node in nodes:
+                inverts[node] = float(invert)
+        return inverts
+
+    @staticmethod
+    def _lowest_inverts(pipes, nodes):
+        """{node: lowest invert of the pipes connected to it} for the nodes in ``nodes``."""
+        drops = pipes.get("DropStructureInvert", pd.Series([None] * len(pipes)))
+        found = {}
+        for up, down, inv_up, inv_down, drop in zip(
+            pipes["UpstreamID"],
+            pipes["DownstreamID"],
+            pipes["UpstreamInvert"],
+            pipes["DownstreamInvert"],
+            drops,
+            strict=True,
+        ):
+            for node, value in ((up, inv_up), (down, inv_down), (down, drop)):
+                value = _invert(value)
+                if node in nodes and value is not None:
+                    found[node] = min(found.get(node, value), value)
+        return found
+
+    @staticmethod
+    def xsections(pipes):
+        """{OBJECTID: (shape, geom1, geom2)} for the GIS rows in ``pipes`` (see :func:`xsection`).
+
+        Raises
+        ----------
+        ValueError
+            If any pipe has an unknown or missing PipeShape, or is missing a size; the message
+            lists every such pipe.
+        """
+        sections, bad = {}, []
+        for _, pipe in pipes.iterrows():
+            section = xsection(pipe)
+            if section is None:
+                bad.append(f"{pipe['OBJECTID']} (PipeShape {pipe.get('PipeShape')!r})")
+            sections[pipe["OBJECTID"]] = section
+        if bad:
+            raise ValueError(
+                "Cannot build a cross-section for pipes with an unknown or missing PipeShape or "
+                f"size: {', '.join(bad)}. Known PipeShape codes: {list(PIPE_SHAPES)}."
+            )
+        return sections
+
     def write_nodes_pyswmm(
         self, pyswmm_file, max_depth, init_depth, surcharge_depth, ponding_area, height_correction
     ):
@@ -792,7 +929,7 @@ class SubNetwork(Network):
             Ponding area for node (default is 0.0).
 
         height_correction : dict
-            User defined height correction in the case that the inv. elev. is not correct in geojson file.
+            User defined node inverts, overriding those computed by :meth:`node_inverts`.
 
         Notes
         -----
@@ -803,29 +940,26 @@ class SubNetwork(Network):
         with open(pyswmm_file) as file:
             content = file.read()
 
+        inverts = self.node_inverts(height_correction)
+
         nodes_content = ""
         outfall_content = ""
         # Iterate through the nodes in the graph and build the content
         for node in self.subgraph.nodes:
+            invert = inverts[node]
             if height_correction is not None and node in height_correction:
-                upstream_invert = height_correction[node]
+                print(f"Node {node}: Updating invert value to: {invert}")
+            if node in self.outfall_node:
+                for idx in range(len(self.outfall_node)):
+                    outfall_node_type = self.outfall_node_type[idx]
+                    outfall_content += (
+                        f"{node:<16} {invert:<11}  {outfall_node_type:<28} {'NO':<10}\n"
+                    )
+            else:
                 nodes_content += (
-                    f"{node:<16} {upstream_invert:<11} {max_depth:<11} {init_depth:<11}"
+                    f"{node:<16} {invert:<11} {max_depth:<11} {init_depth:<11}"
                     f"{surcharge_depth:<11} {ponding_area:<11}\n"
                 )
-                print(f"Node {node}: Updating upstream_invert value to: {upstream_invert}")
-            else:
-                if node in self.outfall_node:
-                    for idx, outfall_node in enumerate(self.outfall_node):
-                        upstream_invert = self.get_upstream_invert(outfall_node)
-                        outfall_node_type = self.outfall_node_type[idx]
-                        outfall_content += f"{node:<16} {upstream_invert:<11}  {outfall_node_type:<28} {'NO':<10}\n"
-                else:
-                    upstream_invert = self.get_upstream_invert(node)
-                    nodes_content += (
-                        f"{node:<16} {upstream_invert:<11} {max_depth:<11} {init_depth:<11}"
-                        f"{surcharge_depth:<11} {ponding_area:<11}\n"
-                    )
 
         coordinates_content = ""
         positions = self.node_positions(self.subgraph.nodes)
@@ -848,7 +982,7 @@ class SubNetwork(Network):
             file.write(modified_content)
 
     def write_conduits_pyswmm(
-        self, pyswmm_file, manning_n, inlet_offset, outlet_offset, init_flow, max_flow, barrels
+        self, pyswmm_file, manning_n, init_flow, max_flow, barrels, height_correction=None
     ):
         """Add subnetwork data into the Conduits and XSection section of a .inp file.
 
@@ -861,12 +995,6 @@ class SubNetwork(Network):
         manning_n : float
             Manning N coefficient for conduit (default is 0.01).
 
-        inlet_offset : float
-            Inlet offset height for conduit (default is 0.0).
-
-        outlet_offset : float
-            Outlet offset height for conduit (default is 0.0).
-
         init_flow : float
             Initial flow value for conduit (default is 0.0).
 
@@ -876,55 +1004,75 @@ class SubNetwork(Network):
         barrels : float
             Barrel value for conduit (default is 0.0).
 
+        height_correction : dict, optional
+            User defined node inverts, overriding those computed by :meth:`node_inverts`.
+
         Notes
         -----
-        Also fills the {vertices} placeholder with the interior vertices of multi-vertex pipes, in
-        the units of the GIS geometry (unscaled).
+        The inlet and outlet offsets are the pipe's GIS inverts minus its nodes' inverts
+        (LINK_OFFSETS DEPTH), so each conduit has the GIS pipe inverts. Conduits that slope uphill
+        are reported with a warning. Also fills the {vertices} placeholder with the interior
+        vertices of multi-vertex pipes, in the units of the GIS geometry (unscaled).
         """
 
         with open(pyswmm_file) as file:
             content = file.read()
 
+        pipes = self.subnetwork_pipes()
+        sections = self.xsections(pipes)
+        inverts = self.node_inverts(height_correction)
+
         conduits_content = ""
         xsection_content = ""
         vertices_content = ""
+        adverse = []
 
-        # Get information from nx.digraph to fill in data
-        for edges in self.subgraph.edges:
-            start_node, end_node = edges
+        for _, row in pipes.iterrows():
+            name = row["OBJECTID"]
+            inlet = row["UpstreamID"]
+            outlet = row["DownstreamID"]
+            length = row["Length"]
+            shape, geom1, geom2 = sections[name]
 
-            for index, row in self.full_data.iterrows():
-                if row["UpstreamID"] == end_node and row["DownstreamID"] == start_node:
-                    print("Found pair")
-
-                    name = row["OBJECTID"]
-                    inlet = row["UpstreamID"]
-                    outlet = row["DownstreamID"]
-                    length = row["Length"]
-
-                    if row["PipeShape"] == "R":
-                        shape = "RECT_CLOSED"
-                        height = row["Height"] / 1000
-                        width = row["Width"] / 1000
-                    elif row["PipeShape"] == "Round":
-                        shape = "CIRCULAR"
-                        height = row["Height"] / 1000
-                        width = "0.0"
-
-                    conduits_content += (
-                        f"{name:<16} {inlet:<16} {outlet:<16}"
-                        f"{length:<11} {manning_n:<11} "
-                        f"{inlet_offset:<11} {outlet_offset:<11}"
-                        f"{init_flow:<11} {max_flow:<11}\n"
+            ends = []
+            for node, pipe_invert in (
+                (inlet, row["UpstreamInvert"]),
+                (outlet, row["DownstreamInvert"]),
+            ):
+                pipe_invert = _invert(pipe_invert)
+                offset = 0.0 if pipe_invert is None else round(pipe_invert - inverts[node], 4)
+                if offset < 0:
+                    warnings.warn(
+                        f"Pipe {name}: invert {pipe_invert} is below the invert of node {node} "
+                        f"({inverts[node]}); its offset there is set to 0.",
+                        stacklevel=2,
                     )
+                    offset = 0.0
+                ends.append((offset, inverts[node] + offset))
+            (inlet_offset, inlet_elev), (outlet_offset, outlet_elev) = ends
+            if outlet_elev > inlet_elev:
+                adverse.append(f"{name} ({inlet} {inlet_elev:.3f} -> {outlet} {outlet_elev:.3f})")
 
-                    xsection_content += (
-                        f"{name:<16} {shape:<16} {height:<16}"
-                        f"{width:<11} {0.0:<11} {0.0:<11} {barrels:<11}\n"
-                    )
+            conduits_content += (
+                f"{name:<16} {inlet:<16} {outlet:<16}"
+                f"{length:<11} {manning_n:<11} "
+                f"{inlet_offset:<11} {outlet_offset:<11}"
+                f"{init_flow:<11} {max_flow:<11}\n"
+            )
 
-                    for x, y in line_coords(row["geometry"])[1:-1]:
-                        vertices_content += f"{name:<16} {x:<18} {y:<18}\n"
+            xsection_content += (
+                f"{name:<16} {shape:<16} {geom1:<16}{geom2:<11} {0.0:<11} {0.0:<11} {barrels:<11}\n"
+            )
+
+            for x, y in line_coords(row["geometry"])[1:-1]:
+                vertices_content += f"{name:<16} {x:<18} {y:<18}\n"
+
+        if adverse:
+            warnings.warn(
+                f"Conduits with an adverse slope (outlet invert above inlet invert): "
+                f"{', '.join(adverse)}.",
+                stacklevel=2,
+            )
 
         # Replace variable in template file with conduit information
         modified_content = (
@@ -944,8 +1092,8 @@ class SubNetwork(Network):
         surcharge_depth=0.0,
         ponding_area=0.0,
         manning_n=0.01,
-        inlet_offset=0.0,
-        outlet_offset=0.0,
+        inlet_offset=None,
+        outlet_offset=None,
         init_flow=0.0,
         max_flow=0.0,
         barrels=1.0,
@@ -954,6 +1102,10 @@ class SubNetwork(Network):
         height_correction=None,
     ):
         """Generate a PySWMM input file based on a networkx digraph and GeoPandas DataFrame.
+
+        Node inverts are the lowest invert of the pipes connected to each node (see
+        :meth:`node_inverts`), and conduits are attached with offsets so that they keep their GIS
+        inverts. Pipe cross-sections come from the GIS PipeShape (see :data:`PIPE_SHAPES`).
 
         Parameters
         ----------
@@ -975,11 +1127,8 @@ class SubNetwork(Network):
         manning_n : float
             Manning N coefficient for conduit (default is 0.01).
 
-        inlet_offset : float
-            Inlet offset height for conduit (default is 0.0).
-
-        outlet_offset : float
-            Outlet offset height for conduit (default is 0.0).
+        inlet_offset, outlet_offset : float
+            Deprecated and ignored: the offsets are computed from the GIS inverts.
 
         init_flow : float
             Initial flow value for conduit (default is 0.0).
@@ -997,16 +1146,31 @@ class SubNetwork(Network):
             lengths, inverts and sizes are in metres, and may only contain the placeholders
             {nodes}, {outfalls}, {conduits}, {xsections}, {coordinates} and {vertices}.
             Pumps are not supported yet, so a template with a {pumps} placeholder is rejected.
+            The offsets are depths, so the template should set LINK_OFFSETS DEPTH (the default).
 
         output_folder : str
             Path to were the new .inp file will be written.
 
         height_correction : dict
-            If heights are not correct in geojson file, this overwrites it with a user defined value.
+            {node: invert} overriding the computed node inverts, e.g. where the GIS inverts are
+            wrong. Conduit offsets are measured from the corrected inverts.
+
+        Raises
+        ----------
+        ValueError
+            If a pipe has an unknown or missing PipeShape or size, or a node has no invert.
         """
 
         if output_file is None:
             raise ValueError("The 'output_path' must be specified.")
+
+        if inlet_offset is not None or outlet_offset is not None:
+            warnings.warn(
+                "inlet_offset and outlet_offset are ignored: conduit offsets are computed from the "
+                "GIS pipe inverts.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
 
         if template_path is None:
             template = default_template_path().read_text()
@@ -1019,6 +1183,10 @@ class SubNetwork(Network):
                 template = file.read()
 
         check_template(template)
+
+        # Fail before writing anything if a pipe or node cannot be represented
+        self.xsections(self.subnetwork_pipes())
+        self.node_inverts(height_correction)
 
         # Always create a copy of the template file
         if output_folder is not None:
@@ -1043,7 +1211,7 @@ class SubNetwork(Network):
 
         # Write conduits to pyswmm inp file
         self.write_conduits_pyswmm(
-            output_file_path, manning_n, inlet_offset, outlet_offset, init_flow, max_flow, barrels
+            output_file_path, manning_n, init_flow, max_flow, barrels, height_correction
         )
 
     def generate_gmap(self, file_name, scale=1, origin=None):

@@ -12,6 +12,20 @@ placeholders; anything else (including US units or `{pumps}`, since pumps are no
 raises `ValueError`. Node `[COORDINATES]` and pipe `[VERTICES]` are written in the units of the GIS
 geometry.
 
+## Conduit geometry
+
+Cross-sections come from the GIS `PipeShape` (sizes in mm, written in m): `R`/`Round` →
+`CIRCULAR(Diameter)`, `REC` → `RECT_CLOSED(Height, Width)`, `EGG` → `EGG(Height)`, `ARC` →
+`ARCH`, `ELH`/`ELV` → `HORIZ_ELLIPSE`/`VERT_ELLIPSE` (`Height, Width`). An unknown or missing
+shape or size raises `ValueError` listing the pipe IDs, before anything is written.
+
+A node's invert is the lowest invert of the subnetwork pipes connected to it, including the
+`DropStructureInvert` of pipes entering it. Each conduit's inlet/outlet offset is its GIS pipe
+invert minus the node invert (`LINK_OFFSETS DEPTH`), so conduits keep their GIS inverts; any that
+slope uphill are reported with a warning. `height_correction={node: invert}` overrides a node's
+invert, and the offsets are measured from it. The `inlet_offset`/`outlet_offset` arguments of
+`write_pyswmm` are deprecated and ignored.
+
 ## Tests
 
 ```bash
