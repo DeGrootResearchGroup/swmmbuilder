@@ -3,7 +3,7 @@
 import pytest
 from conftest import DENDRITIC, TEMPLATE, subnetwork
 
-from sewernetworkx import swmm
+from swmmbuilder import swmm
 
 
 @pytest.fixture

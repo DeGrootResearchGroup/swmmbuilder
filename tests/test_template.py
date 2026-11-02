@@ -4,7 +4,7 @@ the writer cannot fill."""
 import pytest
 from conftest import TEMPLATE, read_sections, subnetwork
 
-from sewernetworkx.swmm import SI_FLOW_UNITS, check_template, default_template_path
+from swmmbuilder.swmm import SI_FLOW_UNITS, check_template, default_template_path
 
 
 @pytest.fixture

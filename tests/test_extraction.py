@@ -6,7 +6,7 @@ import networkx as nx
 import pytest
 from conftest import FIXTURE, REPO, read_sections, write_inp
 
-from sewernetworkx import Subnetwork
+from swmmbuilder import Subnetwork
 
 # Every node that drains to OUT (flow direction in tests/data/make_fixture.py). Not OV1/OV2 (the
 # overflow leaves J2), S1/S2 (storm), 'Abandoned' (abandoned by ID) or X1 (Abandoned flag).
@@ -16,7 +16,7 @@ OUT_CATCHMENT = {
 }  # fmt: skip
 
 PROBE = """
-from sewernetworkx import Network
+from swmmbuilder import Network
 n = Network({fixture!r})
 s = {call}
 print(",".join(s.nodes) + ";" + ",".join(map(str, s.graph.edges(keys=True))))

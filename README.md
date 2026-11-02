@@ -1,10 +1,10 @@
-# SewerNetworkx
+# swmmbuilder
 
 Python package that loads a city's GIS sewer network (GeoJSON or any format geopandas reads),
 selects subnetworks of it, and writes them as SWMM `.inp` files for pyswmm.
 
 ```python
-from sewernetworkx import Network, maps, swmm
+from swmmbuilder import Network, maps, swmm
 
 net = Network("london.geojson")                     # schema=LONDON_ON by default
 sub = net.catchment("OUT")                          # every node draining to OUT
@@ -27,7 +27,7 @@ The pipes name their end nodes, but say little about them. Node layers add what 
 the SWMM nodes need; each is optional:
 
 ```python
-from sewernetworkx import Network, strip_leading_zeros
+from swmmbuilder import Network, strip_leading_zeros
 
 net = Network(
     "Sewer_Pipes.geojson",
@@ -82,7 +82,7 @@ sub.to_inp("model.inp")  # outfalls default to the outfall nodes of the subnetwo
 ## Logging
 
 Progress and data problems (pipes dropped on loading, nodes with no position, height corrections)
-are reported through `logging`, on the `sewernetworkx` logger; nothing is printed. To see them:
+are reported through `logging`, on the `swmmbuilder` logger; nothing is printed. To see them:
 
 ```python
 import logging
@@ -97,8 +97,8 @@ logging.basicConfig(level=logging.INFO)
 `us_node_type`, `ds_node_type`, in m), and the node layers to canonical node columns (`node_id`,
 `node_type`, `name`, `invert`, `rim_elevation`, `depth`, `has_drop`, `overflow`, `weir`,
 `pipes_in`, `pipes_out`, `flow_monitor`, `access`, `verified`); everything after loading reads
-only those (see `sewernetworkx/schema.py`). Two schemas ship with the package, as TOML files in
-`sewernetworkx/schemas/`:
+only those (see `swmmbuilder/schema.py`). Two schemas ship with the package, as TOML files in
+`swmmbuilder/schemas/`:
 
 - `LONDON_ON` (the default): London, ON's GIS export.
 - `TORONTO_ON`: the [Sewer Gravity Mains](https://open.toronto.ca/dataset/sewer-gravity-mains/)
@@ -109,7 +109,7 @@ only those (see `sewernetworkx/schema.py`). Two schemas ship with the package, a
   `flow_types={"sanitary", "combined"}` keeps sanitary and combined sewers.
 
 ```python
-from sewernetworkx import TORONTO_ON, Network
+from swmmbuilder import TORONTO_ON, Network
 
 network = Network("sewer-gravity-main-4326.geojson", schema=TORONTO_ON)
 ```
@@ -153,7 +153,7 @@ network = Network("my_city.geojson", schema="my_city.toml")
 Pipe statuses, pipe structure types and node types are mapped from source codes by the
 `[statuses]`, `[structure_types]` and `[node_types]` tables, and the node layers' columns by
 `[node_columns]`, where a list names alternatives (the first one present in a layer is used);
-see `sewernetworkx/schemas/london_on.toml`. The Toronto preset does not map node layers yet.
+see `swmmbuilder/schemas/london_on.toml`. The Toronto preset does not map node layers yet.
 
 Only `pipe_id`, `from_node` and `to_node` are required; the pipes must name their upstream and
 downstream nodes. Missing lengths (all of them, if `length` is not mapped) are computed from the
@@ -164,7 +164,7 @@ give a warning on loading, and those pipes are rejected if they are written to a
 
 ## SWMM template
 
-`.inp` files are written by `sewernetworkx.swmm`. `build_model(subnetwork, ...)` returns a
+`.inp` files are written by `swmmbuilder.swmm`. `build_model(subnetwork, ...)` returns a
 `SwmmModel`: plain records of the junctions, outfalls, conduits, cross-sections, coordinates and
 vertices, with node inverts, conduit offsets and Manning's n already decided, so the model can be
 inspected or tested without a file. `write_inp(subnetwork, path, ...)` checks the template and
@@ -172,7 +172,7 @@ the topology, builds the model and renders it into the template in one write;
 `Subnetwork.to_inp` calls it.
 
 The default template is the one shipped in the package,
-`sewernetworkx/templates/template.inp` (`examples/pyswmm_template/template.inp` is a copy kept in
+`swmmbuilder/templates/template.inp` (`examples/pyswmm_template/template.inp` is a copy kept in
 sync by a test). It uses SI units, `FLOW_UNITS LPS`, because the GIS lengths, inverts and sizes are
 in metres. A custom template (`template_path=`) must use `CMS`, `LPS` or `MLD`, and may only
 contain the `{nodes}`, `{outfalls}`, `{storage}`, `{conduits}`, `{pumps}`, `{xsections}`,

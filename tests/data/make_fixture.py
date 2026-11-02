@@ -2,7 +2,7 @@
 fixture_nodes_*.geojson node-layer network (see the second half of this file).
 
 Run from anywhere: ``python tests/data/make_fixture.py``. The schema matches the City of London
-(Ontario) sewer GeoJSON that SewerNetworkx was written for. Inverts in m, sizes in mm.
+(Ontario) sewer GeoJSON that swmmbuilder was written for. Inverts in m, sizes in mm.
 
 Layout (flow direction):
 

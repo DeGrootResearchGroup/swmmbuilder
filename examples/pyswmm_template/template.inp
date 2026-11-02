@@ -1,6 +1,6 @@
 [TITLE]
-;;SewerNetworkx template. SI units: FLOW_UNITS LPS (flow in L/s; lengths, elevations
-;;and sizes in m). The placeholders in braces are filled by sewernetworkx.swmm.
+;;swmmbuilder template. SI units: FLOW_UNITS LPS (flow in L/s; lengths, elevations
+;;and sizes in m). The placeholders in braces are filled by swmmbuilder.swmm.
 
 [OPTIONS]
 ;;Options            Value

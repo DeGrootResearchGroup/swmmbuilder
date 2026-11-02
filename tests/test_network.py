@@ -3,7 +3,7 @@ import logging
 import geopandas as gpd
 from conftest import FIXTURE, REPO
 
-from sewernetworkx import Network
+from swmmbuilder import Network
 
 
 def test_storm_pipes_removed(network):
@@ -53,7 +53,7 @@ def test_missing_flow_type_dropped_and_logged(tmp_path, caplog):
     data.loc[data["UpstreamID"] == "E1", "FlowType"] = None
     path = tmp_path / "no_flow_type.geojson"
     data.to_file(path, driver="GeoJSON")
-    with caplog.at_level(logging.INFO, logger="sewernetworkx"):
+    with caplog.at_level(logging.INFO, logger="swmmbuilder"):
         network = Network(str(path))
     assert "E1" not in network.graph
     assert network.removed["flow_type"] == {"None": 1, "storm": 1}

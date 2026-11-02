@@ -8,8 +8,8 @@ import pandas as pd
 import pytest
 from conftest import TESTS, read_sections, run_swmm, write_inp
 
-from sewernetworkx import Network, Schema, Subnetwork, strip_leading_zeros
-from sewernetworkx.swmm import build_model
+from swmmbuilder import Network, Schema, Subnetwork, strip_leading_zeros
+from swmmbuilder.swmm import build_model
 
 DATA = TESTS / "data"
 PIPES = DATA / "fixture_nodes_pipes.geojson"

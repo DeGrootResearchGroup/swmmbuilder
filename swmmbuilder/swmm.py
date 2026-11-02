@@ -49,7 +49,7 @@ PUMP_CURVE_TYPES = {
 
 def default_template_path():
     """Path-like (Traversable) to the SI template shipped with the package."""
-    return resources.files("sewernetworkx") / "templates" / "template.inp"
+    return resources.files("swmmbuilder") / "templates" / "template.inp"
 
 
 def read_template(path=None):
@@ -142,7 +142,7 @@ def xsection(pipe):
     Parameters
     ----------
     pipe : mapping
-        A row of the canonical data (see :mod:`sewernetworkx.schema`).
+        A row of the canonical data (see :mod:`swmmbuilder.schema`).
 
     Returns
     ----------

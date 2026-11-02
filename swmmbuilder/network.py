@@ -1,5 +1,5 @@
 """A city's sewer network: its pipes and node layers, loaded through a
-:class:`~sewernetworkx.Schema`, and the flow graph between their nodes."""
+:class:`~swmmbuilder.Schema`, and the flow graph between their nodes."""
 
 import logging
 import re
@@ -117,7 +117,7 @@ class Network:
     Attributes
     ----------
     full_data : geopandas.GeoDataFrame
-        The pipes, with the canonical columns of :mod:`sewernetworkx.schema`.
+        The pipes, with the canonical columns of :mod:`swmmbuilder.schema`.
 
     schema : Schema
         The schema the data were loaded with.
@@ -130,7 +130,7 @@ class Network:
 
     nodes : geopandas.GeoDataFrame
         One row per node of the graph, indexed by node ID, with the canonical node columns (see
-        :mod:`sewernetworkx.schema`) and the node's point (from its node layer, else the end of a
+        :mod:`swmmbuilder.schema`) and the node's point (from its node layer, else the end of a
         pipe). ``invert`` is the node layer's, else the lowest invert of the pipes connected to
         the node; ``rim_elevation`` is the node layer's, else ``invert + depth``.
 

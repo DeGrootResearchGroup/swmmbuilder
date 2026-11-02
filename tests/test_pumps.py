@@ -3,7 +3,7 @@
 import pytest
 from conftest import DENDRITIC, TEMPLATE, read_sections, run_swmm, subnetwork, write_inp
 
-from sewernetworkx import Pump, WetWell
+from swmmbuilder import Pump, WetWell
 
 # D1 -> D2 is adverse in the GIS inverts (103.80 -> 104.10): a pumped rising main.
 PUMPED = DENDRITIC + [("D1", "D2"), ("D2", "J2")]

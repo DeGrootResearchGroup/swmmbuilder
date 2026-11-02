@@ -6,9 +6,9 @@ import pytest
 from conftest import DENDRITIC, FIXTURE, REPO, read_sections, subnetwork, write_inp
 from shapely.geometry import LineString
 
-from sewernetworkx import LONDON_ON, Network, Schema
-from sewernetworkx.schema import CANONICAL_COLUMNS, as_schema
-from sewernetworkx.swmm import xsection
+from swmmbuilder import LONDON_ON, Network, Schema
+from swmmbuilder.schema import CANONICAL_COLUMNS, as_schema
+from swmmbuilder.swmm import xsection
 
 
 def london_rows(*rows):
@@ -215,7 +215,7 @@ def test_reproject():
 
 # The shipped London preset, renamed.
 LONDON_TOML = (
-    (REPO / "sewernetworkx" / "schemas" / "london_on.toml")
+    (REPO / "swmmbuilder" / "schemas" / "london_on.toml")
     .read_text()
     .replace('name = "London, ON"', 'name = "London from TOML"')
 )
