@@ -3,10 +3,11 @@ maps.generate_gmap."""
 
 import json
 
+import geopandas as gpd
 import pytest
 from conftest import DENDRITIC, FIXTURE, OVERFLOW, read_sections, subnetwork, write_inp
 
-from sewernetworkx import maps
+from sewernetworkx import Network, maps
 
 
 def fixture_geometry():
@@ -81,3 +82,9 @@ def test_generate_gmap(network, tmp_path, monkeypatch):
     first = next(iter(sub.node_positions()))
     assert calls["centre"][::-1] == pytest.approx(NODES[first])
     assert len(calls["lines"]) == len(DENDRITIC)  # parallel J1 -> J2 pipes drawn once
+
+
+def test_map_positions_without_crs_are_lonlat():
+    data = gpd.read_file(FIXTURE).set_crs(None, allow_override=True)
+    sub = subnetwork(Network(data), DENDRITIC)
+    assert maps.lonlat_positions(sub) == sub.node_positions()

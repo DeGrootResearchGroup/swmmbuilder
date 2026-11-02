@@ -15,7 +15,7 @@ sub.validate(outfalls=["OUT"])                      # TopologyReport: splits, cy
 sub.to_inp("model.inp", outfalls=["OUT"])           # or {"OUT": "FIXED"} for other types
 model = swmm.build_model(sub, ["OUT"], manning_n_by_material={"PVC": 0.011})  # without a file
 sub.to_node_list("nodes.txt")                       # Subnetwork.from_node_list(net, "nodes.txt")
-maps.generate_gmap(sub, "map.html")                 # geographic CRS only
+maps.generate_gmap(sub, "map.html")                 # reprojected to WGS 84 for the map
 ```
 
 A `Subnetwork`'s `graph` is a `networkx.MultiDiGraph` in the direction of flow, with one edge per
