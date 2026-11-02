@@ -127,9 +127,40 @@ def _check_nodes(net, nodes):
         raise ValueError(f"Nodes not in the network: {', '.join(missing)}")
 
 
-def network_footprint(net, distance=100.0, crs=None):
-    """The area served by the pipes of ``net``: within about ``distance`` metres of a pipe, with
-    narrow gaps between pipes filled in, as a shapely geometry in the plot CRS."""
+# Defaults relative to the size of the network drawn, so that they suit a 30-pipe catchment and a
+# city alike: ribbons at most RIBBON_WIDTH x the extent wide, ribbons narrower than
+# MIN_RIBBON_WIDTH x the widest left as context, and footprints of FOOTPRINT_PIPES x the median
+# pipe length, at most FOOTPRINT_EXTENT x the extent.
+RIBBON_WIDTH = 0.025
+MIN_RIBBON_WIDTH = 0.05
+FOOTPRINT_PIPES = 2.0
+FOOTPRINT_EXTENT = 0.05
+
+# Pipes drawn as context under other layers (plot_pipes(context=True)): colour and width factor.
+CONTEXT_COLOR = "0.6"
+CONTEXT_WIDTH = 0.6
+
+
+def network_extent(net, crs=None):
+    """The larger side of the bounding box of the pipes of ``net``, in metres of the plot CRS."""
+    xmin, ymin, xmax, ymax = _geodata(net, "pipes", crs).total_bounds
+    return float(max(xmax - xmin, ymax - ymin))
+
+
+def footprint_distance(net, crs=None):
+    """The default :func:`network_footprint` distance of ``net``: twice the median pipe length,
+    at most 5 % of :func:`network_extent`, in metres."""
+    pipes = _geodata(net, "pipes", crs)
+    median = float(np.median(pipes.geometry.length)) if len(pipes) else 0.0
+    return min(FOOTPRINT_PIPES * median, FOOTPRINT_EXTENT * network_extent(net, crs))
+
+
+def network_footprint(net, distance=None, crs=None):
+    """The area served by the pipes of ``net``: within about ``distance`` metres of a pipe
+    (default :func:`footprint_distance`), with narrow gaps between pipes filled in, as a shapely
+    geometry in the plot CRS."""
+    if distance is None:
+        distance = footprint_distance(net, crs)
     pipes = _geodata(net, "pipes", crs).geometry.to_numpy()
     smooth = distance / 3
     return shapely.union_all(shapely.buffer(pipes, distance + smooth)).buffer(-smooth)
@@ -534,18 +565,20 @@ def plot_pipes(
     norm="linear",
     vmin=None,
     vmax=None,
-    color="0.35",
+    color=None,
     missing_color="0.75",
     width=None,
     width_range=(0.4, 4.0),
     width_scale="sqrt",
+    context=False,
     legend=True,
     label=None,
     style=True,
     crs=None,
-    zorder=2,
+    zorder=None,
 ):
-    """Draw the pipes of ``net``, coloured by a per-pipe value.
+    """Draw the pipes of ``net``, coloured by a per-pipe value, or as light context under other
+    layers.
 
     Parameters
     ----------
@@ -557,7 +590,8 @@ def plot_pipes(
 
     values : pandas.Series or dict, optional
         Value per pipe ID. Pipes with no value (or NaN, or a non-positive value with a log norm)
-        are drawn in ``missing_color``. Without values every pipe is drawn in ``color``.
+        are drawn in ``missing_color``. Without values every pipe is drawn in ``color``
+        (default ``0.35`` grey).
 
     cmap, norm, vmin, vmax
         Colour map, ``'linear'``, ``'log'`` or a matplotlib Normalize, and its limits (default:
@@ -571,6 +605,11 @@ def plot_pipes(
         How per-pipe widths are scaled: proportional to the square root of the value (the
         default, readable over several orders of magnitude) or to the value, from 0 at the low
         end of ``width_range``; or the range of the logarithms onto ``width_range``.
+
+    context : bool
+        Draw the pipes as context beneath other layers (e.g. zones or ribbons): lighter (default
+        ``color`` ``0.6`` grey), 0.6 times as wide, and between group fills (zorder 1) and
+        ribbons (zorder 2). ``values`` cannot be given.
 
     legend : bool
         Add a colour bar (labelled ``label``) next to the axes when ``values`` are given.
@@ -587,6 +626,12 @@ def plot_pipes(
         ``artist``: a LineCollection with one line per pipe, thinnest first so that thick pipes
         are drawn on top; ``ids``: the pipe IDs in that order.
     """
+    if context and values is not None:
+        raise ValueError("Context pipes are drawn in one colour; values cannot be given.")
+    if color is None:
+        color = CONTEXT_COLOR if context else "0.35"
+    if zorder is None:
+        zorder = 1.5 if context else 2
     pipes = _geodata(net, "pipes", crs)
     if width is None:
         linewidths = np.full(len(pipes), 1.0)
@@ -594,6 +639,8 @@ def plot_pipes(
         linewidths = np.full(len(pipes), float(width))
     else:
         linewidths = _scaled(_aligned(width, pipes.index, "widths"), width_range, width_scale)
+    if context:
+        linewidths = CONTEXT_WIDTH * linewidths
     order = np.argsort(linewidths, kind="stable")
     pipes, linewidths = pipes.iloc[order], linewidths[order]
 
@@ -621,8 +668,8 @@ def plot_ribbons(
     colors=None,
     *,
     width="total",
-    max_width=30.0,
-    min_width=0.0,
+    max_width=None,
+    min_width=None,
     top_k=None,
     min_share=0.0,
     other_color=NEUTRAL_COLOR,
@@ -660,12 +707,13 @@ def plot_ribbons(
         the row total, ``max_width`` for the largest, so that the ribbons show the load. A
         number: the same for every pipe; a Series or dict: per pipe ID.
 
-    max_width : float
-        Width in metres of the pipe with the largest total, for ``width='total'``.
+    max_width : float, optional
+        Width in metres of the pipe with the largest total, for ``width='total'``. Default: 2.5 %
+        of :func:`network_extent`, so that the ribbons are as visible on a city as on a street.
 
-    min_width : float
+    min_width : float, optional
         Pipes narrower than this (in metres) are not drawn as ribbons; with ``context`` they
-        are still drawn as thin grey lines.
+        are still drawn as thin grey lines. Default: 5 % of the widest ribbon.
 
     top_k : int, optional
         Keep only each pipe's ``top_k`` largest categories and lump the rest into 'other'.
@@ -706,13 +754,18 @@ def plot_ribbons(
     if isinstance(width, str):
         if width != "total":
             raise ValueError(f"width must be 'total', a number or per-pipe values, not {width!r}.")
+        if max_width is None:
+            max_width = RIBBON_WIDTH * network_extent(net, crs)
         totals = raw.sum(axis=1)
         widths = totals / totals.max() * max_width if len(totals) else totals
     elif np.isscalar(width):
         widths = pd.Series(float(width), index=raw.index)
     else:
         widths = pd.Series(_aligned(width, raw.index, "widths"), index=raw.index)
-    widths = widths[np.isfinite(widths) & (widths > 0) & (widths >= min_width)]
+    widths = widths[np.isfinite(widths) & (widths > 0)]
+    if min_width is None:
+        min_width = MIN_RIBBON_WIDTH * widths.max() if len(widths) else 0.0
+    widths = widths[widths >= min_width]
 
     table = _shares_table(raw.loc[widths.index], top_k, min_share)
     widths = widths.loc[table.index]
@@ -774,7 +827,7 @@ def node_group_polygons(
     method="voronoi",
     *,
     clip_to=None,
-    footprint=100.0,
+    footprint=None,
     buffer=10.0,
     ratio=0.3,
     crs=None,
@@ -799,10 +852,11 @@ def node_group_polygons(
         is reprojected and its geometries merged. Default: the network footprint (see
         ``footprint``), so that the polygons cover the serviced area.
 
-    footprint : float or None
-        Default clip area: the :func:`network_footprint` of ``net`` at this distance in metres.
-        None: the convex hull of all the nodes of ``net`` grown by ``buffer`` for 'voronoi', and
-        no clipping for 'concave_hull'.
+    footprint : float, None or False
+        Default clip area: the :func:`network_footprint` of ``net`` at this distance in metres,
+        or by default at :func:`footprint_distance` (twice the median pipe length, at most 5 %
+        of the extent). False: the convex hull of all the nodes of ``net`` grown by ``buffer``
+        for 'voronoi', and no clipping for 'concave_hull'.
 
     buffer : float
         Distance in metres by which hulls are grown, so that groups of one or two nodes, and
@@ -837,7 +891,7 @@ def node_group_polygons(
 
     if clip_to is not None and not isinstance(clip_to, shapely.Geometry):
         clip_to = _with_crs(clip_to).to_crs(crs).geometry.union_all()
-    if clip_to is None and footprint is not None:
+    if clip_to is None and footprint is not False:
         clip_to = network_footprint(net, footprint, crs)
 
     if method == "concave_hull":

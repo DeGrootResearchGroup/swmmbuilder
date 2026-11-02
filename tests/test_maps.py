@@ -1,6 +1,7 @@
 """Map plotting (#26): to_geodataframe, map styling and keys, static plots, group polygons,
 basemaps and export."""
 
+import dataclasses
 import json
 import sys
 import types
@@ -17,7 +18,7 @@ from mpl_toolkits.axes_grid1.anchored_artists import AnchoredSizeBar
 from pyproj import CRS
 from shapely import LineString, Point, Polygon
 
-from swmmbuilder import Network, maps
+from swmmbuilder import LONDON_ON, Network, maps
 
 matplotlib.use("Agg")
 
@@ -78,20 +79,26 @@ def test_bad_kind(network):
 # ---- plot_crs -------------------------------------------------------------------------------
 
 
-def test_plot_crs_is_utm_for_lonlat(network, sub):
+LONLAT_SCHEMA = dataclasses.replace(LONDON_ON, crs=None)  # keeps the fixture in lon/lat
+
+
+def test_plot_crs_is_utm_for_lonlat():
+    network = Network(FIXTURE, schema=LONLAT_SCHEMA)
+    sub = subnetwork(network, DENDRITIC)
     assert maps.plot_crs(network) == CRS.from_epsg(32617)  # London, ON: UTM 17N
     assert maps.plot_crs(sub) == maps.plot_crs(network)
     assert maps.plot_crs(network, "EPSG:3857") == CRS.from_epsg(3857)
 
 
-def test_plot_crs_keeps_projected_crs():
+def test_plot_crs_keeps_projected_crs(network):
+    assert maps.plot_crs(network) == CRS.from_epsg(2958)  # the London schema's CRS
     data = gpd.read_file(FIXTURE).to_crs("EPSG:2952")
-    assert maps.plot_crs(Network(data)) == CRS.from_epsg(2952)
+    assert maps.plot_crs(Network(data, schema=LONLAT_SCHEMA)) == CRS.from_epsg(2952)
 
 
 def test_plot_crs_without_crs_is_utm():
     data = gpd.read_file(FIXTURE).set_crs(None, allow_override=True)
-    assert maps.plot_crs(Network(data)) == CRS.from_epsg(32617)
+    assert maps.plot_crs(Network(data, schema=LONLAT_SCHEMA)) == CRS.from_epsg(32617)
 
 
 # ---- Scaling and colours --------------------------------------------------------------------
@@ -226,6 +233,21 @@ def test_plot_pipes_sqrt_widths_thin_first(ax, sub):
     )
 
 
+def test_plot_pipes_as_context(ax, sub):
+    ids = sub.to_geodataframe("pipes").index
+    flow = pd.Series(np.linspace(1, 100, len(ids)), index=ids)
+    full = maps.plot_pipes(ax, sub, width=flow, legend=False).artist
+    layer = maps.plot_pipes(ax, sub, width=flow, context=True)
+    assert np.asarray(layer.artist.get_linewidths()) == pytest.approx(
+        0.6 * np.asarray(full.get_linewidths())
+    )
+    assert matplotlib.colors.to_hex(layer.artist.get_color()[0]) == matplotlib.colors.to_hex("0.6")
+    assert layer.artist.get_zorder() == 1.5  # above group fills, below ribbons
+    assert layer.mappable is None
+    with pytest.raises(ValueError, match="Context"):
+        maps.plot_pipes(ax, sub, flow, context=True)
+
+
 def test_plot_pipes_in_metric_crs(ax, network):
     maps.plot_pipes(ax, network)
     xmin, xmax = ax.get_xlim()
@@ -325,6 +347,23 @@ def test_plot_ribbons_width_proportional_to_load(ax, sub):
     assert areas[2] / lengths[small] == pytest.approx(6, rel=0.05)  # 3 / 10 of the largest load
 
 
+def test_ribbon_widths_default_to_the_extent(ax, sub):
+    pipe = {(u, v): k for u, v, k in sub.graph.edges(keys=True)}
+    big, small, tiny = pipe["J2", "OUT"], pipe["B1", "B2"], pipe["C1", "J1"]
+    shares = pd.DataFrame({"x": [100.0, 10.0, 4.0]}, index=[big, small, tiny])
+    layer = maps.plot_ribbons(ax, sub, shares, context=False)
+    max_width = 0.025 * maps.network_extent(sub)
+    assert layer.ids == [big, small]  # tiny is 4 % of the widest, below the 5 % default
+    lengths = maps._geodata(sub, "pipes").geometry.length
+    areas = [Polygon(p.to_polygons()[0]).area for p in layer.artist.get_paths()]
+    assert areas[0] / lengths[big] == pytest.approx(max_width, rel=0.05)
+
+
+def test_network_extent(sub):
+    xmin, ymin, xmax, ymax = maps._geodata(sub, "pipes").total_bounds
+    assert maps.network_extent(sub) == pytest.approx(max(xmax - xmin, ymax - ymin))
+
+
 def test_plot_ribbons_colours(ax, sub):
     pipe = sub.to_geodataframe("pipes").index[0]
     shares = pd.DataFrame({"x": [0.25], "y": [0.75]}, index=[pipe])
@@ -371,8 +410,18 @@ def test_voronoi_tiles_partition_the_footprint(sub):
     assert footprint.area < pipes.union_all().convex_hull.buffer(50).area
 
 
+def test_footprint_distance_scales_with_the_network(sub):
+    lengths = maps._geodata(sub, "pipes").geometry.length
+    expected = min(2 * lengths.median(), 0.05 * maps.network_extent(sub))
+    assert maps.footprint_distance(sub) == pytest.approx(expected)
+    default = maps.network_footprint(sub)
+    assert default.area == pytest.approx(maps.network_footprint(sub, expected).area)
+    polygons = maps.node_group_polygons(sub, GROUPS)
+    assert polygons.geometry.union_all().area == pytest.approx(default.area, rel=1e-6)
+
+
 def test_voronoi_without_footprint_fills_the_hull(sub):
-    polygons = maps.node_group_polygons(sub, GROUPS, footprint=None)
+    polygons = maps.node_group_polygons(sub, GROUPS, footprint=False)
     nodes = maps._geodata(sub, "nodes").geometry
     hull = nodes.union_all().convex_hull.buffer(10.0)
     assert polygons.geometry.area.sum() == pytest.approx(hull.area, rel=1e-6)
@@ -520,11 +569,11 @@ def test_to_geojson(sub, tmp_path):
     assert set(by_id) == nodes_of(DENDRITIC)
     assert by_id["A1"]["properties"]["samples"] == 7.0
     lon, lat = by_id["A1"]["geometry"]["coordinates"]
-    assert Point(lon, lat).distance(Point(sub.node_positions()["A1"])) < 1e-9
+    assert Point(lon, lat).distance(Point(maps.lonlat_positions(sub)["A1"])) < 1e-9
 
 
 def test_to_geojson_reprojects_to_wgs84(tmp_path):
-    projected = Network(gpd.read_file(FIXTURE).to_crs("EPSG:2952"))
+    projected = Network(gpd.read_file(FIXTURE).to_crs("EPSG:2952"), schema=LONLAT_SCHEMA)
     maps.to_geojson(projected, tmp_path / "pipes.geojson")
     written = gpd.read_file(tmp_path / "pipes.geojson")
     assert written.crs == CRS.from_epsg(4326)

@@ -1,9 +1,11 @@
+import dataclasses
 import math
 import warnings
 
 import geopandas as gpd
 import pytest
 from conftest import DENDRITIC, FIXTURE, REPO, read_sections, subnetwork, write_inp
+from pyproj import Geod
 from shapely.geometry import LineString
 
 from swmmbuilder import LONDON_ON, Network, Schema
@@ -128,6 +130,7 @@ OTHER = Schema(
     shapes={"CIRC": "CIRCULAR", "BOX": "RECT_CLOSED", "OVOID": "EGG"},
     flow_types={"Sanitary": "sanitary", "Storm": "storm"},
     length_unit="cm",
+    crs="EPSG:2958",
 )
 
 
@@ -182,10 +185,11 @@ def test_null_values():
 
 
 def projected(*rows):
-    """London rows with a 30 m and a 40 m pipe, in a projected CRS (UTM 17N, metres)."""
+    """London rows with a 30 m and a 40 m pipe, in the London schema's projected CRS (UTM 17N,
+    metres)."""
     data = london_rows(*rows)
     data.geometry = [LineString([(0, 0), (30, 0)]), LineString([(0, 0), (0, 40)])][: len(data)]
-    return data.set_crs("EPSG:32617")
+    return data.set_crs("EPSG:2958")
 
 
 def test_missing_lengths_from_geometry():
@@ -203,7 +207,25 @@ def test_unmapped_length_from_geometry():
 def test_missing_length_needs_projected_crs():
     data = london_rows({"Length": None}).set_crs("EPSG:4326")
     with pytest.raises(ValueError, match=r"1 pipes have no length.*not projected"):
-        LONDON_ON.normalize(data)
+        dataclasses.replace(LONDON_ON, crs=None).normalize(data)
+
+
+def test_london_wgs84_pipe_without_length():
+    """The City's GeoJSON is in WGS 84; the shipped schema projects it to measure lengths."""
+    data = london_rows({"Length": None}).set_crs("EPSG:4326")
+    data.geometry = [LineString([(-81.25, 42.98), (-81.25, 42.99)])]
+    pipe = LONDON_ON.normalize(data).iloc[0]
+    assert LONDON_ON.crs == "EPSG:2958"
+    _, _, metres = Geod(ellps="GRS80").inv(-81.25, 42.98, -81.25, 42.99)
+    assert pipe["length"] == pytest.approx(metres, rel=1e-3)
+
+
+def test_data_without_crs_are_in_the_schema_crs():
+    data = london_rows({})
+    assert data.crs is None
+    normalized = LONDON_ON.normalize(data)
+    assert normalized.crs == "EPSG:2958"
+    assert list(normalized.geometry.iloc[0].coords) == [(0, 0), (1, 0)]
 
 
 def test_reproject():

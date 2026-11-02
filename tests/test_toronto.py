@@ -1,14 +1,18 @@
 """The TORONTO_ON schema, on a sanitary catchment from the City of Toronto Open Data Portal
 (tests/data/toronto_catchment.geojson; see tests/data/make_toronto_fixture.py)."""
 
+import gzip
 import json
 
+import geopandas as gpd
 import pytest
 from conftest import TESTS, read_sections, run_swmm, write_inp
 
 from swmmbuilder import TORONTO_ON, Network, maps
 
 TORONTO = TESTS / "data" / "toronto_catchment.geojson"
+TORONTO_LARGE = TESTS / "data" / "toronto_large_catchment.geojson.gz"
+TORONTO_LARGE_OUTLET = "MH3948903491"
 # The catchment drains to MH5130118747, and pipe SL963 takes it on to OUTFALL.
 OUTFALL = "MH5128918783"
 
@@ -40,8 +44,6 @@ def test_lengths_match_reprojected_geometry(toronto):
 
 
 def test_missing_length_from_geometry(tmp_path):
-    import geopandas as gpd
-
     data = gpd.read_file(TORONTO)
     data.loc[0, "Sewer Gravity Measured Length"] = None
     path = tmp_path / "toronto.geojson"
@@ -53,6 +55,19 @@ def test_missing_length_from_geometry(tmp_path):
 
 def test_catchment_is_whole_fixture(catchment):
     assert catchment.graph.number_of_edges() == 31
+
+
+def test_large_catchment():
+    """The 2,692-pipe catchment (with trunk sewers) used by the map gallery at full scale; see
+    tests/data/make_toronto_large_fixture.py."""
+    data = gpd.read_file(gzip.decompress(TORONTO_LARGE.read_bytes()))
+    with pytest.warns(UserWarning, match="Shape codes not in schema"):
+        network = Network(data, schema=TORONTO_ON)
+    sub = network.catchment(TORONTO_LARGE_OUTLET)
+    assert sub.graph.number_of_edges() == len(data) == 2692
+    assert (data["Sewer Gravity Trunk Sewer"] == "Yes").sum() == 159
+    xmin, ymin, xmax, ymax = sub.to_geodataframe("pipes").total_bounds
+    assert 8000 < max(xmax - xmin, ymax - ymin) < 10000  # metres, in EPSG:2952
 
 
 def test_toronto_inp_runs_in_swmm(catchment, tmp_path):

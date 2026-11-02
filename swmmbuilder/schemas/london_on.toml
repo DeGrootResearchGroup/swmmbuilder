@@ -6,6 +6,9 @@
 # with this schema. The node layers (maintenance holes, Pumping_Stations, Sewer_Outfalls and
 # Sewer_Other_Nodes) share GIS_FeatureKey as the node ID; rims below 150 m or above 350 m are
 # data errors.
+#
+# The City's GeoJSON is in WGS 84; it is reprojected to UTM zone 17N (EPSG:2958, NAD83(CSRS),
+# metres), so that missing lengths can be computed and the .inp coordinates are in metres.
 name = "London, ON"
 abandoned = "Abandoned"
 abandoned_values = [1]
@@ -13,6 +16,7 @@ null_nodes = ["Abandoned"]
 nonpositive_inverts_missing = true
 size_unit = "mm"
 rim_range = [150.0, 350.0]
+crs = "EPSG:2958"
 
 [columns]
 pipe_id = "OBJECTID"
