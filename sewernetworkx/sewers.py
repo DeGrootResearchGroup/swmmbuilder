@@ -5,6 +5,7 @@ generates a subnetwork given an initial starting node and number
 of levels, and generates a .inp file to be used by pyswmm.
 """
 
+import logging
 import os
 import re
 import warnings
@@ -18,6 +19,8 @@ import networkx as nx
 import pandas as pd
 
 from .schema import CANONICAL_COLUMNS, LONDON_ON, as_schema
+
+logger = logging.getLogger(__name__)
 
 # SWMM's SI flow units. With any of these, lengths, elevations and section sizes are in metres,
 # matching the GIS data; with a US unit (CFS, GPM, MGD) SWMM would read them as feet.
@@ -238,16 +241,18 @@ class Network:
             self.removed["flow_type"] = dropped.value_counts().sort_index().to_dict()
             self.full_data = self.full_data[keep]
             for flow_type, count in self.removed["flow_type"].items():
-                print(
-                    f"Removed {count} pipes with flow type {flow_type} "
-                    f"(keeping {sorted(flow_types)})"
+                logger.info(
+                    "Removed %d pipes with flow type %s (keeping %s)",
+                    count,
+                    flow_type,
+                    sorted(flow_types),
                 )
 
         if not keep_abandoned and schema.abandoned is not None:
             abandoned = self.full_data["abandoned"]
             self.removed["abandoned"] = int(abandoned.sum())
             self.full_data = self.full_data[~abandoned]
-            print(f"Removed {self.removed['abandoned']} pipes flagged abandoned")
+            logger.info("Removed %d pipes flagged abandoned", self.removed["abandoned"])
 
         self.graph = self._build_graph(self.full_data)
 
@@ -260,78 +265,6 @@ class Network:
         for oid, up, down, length in records:
             G.add_edge(up, down, key=oid, pipe=oid, length=length)
         return G
-
-    """
-    # Needs to be updated
-    def filter_data_gisid(self, network_data, ppty):
-        Filter Network class data.
-
-                Parameters
-                ----------
-                network_data : class '__main__.Network'
-                    Sewer network class
-
-                ppty : str
-                    Property to filter data by
-
-                Returns
-                -------
-                str
-                    The GIS_ID of the filtered data
-
-        if not isinstance(ppty, str):
-            raise TypeError("Input must be a string.")
-
-        return network_data[ppty].iloc[0]
-    """
-
-    def get_upstream_invert(self, upstream_id):
-        """Find the upstream invert of a pipe leaving a node (or the downstream one of a pipe
-        entering it, if none leaves it).
-
-        Parameters
-        ----------
-        upstream_id : str
-            The node to search for.
-
-        Returns
-        ----------
-        float or None
-            The corresponding invert.
-        """
-        if not isinstance(upstream_id, str):
-            raise TypeError("Input must be a string")
-
-        inverts = self._first_inverts()
-        if upstream_id not in inverts:
-            raise TypeError("Cant find either upstreaminvert of downstreaminvert")
-        return inverts[upstream_id]
-
-    def _first_inverts(self):
-        """{node: us_invert of the first pipe leaving it or, if no pipe leaves it, ds_invert of
-        the first pipe entering it}, over ``full_data``.
-
-        Built on first use and rebuilt if ``full_data`` is replaced.
-        """
-        cached = getattr(self, "_inverts", None)
-        if cached is not None and cached[0] is self.full_data:
-            return cached[1]
-
-        data = self.full_data
-        upstream, downstream = {}, {}
-        for up, down, up_inv, down_inv in zip(
-            data["from_node"],
-            data["to_node"],
-            data["us_invert"],
-            data["ds_invert"],
-            strict=True,
-        ):
-            upstream.setdefault(up, up_inv)
-            downstream.setdefault(down, down_inv)
-
-        inverts = {**downstream, **upstream}
-        self._inverts = (data, inverts)
-        return inverts
 
 
 class SubNetwork(Network):
@@ -394,7 +327,6 @@ class SubNetwork(Network):
         self.outfall_node_type = subnetwork_data["outfall_node_type"]
         self.scale = subnetwork_data["scale"]
         self.subgraph = nx.DiGraph()
-        self.node_colour = []
         self.coords = {}
 
         if len(self.outfall_node) != len(self.outfall_node_type):
@@ -407,7 +339,6 @@ class SubNetwork(Network):
         self.graph = source.graph
         self.reduced_keys_data = source.full_data[[*CANONICAL_COLUMNS, "geometry"]].copy()
 
-        print("Creating Pipes")
         for oid, up, down, _ in _pipe_records(self.reduced_keys_data):
             self.network_data[oid] = (down, up)
 
@@ -612,16 +543,12 @@ class SubNetwork(Network):
             DeprecationWarning,
             stacklevel=2,
         )
-        print("Creating subnetwork for plotting")
-
         G = self._initialize_digraph()
 
         # Generate subnetwork starting with successors of starting node
-        print("Checking successor nodes")
         successors_subgraph = self._explore_nodes(G, direction="successors")
 
         # Generate subnetwork with predecessors of starting node
-        print("Checking predecessor nodes")
         predecessors_subgraph = self._explore_nodes(G, direction="predecessors")
 
         if ignore_successors:
@@ -643,27 +570,6 @@ class SubNetwork(Network):
 
         return G
 
-    def add_colouring(self):
-        """Apply colouring for subnetwork nodes.
-
-        Note: This method is intended for internal use and should not be called directly
-        by external code.
-
-        Returns
-        ----------
-        None
-        """
-
-        for node in self.subgraph.nodes:
-            if node == self.start or node == self.outfall_node:
-                self.node_colour.append("green")
-            elif len(list(self.subgraph.successors(node))) > 1:
-                self.node_colour.append("red")
-            elif len(list(self.subgraph.successors(node))) == 0:
-                self.node_colour.append("orange")
-            else:
-                self.node_colour.append("blue")
-
     def add_coordinates(self):
         """Apply node coordinates for subnetwork nodes.
 
@@ -680,7 +586,7 @@ class SubNetwork(Network):
 
         missing_nodes = set(self.subgraph.nodes()) - set(self.coords.keys())
         if missing_nodes:
-            print(f"Error: Positions for nodes {missing_nodes} could not be found.")
+            logger.warning("Positions for nodes %s could not be found.", sorted(missing_nodes))
 
     def node_positions(self, nodes):
         """Unscaled (x, y) position of each node, from the GIS pipe geometry.
@@ -751,7 +657,7 @@ class SubNetwork(Network):
                     not any(n in node_set for n in next_nodes) for node_set in connected_subgraph
                 ):
                     if len(next_nodes) > 1:
-                        print(f"Branch Detected at node: {node}")
+                        logger.debug("Branch detected at node %s", node)
                         branch_nodes = self._explore_branch(
                             next_nodes, new_nodes, G, direction, opposite_direction
                         )
@@ -760,13 +666,11 @@ class SubNetwork(Network):
                     elif len(next_nodes) == 1:
                         new_nodes.update(next_nodes)
                         opposite_nodes = set(getattr(G, opposite_direction)(next(iter(next_nodes))))
-                        print(
-                            f"Checking {opposite_direction.capitalize()} of {next_nodes}: {opposite_nodes}"
-                        )
+                        logger.debug("%s of %s: %s", opposite_direction, next_nodes, opposite_nodes)
                         if next(iter(opposite_nodes)) == node and len(opposite_nodes) == 1:
                             break
                         else:
-                            print(f"Possible branch detected at: {next_nodes}")
+                            logger.debug("Possible branch detected at %s", next_nodes)
                             if next_nodes in connected_subgraph:
                                 break
                             else:
@@ -780,7 +684,7 @@ class SubNetwork(Network):
                                     inner_depth += 1
 
                     elif len(next_nodes) == 0:
-                        print("Endpoint reached")
+                        logger.debug("Endpoint reached at %s", node)
                         new_nodes.update(next_nodes)
                         current_depth += 1
                         break
@@ -830,9 +734,8 @@ class SubNetwork(Network):
             nodes to be added to the subnetwork from branches
         """
         for branch in sorted(branch_nodes):
-            print(f"Exploring branch from node: {branch}")
+            logger.debug("Exploring branch from node %s", branch)
             new_nodes.add(branch)
-            # print(f'{direction.capitalize()} of {branch} is: {list(getattr(G, direction)(branch))}')
             branch_next = set(getattr(G, direction)(branch))
 
             new_nodes.update(branch_next)
@@ -840,112 +743,20 @@ class SubNetwork(Network):
                 next_node = next(iter(branch_next))
                 branch_next = set(getattr(G, direction)(next_node))
                 if len(branch_next) >= 2:
-                    print(f"New branch detected at {next_node}")
+                    logger.debug("New branch detected at %s", next_node)
                     break
                 elif len(branch_next) == 0:
-                    print(f"Endpoint reached at {next_node}")
+                    logger.debug("Endpoint reached at %s", next_node)
                     new_nodes.add(next_node)
                     new_nodes.update(branch_next)
 
                     # Check for successors or predecessors based on the current direction
                     opposite_nodes = set(getattr(G, opposite_direction)(next_node))
-                    print(
-                        f"Checking {opposite_direction.capitalize()} of {next_node}: "
-                        f"{opposite_nodes}"
-                    )
+                    logger.debug("%s of %s: %s", opposite_direction, next_node, opposite_nodes)
                     break
                 else:
                     new_nodes.update(branch_next)
         return new_nodes
-
-    def manipulate_network(self, operation, direction, start_nodes, copy=False):
-        """Manipulate graph based on specified operation
-
-        Parameters
-        ----------
-        operation : str
-            operation to perform.
-            options: trim, extend
-
-        direction : str
-            direction to trim or extend.
-
-        start_nodes: list
-            node(s) to start trimming or extending direction.
-
-        copy : bool, optional
-            manipulate existing graph or return a new one.
-
-        Returns
-        ----------
-        nx.Digraph
-        """
-
-        G = self._initialize_digraph()
-
-        if len(start_nodes) == 0:
-            raise ValueError("No nodes listed to trim. At least 1 node needs to be provided.")
-
-        self.validate_direction(direction)
-
-        # if tuple(str(start_nodes)) not in self.subgraph.nodes():
-        #    print(f"Node {start_nodes} is not in the current graph. Exiting manipulate_subnetwork.")
-        #    return
-
-        if operation == "trim":
-            if copy:
-                trimmed_graph = self.subgraph.copy()
-                for nodes in start_nodes:
-                    remove_nodes = set(getattr(trimmed_graph, direction)(nodes))
-                    remove_nodes.update(start_nodes)
-                    trimmed_graph.remove_nodes_from(remove_nodes)
-                return trimmed_graph
-            else:
-                self.subgraph = nx.DiGraph(self.subgraph)
-                remove_nodes = set()
-                for nodes in start_nodes:
-                    remove_nodes = set(getattr(self.subgraph, direction)(nodes))
-                    remove_nodes.update(start_nodes)
-                    self.subgraph.remove_nodes_from(remove_nodes)
-
-        elif operation == "extend":
-            if copy:
-                extended_graph = self.subgraph.copy()
-                for nodes in start_nodes:
-                    add_nodes = set(getattr(G, direction)(nodes))
-                    add_nodes.update(start_nodes)
-                    extended_graph.update(add_nodes)
-                return extended_graph
-            else:
-                self.subgraph = nx.DiGraph(self.subgraph)
-                for nodes in start_nodes:
-                    neighbour = getattr(G, direction)(nodes)
-                    add_nodes = set(neighbour)
-                    add_nodes.update(start_nodes)
-                    print(add_nodes)
-                    self.subgraph.add_nodes_from(add_nodes)
-        else:
-            raise ValueError("Invalid operation specified. Must be: extend or trim")
-
-        # Add the ability to trim / extend branches now
-
-    @staticmethod
-    def validate_direction(direction):
-        """Validate the direction parameter.
-
-        Parameters:
-        ----------
-        direction : str
-            The direction parameter to be validated.
-
-        Raises
-        ----------
-        ValueError
-            If the direction is not 'successors' or 'predecessors'.
-        """
-
-        if direction not in ["successors", "predecessors"]:
-            raise ValueError("Invalid direction. Use 'successors' or 'predecessors'.")
 
     def subnetwork_pipes(self):
         """GIS rows of the pipes in ``subgraph`` (including parallel pipes), sorted by pipe_id."""
@@ -1085,7 +896,7 @@ class SubNetwork(Network):
         for node in self.subgraph.nodes:
             invert = inverts[node]
             if height_correction is not None and node in height_correction:
-                print(f"Node {node}: Updating invert value to: {invert}")
+                logger.info("Node %s: invert set to %s by height_correction", node, invert)
 
             if node in outfall_types:
                 outfall_content += (
@@ -1104,7 +915,7 @@ class SubNetwork(Network):
                 x, y = positions[node]
                 coordinates_content += f"{node:<16} {x:<18} {y:<18}\n"
             else:
-                print(f"Warning: Node {node} has no position; it is left out of [COORDINATES]")
+                logger.warning("Node %s has no position; it is left out of [COORDINATES]", node)
 
         # Replace {nodes} placeholder with the built nodes content
         modified_content = (
@@ -1364,7 +1175,7 @@ class SubNetwork(Network):
 
         with open(output_file_path, "w") as file:
             file.write(template)
-        print(f"Template file copied to: {output_file_path}")
+        logger.info("Writing %s", output_file_path)
 
         # Write nodes to pyswmm .inp file
         self.write_nodes_pyswmm(

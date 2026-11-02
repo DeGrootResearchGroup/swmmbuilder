@@ -1,6 +1,16 @@
 # SewerNetworkx
  Python module used take GeoJSON data of a sewer network and create subnetworks and .inp files for pyswmm
 
+## Logging
+
+Progress and data problems (pipes dropped on loading, nodes with no position, height corrections)
+are reported through `logging`, on the `sewernetworkx` logger; nothing is printed. To see them:
+
+```python
+import logging
+logging.basicConfig(level=logging.INFO)
+```
+
 ## GIS schema
 
 `Network(path, schema=...)` reads the GeoJSON and converts it to canonical columns (`pipe_id`,

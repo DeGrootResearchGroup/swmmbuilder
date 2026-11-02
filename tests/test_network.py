@@ -1,5 +1,4 @@
-import contextlib
-import io
+import logging
 
 import geopandas as gpd
 import pytest
@@ -51,17 +50,16 @@ def test_flow_types_none_keeps_every_pipe():
     assert network.removed["flow_type"] == {}
 
 
-def test_missing_flow_type_dropped_and_logged(tmp_path):
+def test_missing_flow_type_dropped_and_logged(tmp_path, caplog):
     data = gpd.read_file(FIXTURE)
     data.loc[data["UpstreamID"] == "E1", "FlowType"] = None
     path = tmp_path / "no_flow_type.geojson"
     data.to_file(path, driver="GeoJSON")
-    out = io.StringIO()
-    with contextlib.redirect_stdout(out):
+    with caplog.at_level(logging.INFO, logger="sewernetworkx"):
         network = Network(str(path))
     assert "E1" not in network.graph
     assert network.removed["flow_type"] == {"None": 1, "storm": 1}
-    assert "Removed 1 pipes with flow type None" in out.getvalue()
+    assert "Removed 1 pipes with flow type None" in caplog.text
 
 
 def test_remove_storm_deprecated():
