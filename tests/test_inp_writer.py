@@ -1,6 +1,8 @@
 import pytest
 from conftest import DENDRITIC, OVERFLOW, read_sections, run_swmm, subnetwork_with_edges, write_inp
 
+from sewernetworkx.sewers import xsection
+
 # GIS values for the fixture pipes used below (see tests/data/make_fixture.py).
 GIS = {
     ("A1", "A2"): dict(shape="R", d=0.200, inv=(105.00, 104.50)),
@@ -47,7 +49,6 @@ def test_flow_units_are_si(dendritic_inp):
     assert opts["FLOW_UNITS"] in {"CMS", "LPS", "MLD"}
 
 
-@pytest.mark.xfail(strict=True, reason="#4: PipeShape 'R' (round) is written as RECT_CLOSED")
 def test_round_pipes_are_circular(dendritic_inp):
     pairs = conduits_by_pair(read_sections(dendritic_inp))
     for pair in [("A1", "A2"), ("A2", "J1"), ("B1", "B2"), ("J2", "OUT")]:
@@ -55,7 +56,6 @@ def test_round_pipes_are_circular(dendritic_inp):
         assert xs[1] == "CIRCULAR" and float(xs[2]) == pytest.approx(GIS[pair]["d"]), pair
 
 
-@pytest.mark.xfail(strict=True, reason="#4: only 'R' and 'Round' shapes are handled")
 def test_rectangular_and_egg_sections(dendritic_inp):
     pairs = conduits_by_pair(read_sections(dendritic_inp))
     ((_, rec),) = pairs[("B2", "J1")]
@@ -68,18 +68,12 @@ def test_rectangular_and_egg_sections(dendritic_inp):
     assert shapes == ["CIRCULAR", "EGG"]
 
 
-@pytest.mark.xfail(
-    strict=True, reason="#4: missing PipeShape silently reuses the previous pipe's section"
-)
 def test_missing_shape_raises(network, tmp_path):
     sub = subnetwork_with_edges(network, DENDRITIC + [("E1", "J2")])
     with pytest.raises(ValueError, match="1012"):
         write_inp(sub, tmp_path, routing="DYNWAVE")
 
 
-@pytest.mark.xfail(
-    strict=True, reason="#4: node invert = first outgoing pipe; offsets 0; drop structures ignored"
-)
 def test_conduit_inverts_reproduce_gis(dendritic_inp):
     s = read_sections(dendritic_inp)
     inv = node_inverts(s)
@@ -92,9 +86,6 @@ def test_conduit_inverts_reproduce_gis(dendritic_inp):
     assert inv["J1"] == pytest.approx(103.90)  # lowest pipe invert at J1 (outgoing EGG/round pipes)
 
 
-@pytest.mark.xfail(
-    strict=True, reason="#4: J2 takes the overflow pipe's invert, making J1->J2 adverse"
-)
 def test_no_adverse_conduits_in_dendritic_network(dendritic_inp):
     s = read_sections(dendritic_inp)
     inv = node_inverts(s)
@@ -173,10 +164,80 @@ def test_dead_end_written_as_outfall(network, tmp_path):
 
 
 def test_manning_n_by_material(network, tmp_path):
-    sub = subnetwork_with_edges(network, [("A1", "A2"), ("B2", "J1"), ("E1", "J2")], outfalls=())
+    sub = subnetwork_with_edges(network, [("A1", "A2"), ("B2", "J1")], outfalls=())
     path = write_inp(
         sub, tmp_path, dead_ends="outfall", manning_n=0.02, manning_n_by_material={"PVC": 0.011}
     )
     n = {r[0]: float(r[4]) for r in read_sections(path)["CONDUITS"]}
-    # A1-A2 is PVC; B2-J1 is CONC and E1-J2 has no material, so both fall back to manning_n.
-    assert n == {"1000": 0.011, "1003": 0.02, "1012": 0.02}
+    # A1-A2 is PVC; B2-J1 is CONC, which is not in the mapping, so it falls back to manning_n.
+    # (E1-J2, the fixture pipe with no Material, also has no PipeShape and is rejected, #4.)
+    assert n == {"1000": 0.011, "1003": 0.02}
+
+
+def test_adverse_gis_pipe_is_reported(network, tmp_path):
+    """D1-D2 is adverse in the GIS inverts: it is written as is, and reported."""
+    sub = subnetwork_with_edges(network, DENDRITIC + [("D1", "D2"), ("D2", "J2")])
+    with pytest.warns(UserWarning, match=r"adverse slope.*1010 \(D1") as record:
+        path = write_inp(sub, tmp_path, routing="DYNWAVE")
+    assert len([w for w in record if "adverse" in str(w.message)]) == 1
+    s = read_sections(path)
+    inv = node_inverts(s)
+    ((row, _),) = conduits_by_pair(s)[("D1", "D2")]
+    assert inv["D1"] + float(row[5]) == pytest.approx(103.80)
+    assert inv["D2"] + float(row[6]) == pytest.approx(104.10)
+
+
+def test_height_correction_overrides_node_invert(network, tmp_path):
+    path = write_inp(
+        subnetwork_with_edges(network, DENDRITIC),
+        tmp_path,
+        routing="DYNWAVE",
+        height_correction={"J2": 103.40},
+    )
+    s = read_sections(path)
+    assert node_inverts(s)["J2"] == pytest.approx(103.40)
+    pairs = conduits_by_pair(s)
+    ((row, _),) = pairs[("J2", "OUT")]
+    assert float(row[5]) == pytest.approx(0.10)  # pipe keeps its GIS invert of 103.50
+
+
+def test_height_correction_above_pipe_invert_warns(network, tmp_path):
+    with pytest.warns(UserWarning, match="below the invert of node J2"):
+        write_inp(
+            subnetwork_with_edges(network, DENDRITIC),
+            tmp_path,
+            routing="DYNWAVE",
+            height_correction={"J2": 103.55},
+        )
+
+
+def test_offset_arguments_are_deprecated(network, tmp_path):
+    with pytest.warns(DeprecationWarning, match="inlet_offset"):
+        write_inp(
+            subnetwork_with_edges(network, DENDRITIC), tmp_path, routing="DYNWAVE", inlet_offset=0.1
+        )
+
+
+@pytest.mark.parametrize(
+    "code, expected",
+    [
+        ("R", ("CIRCULAR", 0.25, 0.0)),
+        ("Round", ("CIRCULAR", 0.25, 0.0)),
+        ("REC", ("RECT_CLOSED", 0.3, 0.45)),
+        ("EGG", ("EGG", 0.3, 0.0)),
+        ("ARC", ("ARCH", 0.3, 0.45)),
+        ("ELH", ("HORIZ_ELLIPSE", 0.3, 0.45)),
+        ("ELV", ("VERT_ELLIPSE", 0.3, 0.45)),
+        ("S", None),
+        ("", None),
+        (None, None),
+    ],
+)
+def test_xsection_shape_map(code, expected):
+    pipe = {"PipeShape": code, "Height": 300, "Width": 450, "Diameter": 250}
+    assert xsection(pipe) == (pytest.approx(expected) if expected else None)
+
+
+@pytest.mark.parametrize("size", [None, float("nan"), 0])
+def test_xsection_missing_size(size):
+    assert xsection({"PipeShape": "R", "Height": 300, "Width": 300, "Diameter": size}) is None
