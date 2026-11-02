@@ -17,12 +17,14 @@ import gmplot
 import networkx as nx
 import pandas as pd
 
+from .schema import CANONICAL_COLUMNS, LONDON_ON
+
 # SWMM's SI flow units. With any of these, lengths, elevations and section sizes are in metres,
 # matching the GIS data; with a US unit (CFS, GPM, MGD) SWMM would read them as feet.
 SI_FLOW_UNITS = ("CMS", "LPS", "MLD")
 
-# FlowType values that Network keeps by default: sanitary sewers only.
-DEFAULT_FLOW_TYPES = frozenset({"SAN"})
+# Canonical flow types that Network keeps by default: sanitary sewers only.
+DEFAULT_FLOW_TYPES = frozenset({"sanitary"})
 
 # Placeholders that write_pyswmm fills in the template.
 TEMPLATE_PLACEHOLDERS = ("nodes", "outfalls", "conduits", "xsections", "coordinates", "vertices")
@@ -78,65 +80,51 @@ def line_coords(geometry):
     return [(c[0], c[1]) for part in parts for c in part.coords]
 
 
-# GIS PipeShape code -> SWMM cross-section. In the London GIS, 'R' means round; rectangular
-# pipes are 'REC'.
-PIPE_SHAPES = {
-    "R": "CIRCULAR",
-    "Round": "CIRCULAR",
-    "REC": "RECT_CLOSED",
-    "EGG": "EGG",
-    "ARC": "ARCH",
-    "ELH": "HORIZ_ELLIPSE",
-    "ELV": "VERT_ELLIPSE",
-}
-
-
 def xsection(pipe):
-    """SWMM cross-section of a pipe, from its GIS PipeShape and sizes (in mm).
+    """SWMM cross-section of a pipe, from its canonical shape and sizes (in m).
 
-    CIRCULAR uses the Diameter and EGG the full Height; the other shapes use the full Height
-    and maximum Width.
+    CIRCULAR uses the diameter and EGG the full height; the other shapes use the full height
+    and maximum width.
 
     Parameters
     ----------
     pipe : mapping
-        A row of the GIS data.
+        A row of the canonical data (see :mod:`sewernetworkx.schema`).
 
     Returns
     ----------
     tuple or None
-        (shape, geom1, geom2), with geom1 and geom2 in m, or None if the PipeShape is unknown or
-        missing, or a size it needs is missing or not positive.
+        (shape, geom1, geom2), or None if the shape is unknown or missing, or a size it needs is
+        missing or not positive.
     """
-    shape = PIPE_SHAPES.get(pipe.get("PipeShape"))
-    if shape is None:
+    shape = pipe.get("shape")
+    if pd.isna(shape):
         return None
     if shape == "CIRCULAR":
-        sizes = [pipe.get("Diameter")]
+        sizes = [pipe.get("diameter")]
     elif shape == "EGG":
-        sizes = [pipe.get("Height")]
+        sizes = [pipe.get("height")]
     else:
-        sizes = [pipe.get("Height"), pipe.get("Width")]
+        sizes = [pipe.get("height"), pipe.get("width")]
     if any(pd.isna(s) or s <= 0 for s in sizes):
         return None
-    geom = [s / 1000 for s in sizes] + [0.0] * (2 - len(sizes))
-    return shape, *geom
+    return shape, *sizes, *[0.0] * (2 - len(sizes))
 
 
 def _invert(value):
-    """An invert elevation, or None if it is missing (NaN or 0, the GIS code for none)."""
-    return None if pd.isna(value) or value <= 0 else float(value)
+    """An invert elevation, or None if it is missing."""
+    return None if pd.isna(value) else float(value)
 
 
 def _pipe_records(data):
-    """Yield (OBJECTID, UpstreamID, DownstreamID, Length) for every pipe with two node IDs.
+    """Yield (pipe_id, from_node, to_node, length) for every pipe with two node IDs.
 
-    Pipes with a missing node ID, or a node ID of 'Abandoned', are skipped.
+    Pipes with a missing node ID are skipped.
     """
     for oid, up, down, length in zip(
-        data["OBJECTID"], data["UpstreamID"], data["DownstreamID"], data["Length"], strict=True
+        data["pipe_id"], data["from_node"], data["to_node"], data["length"], strict=True
     ):
-        if pd.isna(up) or pd.isna(down) or "Abandoned" in (up, down):
+        if pd.isna(up) or pd.isna(down):
             continue
         yield oid, up, down, length
 
@@ -148,7 +136,7 @@ class TopologyReport:
     Attributes
     ----------
     splits : dict
-        Node -> sorted OBJECTIDs of its outlet pipes, for every node with more than one outlet
+        Node -> sorted pipe IDs of its outlet pipes, for every node with more than one outlet
         pipe. Parallel pipes count separately, as they do in SWMM.
 
     cycles : list of list
@@ -158,7 +146,7 @@ class TopologyReport:
         Nodes with no outlet pipe that are not outfalls.
 
     parallel_pipes : dict
-        (upstream, downstream) -> sorted OBJECTIDs, for every node pair joined by more than one pipe.
+        (upstream, downstream) -> sorted pipe IDs, for every node pair joined by more than one pipe.
     """
 
     splits: dict = field(default_factory=dict)
@@ -183,40 +171,53 @@ class Network:
     Attributes
     ----------
     full_data : geopandas.GeoDataFrame
-        Pipe data read from the GeoJSON file.
+        Pipe data read from the GeoJSON file, with the canonical columns of
+        :mod:`sewernetworkx.schema`.
+
+    schema : Schema
+        The schema the data were loaded with.
 
     graph : networkx.MultiDiGraph
-        One edge per pipe, in the direction of flow (UpstreamID -> DownstreamID), keyed by
-        OBJECTID so that parallel pipes are kept. Each edge has the attributes ``pipe`` (OBJECTID)
-        and ``length``. Nodes and edges are inserted in sorted order, so traversals do not depend
+        One edge per pipe, in the direction of flow (from_node -> to_node), keyed by pipe_id so
+        that parallel pipes are kept. Each edge has the attributes ``pipe`` (pipe_id) and
+        ``length``. Nodes and edges are inserted in sorted order, so traversals do not depend
         on the order of the file.
 
     remove_storm : bool, optional
         Deprecated. ``False`` is the same as ``flow_types=None``; ``True`` keeps the default.
 
     flow_types : iterable of str or None
-        FlowType values to keep (default ``{'SAN'}``). Every other pipe, including those with no
-        FlowType, is dropped and the counts are printed. ``None`` keeps every pipe.
+        Flow types to keep (default ``{'sanitary'}``). Source codes are translated by the schema,
+        so for London ``{'SAN'}`` is the same. Every other pipe, including those with no flow type,
+        is dropped and the counts are printed. ``None`` keeps every pipe.
 
     keep_abandoned : bool
-        Keep pipes with ``Abandoned == 1`` (default False: they are dropped). Pipes with a node ID
-        of 'Abandoned' are dropped from the graph either way.
+        Keep pipes flagged abandoned (default False: they are dropped). Pipes with a node ID the
+        schema treats as no node (for London, 'Abandoned') are dropped from the graph either way.
+
+    schema : Schema
+        How the GIS columns map to the canonical columns (default :data:`LONDON_ON`).
 
     Attributes
     ----------
     removed : dict
-        What was dropped on loading: ``{'flow_type': {FlowType: count}, 'abandoned': count}``.
-        Pipes with no FlowType are counted under ``'None'``.
+        What was dropped on loading: ``{'flow_type': {flow_type: count}, 'abandoned': count}``.
+        Pipes with no flow type are counted under ``'None'``.
     """
 
     def __init__(
-        self, file_path, remove_storm=None, flow_types=DEFAULT_FLOW_TYPES, keep_abandoned=False
+        self,
+        file_path,
+        remove_storm=None,
+        flow_types=DEFAULT_FLOW_TYPES,
+        keep_abandoned=False,
+        schema=LONDON_ON,
     ):
         """Class initialization"""
 
         self.file_path = file_path
-        data = gpd.read_file(self.file_path)
-        self.full_data = gpd.GeoDataFrame(data, geometry="geometry")
+        self.schema = schema
+        self.full_data = schema.normalize(gpd.read_file(self.file_path))
 
         if remove_storm is not None:
             warnings.warn(
@@ -229,22 +230,23 @@ class Network:
 
         self.removed = {"flow_type": {}, "abandoned": 0}
 
-        if flow_types is not None and "FlowType" in self.full_data.columns:
-            flow_types = set(flow_types)
-            keep = self.full_data["FlowType"].isin(flow_types)
-            dropped = self.full_data.loc[~keep, "FlowType"].fillna("None").astype(str)
+        if flow_types is not None and "flow_type" in schema.columns:
+            flow_types = {schema.flow_type(f) for f in flow_types}
+            keep = self.full_data["flow_type"].isin(flow_types)
+            dropped = self.full_data.loc[~keep, "flow_type"].fillna("None").astype(str)
             self.removed["flow_type"] = dropped.value_counts().sort_index().to_dict()
             self.full_data = self.full_data[keep]
             for flow_type, count in self.removed["flow_type"].items():
                 print(
-                    f"Removed {count} pipes with FlowType {flow_type} (keeping {sorted(flow_types)})"
+                    f"Removed {count} pipes with flow type {flow_type} "
+                    f"(keeping {sorted(flow_types)})"
                 )
 
-        if not keep_abandoned and "Abandoned" in self.full_data.columns:
-            abandoned = pd.to_numeric(self.full_data["Abandoned"], errors="coerce") == 1
+        if not keep_abandoned and schema.abandoned is not None:
+            abandoned = self.full_data["abandoned"]
             self.removed["abandoned"] = int(abandoned.sum())
             self.full_data = self.full_data[~abandoned]
-            print(f"Removed {self.removed['abandoned']} pipes flagged Abandoned")
+            print(f"Removed {self.removed['abandoned']} pipes flagged abandoned")
 
         self.graph = self._build_graph(self.full_data)
 
@@ -283,29 +285,29 @@ class Network:
     """
 
     def get_upstream_invert(self, upstream_id):
-        """Find the UpstreamInvert value based on the UpstreamID from a GeoPandas DataFrame.
+        """Find the upstream invert of a pipe leaving a node (or the downstream one of a pipe
+        entering it, if none leaves it).
 
         Parameters
         ----------
         upstream_id : str
-            The UpstreamID to search for.
+            The node to search for.
 
         Returns
         ----------
         float or None
-            The corresponding UpstreamInvert value if found, else None.
+            The corresponding invert.
         """
         if not isinstance(upstream_id, str):
             raise TypeError("Input must be a string")
 
-        # row = self.full_data[self.full_data['UpstreamID'] == upstream_id]
-        row = self.full_data[self.full_data["UpstreamID"] == upstream_id]
+        row = self.full_data[self.full_data["from_node"] == upstream_id]
         if not row.empty:
-            return row.iloc[0]["UpstreamInvert"]
+            return row.iloc[0]["us_invert"]
         else:
-            row = self.full_data[self.full_data["DownstreamID"] == upstream_id]
+            row = self.full_data[self.full_data["to_node"] == upstream_id]
             if not row.empty:
-                return row.iloc[0]["DownstreamInvert"]
+                return row.iloc[0]["ds_invert"]
             else:
                 raise TypeError("Cant find either upstreaminvert of downstreaminvert")
 
@@ -330,18 +332,21 @@ class SubNetwork(Network):
         Path to GeoJSON file. If given, the pipes are read from this file instead of
         ``network_data``.
 
+    schema : Schema
+        Schema of the file at ``file_path`` (default :data:`LONDON_ON`).
+
     Notes
     -----
     Select the subnetwork with one of :meth:`catchment`, :meth:`from_nodes` or
     :meth:`from_node_list`; each sets ``subgraph`` deterministically. ``subgraph`` is a
     ``networkx.DiGraph`` whose edges are stored as (downstream, upstream), the orientation the
-    .inp writer expects, with the attribute ``pipes``: the sorted OBJECTIDs of the (possibly
-    parallel) pipes between the two nodes.
+    .inp writer expects, with the attribute ``pipes``: the sorted pipe IDs of the (possibly
+    parallel) pipes between the two nodes, by pipe_id.
     """
 
-    def __init__(self, subnetwork_data, file_path=None):
+    def __init__(self, subnetwork_data, file_path=None, schema=LONDON_ON):
         if file_path:
-            super().__init__(file_path)
+            super().__init__(file_path, schema=schema)
             source = self
         else:
             source = subnetwork_data.get("network_data")
@@ -374,38 +379,10 @@ class SubNetwork(Network):
                 f"Length of {self.outfall_node} and {self.outfall_node_type} are not the same."
             )
 
-        print("Removing Unnecessary Entries")
-        keys_to_remove = [
-            "GIS_ID",
-            "GIS_FeatureKey",
-            "FlowType",
-            "StreetName",
-            "Location",
-            "Material",
-            "MaterialClass",
-            "Slope",
-            "AverageDepth",
-            "MaximumDepth",
-            "PDC_Count",
-            "ConstructionDate",
-            "Ownership",
-            "Assumed",
-            "Combined",
-            "Relief",
-            "LastEditDate",
-            "Abandoned",
-            "Grouted",
-            "CCTVInspectionDate",
-            "ShapeSTLength",
-        ]
-
+        self.schema = source.schema
         self.full_data = source.full_data
         self.graph = source.graph
-        self.reduced_keys_data = source.full_data.copy()
-
-        for keys in keys_to_remove:
-            if keys in self.reduced_keys_data.columns:
-                self.reduced_keys_data.drop(keys, axis=1, inplace=True)
+        self.reduced_keys_data = source.full_data[[*CANONICAL_COLUMNS, "geometry"]].copy()
 
         print("Creating Pipes")
         for oid, up, down, _ in _pipe_records(self.reduced_keys_data):
@@ -544,7 +521,7 @@ class SubNetwork(Network):
         return [types] if isinstance(types, str) else list(types)
 
     def _edge_pipes(self, up, down):
-        """OBJECTIDs of the pipes from ``up`` to ``down`` in ``subgraph``.
+        """pipe IDs of the pipes from ``up`` to ``down`` in ``subgraph``.
 
         Uses the ``pipes`` edge attribute, or the full network's pipes when a subgraph was built
         without it.
@@ -555,7 +532,7 @@ class SubNetwork(Network):
         return pipes
 
     def _outlet_pipes(self, node):
-        """{downstream node: OBJECTIDs} of the pipes leaving ``node`` in ``subgraph``."""
+        """{downstream node: pipe IDs} of the pipes leaving ``node`` in ``subgraph``."""
         return {down: self._edge_pipes(node, down) for down in self.subgraph.predecessors(node)}
 
     def validate(self):
@@ -701,7 +678,7 @@ class SubNetwork(Network):
         nodes = set(nodes)
         upstream_ends, downstream_ends = {}, {}
         for _, pipe in self.reduced_keys_data.iterrows():
-            upstream_id, downstream_id = pipe["UpstreamID"], pipe["DownstreamID"]
+            upstream_id, downstream_id = pipe["from_node"], pipe["to_node"]
             if upstream_id in nodes and upstream_id not in upstream_ends:
                 upstream_ends[upstream_id] = line_coords(pipe["geometry"])[0]
             if downstream_id in nodes and downstream_id not in downstream_ends:
@@ -852,9 +829,6 @@ class SubNetwork(Network):
                         f"{opposite_nodes}"
                     )
                     break
-                elif branch_next == "Abandoned":
-                    print("Reached abandoned node.")
-                    break
                 else:
                     new_nodes.update(branch_next)
         return new_nodes
@@ -949,9 +923,9 @@ class SubNetwork(Network):
             raise ValueError("Invalid direction. Use 'successors' or 'predecessors'.")
 
     def subnetwork_pipes(self):
-        """GIS rows of the pipes in ``subgraph`` (including parallel pipes), sorted by OBJECTID."""
+        """GIS rows of the pipes in ``subgraph`` (including parallel pipes), sorted by pipe_id."""
         pipes = {p for down, up in self.subgraph.edges for p in self._edge_pipes(up, down)}
-        return self.full_data[self.full_data["OBJECTID"].isin(pipes)].sort_values("OBJECTID")
+        return self.full_data[self.full_data["pipe_id"].isin(pipes)].sort_values("pipe_id")
 
     def node_inverts(self, height_correction=None):
         """Invert elevation of every node in ``subgraph``.
@@ -991,14 +965,13 @@ class SubNetwork(Network):
     @staticmethod
     def _lowest_inverts(pipes, nodes):
         """{node: lowest invert of the pipes connected to it} for the nodes in ``nodes``."""
-        drops = pipes.get("DropStructureInvert", pd.Series([None] * len(pipes)))
         found = {}
         for up, down, inv_up, inv_down, drop in zip(
-            pipes["UpstreamID"],
-            pipes["DownstreamID"],
-            pipes["UpstreamInvert"],
-            pipes["DownstreamInvert"],
-            drops,
+            pipes["from_node"],
+            pipes["to_node"],
+            pipes["us_invert"],
+            pipes["ds_invert"],
+            pipes["drop_invert"],
             strict=True,
         ):
             for node, value in ((up, inv_up), (down, inv_down), (down, drop)):
@@ -1007,26 +980,26 @@ class SubNetwork(Network):
                     found[node] = min(found.get(node, value), value)
         return found
 
-    @staticmethod
-    def xsections(pipes):
-        """{OBJECTID: (shape, geom1, geom2)} for the GIS rows in ``pipes`` (see :func:`xsection`).
+    def xsections(self, pipes):
+        """{pipe_id: (shape, geom1, geom2)} for the rows in ``pipes`` (see :func:`xsection`).
 
         Raises
         ----------
         ValueError
-            If any pipe has an unknown or missing PipeShape, or is missing a size; the message
+            If any pipe has an unknown or missing shape code, or is missing a size; the message
             lists every such pipe.
         """
         sections, bad = {}, []
         for _, pipe in pipes.iterrows():
             section = xsection(pipe)
             if section is None:
-                bad.append(f"{pipe['OBJECTID']} (PipeShape {pipe.get('PipeShape')!r})")
-            sections[pipe["OBJECTID"]] = section
+                bad.append(f"{pipe['pipe_id']} (shape code {pipe.get('shape_code')!r})")
+            sections[pipe["pipe_id"]] = section
         if bad:
             raise ValueError(
-                "Cannot build a cross-section for pipes with an unknown or missing PipeShape or "
-                f"size: {', '.join(bad)}. Known PipeShape codes: {list(PIPE_SHAPES)}."
+                "Cannot build a cross-section for pipes with an unknown or missing shape code or "
+                f"size: {', '.join(bad)}. Known shape codes in schema {self.schema.name!r}: "
+                f"{list(self.schema.shapes)}."
             )
         return sections
 
@@ -1150,7 +1123,7 @@ class SubNetwork(Network):
             Barrel value for conduit (default is 0.0).
 
         manning_n_by_material : dict, optional
-            Material -> Manning N. Pipes whose Material is not in the mapping use ``manning_n``.
+            material -> Manning N. Pipes whose material is not in the mapping use ``manning_n``.
 
         height_correction : dict, optional
             User defined node inverts, overriding those computed by :meth:`node_inverts`.
@@ -1176,17 +1149,17 @@ class SubNetwork(Network):
         adverse = []
 
         for _, row in pipes.iterrows():
-            name = row["OBJECTID"]
-            inlet = row["UpstreamID"]
-            outlet = row["DownstreamID"]
-            length = row["Length"]
-            roughness = (manning_n_by_material or {}).get(row.get("Material"), manning_n)
+            name = row["pipe_id"]
+            inlet = row["from_node"]
+            outlet = row["to_node"]
+            length = row["length"]
+            roughness = (manning_n_by_material or {}).get(row["material"], manning_n)
             shape, geom1, geom2 = sections[name]
 
             ends = []
             for node, pipe_invert in (
-                (inlet, row["UpstreamInvert"]),
-                (outlet, row["DownstreamInvert"]),
+                (inlet, row["us_invert"]),
+                (outlet, row["ds_invert"]),
             ):
                 pipe_invert = _invert(pipe_invert)
                 offset = 0.0 if pipe_invert is None else round(pipe_invert - inverts[node], 4)
@@ -1259,7 +1232,7 @@ class SubNetwork(Network):
 
         Node inverts are the lowest invert of the pipes connected to each node (see
         :meth:`node_inverts`), and conduits are attached with offsets so that they keep their GIS
-        inverts. Pipe cross-sections come from the GIS PipeShape (see :data:`PIPE_SHAPES`).
+        inverts. Pipe cross-sections come from the shape codes, mapped by the schema's ``shapes``.
 
         Parameters
         ----------
@@ -1280,10 +1253,10 @@ class SubNetwork(Network):
 
         manning_n : float
             Manning N coefficient for conduit (default is 0.01). With ``manning_n_by_material``,
-            the fallback for pipes whose Material is not in the mapping.
+            the fallback for pipes whose material is not in the mapping.
 
         manning_n_by_material : dict, optional
-            Material -> Manning N, e.g. ``{'PVC': 0.011, 'CONC': 0.013, 'VIT': 0.013}``.
+            material -> Manning N, e.g. ``{'PVC': 0.011, 'CONC': 0.013, 'VIT': 0.013}``.
 
         inlet_offset, outlet_offset : float
             Deprecated and ignored: the offsets are computed from the GIS inverts.
@@ -1321,7 +1294,7 @@ class SubNetwork(Network):
         ----------
         ValueError
             If the topology is invalid for the template's flow routing, there are dead ends and
-            ``dead_ends`` is 'raise', a pipe has an unknown or missing PipeShape or size, or a
+            ``dead_ends`` is 'raise', a pipe has an unknown or missing shape code or size, or a
             node has no invert.
         """
 

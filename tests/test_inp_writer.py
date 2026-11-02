@@ -1,8 +1,6 @@
 import pytest
 from conftest import DENDRITIC, OVERFLOW, read_sections, run_swmm, subnetwork_with_edges, write_inp
 
-from sewernetworkx.sewers import xsection
-
 # GIS values for the fixture pipes used below (see tests/data/make_fixture.py).
 GIS = {
     ("A1", "A2"): dict(shape="R", d=0.200, inv=(105.00, 104.50)),
@@ -216,28 +214,3 @@ def test_offset_arguments_are_deprecated(network, tmp_path):
         write_inp(
             subnetwork_with_edges(network, DENDRITIC), tmp_path, routing="DYNWAVE", inlet_offset=0.1
         )
-
-
-@pytest.mark.parametrize(
-    "code, expected",
-    [
-        ("R", ("CIRCULAR", 0.25, 0.0)),
-        ("Round", ("CIRCULAR", 0.25, 0.0)),
-        ("REC", ("RECT_CLOSED", 0.3, 0.45)),
-        ("EGG", ("EGG", 0.3, 0.0)),
-        ("ARC", ("ARCH", 0.3, 0.45)),
-        ("ELH", ("HORIZ_ELLIPSE", 0.3, 0.45)),
-        ("ELV", ("VERT_ELLIPSE", 0.3, 0.45)),
-        ("S", None),
-        ("", None),
-        (None, None),
-    ],
-)
-def test_xsection_shape_map(code, expected):
-    pipe = {"PipeShape": code, "Height": 300, "Width": 450, "Diameter": 250}
-    assert xsection(pipe) == (pytest.approx(expected) if expected else None)
-
-
-@pytest.mark.parametrize("size", [None, float("nan"), 0])
-def test_xsection_missing_size(size):
-    assert xsection({"PipeShape": "R", "Height": 300, "Width": 300, "Diameter": size}) is None

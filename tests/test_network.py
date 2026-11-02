@@ -13,7 +13,7 @@ def pipe_pairs(sub):
 
 
 def test_storm_pipes_removed(network):
-    assert "STM" not in set(network.full_data["FlowType"])
+    assert "storm" not in set(network.full_data["flow_type"])
 
 
 def test_pipes_abandoned_by_id_removed(network):
@@ -36,7 +36,7 @@ def test_networks_are_independent():
 
 def test_flagged_abandoned_pipes_not_in_graph(network):
     assert "X1" not in network.graph
-    assert network.removed == {"flow_type": {"STM": 1}, "abandoned": 1}
+    assert network.removed == {"flow_type": {"storm": 1}, "abandoned": 1}
 
 
 def test_keep_abandoned():
@@ -60,11 +60,17 @@ def test_missing_flow_type_dropped_and_logged(tmp_path):
     with contextlib.redirect_stdout(out):
         network = Network(str(path))
     assert "E1" not in network.graph
-    assert network.removed["flow_type"] == {"None": 1, "STM": 1}
-    assert "Removed 1 pipes with FlowType None" in out.getvalue()
+    assert network.removed["flow_type"] == {"None": 1, "storm": 1}
+    assert "Removed 1 pipes with flow type None" in out.getvalue()
 
 
 def test_remove_storm_deprecated():
     with pytest.warns(DeprecationWarning, match="flow_types"):
         network = quiet(Network, str(FIXTURE), remove_storm=False)
     assert network.graph.has_edge("S1", "S2")
+
+
+def test_flow_types_accept_source_codes():
+    network = quiet(Network, str(FIXTURE), flow_types={"SAN", "STM"})
+    assert network.graph.has_edge("S1", "S2")
+    assert network.removed["flow_type"] == {}
