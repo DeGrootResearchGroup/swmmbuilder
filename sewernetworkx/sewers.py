@@ -17,7 +17,7 @@ import gmplot
 import networkx as nx
 import pandas as pd
 
-from .schema import CANONICAL_COLUMNS, LONDON_ON
+from .schema import CANONICAL_COLUMNS, LONDON_ON, as_schema
 
 # SWMM's SI flow units. With any of these, lengths, elevations and section sizes are in metres,
 # matching the GIS data; with a US unit (CFS, GPM, MGD) SWMM would read them as feet.
@@ -195,8 +195,9 @@ class Network:
         Keep pipes flagged abandoned (default False: they are dropped). Pipes with a node ID the
         schema treats as no node (for London, 'Abandoned') are dropped from the graph either way.
 
-    schema : Schema
-        How the GIS columns map to the canonical columns (default :data:`LONDON_ON`).
+    schema : Schema, str or Path
+        How the GIS columns map to the canonical columns: a :class:`Schema` (default
+        :data:`LONDON_ON`; see also :data:`TORONTO_ON`) or the path to a schema TOML file.
 
     Attributes
     ----------
@@ -216,7 +217,7 @@ class Network:
         """Class initialization"""
 
         self.file_path = file_path
-        self.schema = schema
+        self.schema = schema = as_schema(schema)
         self.full_data = schema.normalize(gpd.read_file(self.file_path))
 
         if remove_storm is not None:
@@ -353,8 +354,9 @@ class SubNetwork(Network):
         Path to GeoJSON file. If given, the pipes are read from this file instead of
         ``network_data``.
 
-    schema : Schema
-        Schema of the file at ``file_path`` (default :data:`LONDON_ON`).
+    schema : Schema, str or Path
+        Schema of the file at ``file_path`` (default :data:`LONDON_ON`), or the path to a schema
+        TOML file.
 
     Notes
     -----

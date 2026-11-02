@@ -1,0 +1,33 @@
+# Toronto, ON: the Sewer Gravity Mains dataset of the City of Toronto Open Data Portal
+# (https://open.toronto.ca/dataset/sewer-gravity-mains/). Missing values are the string 'None'.
+# Upstream/Downstream Elevation are taken to be the pipe inverts. Only a diameter is published,
+# so only circular pipes have a cross-section; Egg, Rectangular, Arched, Horseshoe, Oblong and
+# Trapezoidal pipes are reported on loading and rejected if they are written. Flow types other
+# than SAN, Storm and Combined (CSO, SCSO, FD, EO) pass through unchanged. The geometry is
+# reprojected to MTM zone 10 (EPSG:2952, metres), so that missing lengths can be computed and the
+# .inp coordinates are in metres.
+name = "Toronto, ON"
+null_values = ["None"]
+nonpositive_inverts_missing = true
+size_unit = "mm"
+crs = "EPSG:2952"
+
+[columns]
+pipe_id = "Sewer Gravity Asset Identification"
+from_node = "Sewer Gravity Upstream Maintenance Hole"
+to_node = "Sewer Gravity Downstream Maintenance Hole"
+length = "Sewer Gravity Measured Length"
+us_invert = "Upstream Elevation"
+ds_invert = "Downstream Elevation"
+shape = "Sewer Gravity Main Shape"
+diameter = "Sewer Gravity Diameter"
+flow_type = "Sewer Gravity Flow Type"
+material = "Sewer Gravity Material"
+
+[shapes]
+Circular = "CIRCULAR"
+
+[flow_types]
+SAN = "sanitary"
+Storm = "storm"
+Combined = "combined"

@@ -1,0 +1,37 @@
+# London, ON. In the London GIS, PipeShape 'R' means round; rectangular pipes are 'REC'. Sizes
+# are in mm, an invert of 0 means none, and a node ID of 'Abandoned' means no node.
+name = "London, ON"
+abandoned = "Abandoned"
+abandoned_values = [1]
+null_nodes = ["Abandoned"]
+nonpositive_inverts_missing = true
+size_unit = "mm"
+
+[columns]
+pipe_id = "OBJECTID"
+from_node = "UpstreamID"
+to_node = "DownstreamID"
+length = "Length"
+us_invert = "UpstreamInvert"
+ds_invert = "DownstreamInvert"
+drop_invert = "DropStructureInvert"
+shape = "PipeShape"
+diameter = "Diameter"
+height = "Height"
+width = "Width"
+flow_type = "FlowType"
+material = "Material"
+
+[shapes]
+R = "CIRCULAR"
+Round = "CIRCULAR"
+REC = "RECT_CLOSED"
+EGG = "EGG"
+ARC = "ARCH"
+ELH = "HORIZ_ELLIPSE"
+ELV = "VERT_ELLIPSE"
+
+[flow_types]
+SAN = "sanitary"
+STM = "storm"
+COM = "combined"

@@ -34,8 +34,8 @@ test = [
 packages = ["sewernetworkx"]
 
 [tool.setuptools.package-data]
-# The default .inp template, loaded with importlib.resources by SubNetwork.write_pyswmm.
-sewernetworkx = ["templates/*.inp"]
+# The default .inp template and the schema presets, loaded with importlib.resources.
+sewernetworkx = ["templates/*.inp", "schemas/*.toml"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

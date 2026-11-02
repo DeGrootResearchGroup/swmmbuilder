@@ -23,10 +23,16 @@ reads only the canonical columns:
 =================  ===========================================================================
 
 Columns that are not mapped keep their source names.
+
+Schemas can be written in TOML (see :meth:`Schema.from_toml`); the presets :data:`LONDON_ON` and
+:data:`TORONTO_ON` are loaded from ``sewernetworkx/schemas``.
 """
 
+import tomllib
 import warnings
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, fields
+from importlib import resources
+from pathlib import Path
 
 import geopandas as gpd
 import pandas as pd
@@ -51,7 +57,7 @@ CANONICAL_COLUMNS = (
 )
 
 # Canonical columns a schema must map, and that must be present in the source data.
-REQUIRED_COLUMNS = ("pipe_id", "from_node", "to_node", "length")
+REQUIRED_COLUMNS = ("pipe_id", "from_node", "to_node")
 
 # Units of length -> units per metre.
 UNITS = {"m": 1, "cm": 100, "mm": 1000, "ft": 1 / 0.3048, "in": 1 / 0.0254}
@@ -69,9 +75,11 @@ class Schema:
     name : str
         Name of the schema, e.g. the city.
     columns : dict
-        Canonical column -> source column. ``pipe_id``, ``from_node``, ``to_node`` and ``length``
-        are required; ``shape_code`` and ``abandoned`` are derived and cannot be mapped.
-        ``columns['shape']`` is the source column holding the shape code.
+        Canonical column -> source column. ``pipe_id``, ``from_node`` and ``to_node`` are
+        required; ``shape_code`` and ``abandoned`` are derived and cannot be mapped.
+        ``columns['shape']`` is the source column holding the shape code. Missing lengths
+        (including all of them, if ``length`` is not mapped) are computed from the geometry, which
+        needs a projected CRS (see ``crs``).
     shapes : dict
         Source shape code -> SWMM cross-section name (CIRCULAR uses ``diameter``, EGG ``height``,
         the others ``height`` and ``width``).
@@ -81,6 +89,8 @@ class Schema:
         Source column that flags abandoned pipes.
     abandoned_values : frozenset
         Values of ``abandoned`` that mean the pipe is abandoned.
+    null_values : frozenset
+        Values that mean "missing" in every mapped column (e.g. the string ``'None'``).
     null_nodes : frozenset
         Node IDs that mean "no node" (set to NaN).
     nonpositive_inverts_missing : bool
@@ -98,6 +108,7 @@ class Schema:
     flow_types: dict = field(default_factory=dict)
     abandoned: str | None = None
     abandoned_values: frozenset = frozenset()
+    null_values: frozenset = frozenset()
     null_nodes: frozenset = frozenset()
     nonpositive_inverts_missing: bool = False
     length_unit: str = "m"
@@ -120,6 +131,44 @@ class Schema:
             if unit not in UNITS:
                 raise ValueError(f"Unknown unit {unit!r}; use one of {list(UNITS)}.")
 
+    @classmethod
+    def from_toml(cls, path):
+        """Read a schema from a TOML file.
+
+        The top-level keys are the parameters of :class:`Schema`, and ``columns``, ``shapes`` and
+        ``flow_types`` are tables; see ``sewernetworkx/schemas/*.toml`` for examples.
+
+        Parameters
+        ----------
+        path : str, Path or importlib.resources.abc.Traversable
+            The TOML file.
+        """
+        path = Path(path) if isinstance(path, str) else path
+        with path.open("rb") as file:
+            values = tomllib.load(file)
+        unknown = set(values) - {f.name for f in fields(cls)}
+        if unknown:
+            raise ValueError(f"Unknown keys in schema file {path}: {sorted(unknown)}.")
+        for key in ("abandoned_values", "null_values", "null_nodes"):
+            if key in values:
+                values[key] = frozenset(values[key])
+        return cls(**values)
+
+    def _lengths(self, data, lengths):
+        """Pipe lengths in m; missing ones are computed from the (projected) geometry."""
+        lengths = pd.to_numeric(lengths, errors="coerce") / UNITS[self.length_unit]
+        missing = lengths.isna()
+        if not missing.any():
+            return lengths
+        if data.crs is None or not data.crs.is_projected:
+            raise ValueError(
+                f"{int(missing.sum())} pipes have no length, and it cannot be computed from the "
+                f"geometry, whose CRS ({data.crs}) is not projected. Set the schema's crs to a "
+                "projected CRS in metres (e.g. the local UTM or MTM zone)."
+            )
+        metres = data.crs.axis_info[0].unit_conversion_factor
+        return lengths.where(~missing, data.geometry.length * metres)
+
     def flow_type(self, code):
         """Canonical flow type of a source code (codes not in ``flow_types`` pass through)."""
         return self.flow_types.get(code, code)
@@ -140,7 +189,8 @@ class Schema:
         Raises
         ----------
         ValueError
-            If a required source column is missing or ``pipe_id`` is not unique.
+            If a required source column is missing, ``pipe_id`` is not unique, or lengths must be
+            computed from a geometry that is not in a projected CRS.
 
         Warns
         ----------
@@ -170,13 +220,14 @@ class Schema:
             column = sources.get(canonical)
             if column is None or column not in data.columns:
                 return pd.Series(pd.NA, index=data.index, dtype=object)
-            return data[column]
+            values = data[column]
+            return values.where(~values.isin(self.null_values)) if self.null_values else values
 
         out = {}
         out["pipe_id"] = source("pipe_id")
         for node in ("from_node", "to_node"):
             out[node] = source(node).where(~source(node).isin(self.null_nodes))
-        out["length"] = source("length") / UNITS[self.length_unit]
+        out["length"] = self._lengths(data, source("length"))
         for column in INVERT_COLUMNS:
             inverts = pd.to_numeric(source(column), errors="coerce") / UNITS[self.invert_unit]
             if self.nonpositive_inverts_missing:
@@ -215,38 +266,17 @@ class Schema:
         return gpd.GeoDataFrame(frame, geometry=geometry, crs=data.crs)
 
 
-# London, ON. In the London GIS, PipeShape 'R' means round; rectangular pipes are 'REC'. Sizes
-# are in mm, an invert of 0 means none, and a node ID of 'Abandoned' means no node.
-LONDON_ON = Schema(
-    name="London, ON",
-    columns={
-        "pipe_id": "OBJECTID",
-        "from_node": "UpstreamID",
-        "to_node": "DownstreamID",
-        "length": "Length",
-        "us_invert": "UpstreamInvert",
-        "ds_invert": "DownstreamInvert",
-        "drop_invert": "DropStructureInvert",
-        "shape": "PipeShape",
-        "diameter": "Diameter",
-        "height": "Height",
-        "width": "Width",
-        "flow_type": "FlowType",
-        "material": "Material",
-    },
-    shapes={
-        "R": "CIRCULAR",
-        "Round": "CIRCULAR",
-        "REC": "RECT_CLOSED",
-        "EGG": "EGG",
-        "ARC": "ARCH",
-        "ELH": "HORIZ_ELLIPSE",
-        "ELV": "VERT_ELLIPSE",
-    },
-    flow_types={"SAN": "sanitary", "STM": "storm", "COM": "combined"},
-    abandoned="Abandoned",
-    abandoned_values=frozenset({1}),
-    null_nodes=frozenset({"Abandoned"}),
-    nonpositive_inverts_missing=True,
-    size_unit="mm",
-)
+def _preset(name):
+    return Schema.from_toml(resources.files("sewernetworkx") / "schemas" / f"{name}.toml")
+
+
+def as_schema(schema):
+    """A :class:`Schema`, or one read from a TOML file path."""
+    return schema if isinstance(schema, Schema) else Schema.from_toml(schema)
+
+
+# London, ON (the default). See sewernetworkx/schemas/london_on.toml.
+LONDON_ON = _preset("london_on")
+
+# Toronto, ON, Sewer Gravity Mains. See sewernetworkx/schemas/toronto_on.toml.
+TORONTO_ON = _preset("toronto_on")

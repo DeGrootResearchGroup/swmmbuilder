@@ -7,7 +7,7 @@ from conftest import DENDRITIC, FIXTURE, quiet, read_sections, subnetwork_with_e
 from shapely.geometry import LineString
 
 from sewernetworkx import LONDON_ON, Network, Schema
-from sewernetworkx.schema import CANONICAL_COLUMNS
+from sewernetworkx.schema import CANONICAL_COLUMNS, as_schema
 from sewernetworkx.sewers import xsection
 
 
@@ -82,8 +82,8 @@ def test_unknown_shape_code_warns():
 
 
 def test_missing_required_column():
-    with pytest.raises(ValueError, match=r"missing required columns \['Length'\]"):
-        LONDON_ON.normalize(london_rows({}).drop(columns="Length"))
+    with pytest.raises(ValueError, match=r"missing required columns \['UpstreamID'\]"):
+        LONDON_ON.normalize(london_rows({}).drop(columns="UpstreamID"))
 
 
 def test_duplicate_pipe_ids():
@@ -96,7 +96,7 @@ def test_duplicate_pipe_ids():
 @pytest.mark.parametrize(
     "kwargs, match",
     [
-        ({"columns": {"pipe_id": "id", "from_node": "a", "to_node": "b"}}, "required"),
+        ({"columns": {"pipe_id": "id", "from_node": "a"}}, "required"),
         ({"columns": {**LONDON_ON.columns, "colour": "Colour"}}, "colour"),
         ({"columns": {**LONDON_ON.columns, "abandoned": "Abandoned"}}, "abandoned"),
         ({"columns": LONDON_ON.columns, "size_unit": "furlong"}, "furlong"),
@@ -167,3 +167,111 @@ def test_other_schema_writes_same_inp(network, tmp_path):
     )
     path = write_inp(subnetwork_with_edges(other, DENDRITIC), tmp_path, "b.inp", "DYNWAVE")
     assert numbers(read_sections(path)) == numbers(london)
+
+
+def test_null_values():
+    schema = Schema(
+        name="nulls",
+        columns=LONDON_ON.columns,
+        shapes={"R": "CIRCULAR"},
+        null_values=frozenset({"None"}),
+    )
+    pipe = schema.normalize(
+        london_rows({"PipeShape": "None", "UpstreamInvert": "None", "Material": "None"})
+    ).iloc[0]
+    assert math.isnan(pipe["shape_code"]) and math.isnan(pipe["us_invert"])
+    assert math.isnan(pipe["material"])
+
+
+def projected(*rows):
+    """London rows with a 30 m and a 40 m pipe, in a projected CRS (UTM 17N, metres)."""
+    data = london_rows(*rows)
+    data.geometry = [LineString([(0, 0), (30, 0)]), LineString([(0, 0), (0, 40)])][: len(data)]
+    return data.set_crs("EPSG:32617")
+
+
+def test_missing_lengths_from_geometry():
+    data = projected({"Length": 31.0}, {"Length": None})
+    assert list(LONDON_ON.normalize(data)["length"]) == [31.0, 40.0]
+
+
+def test_unmapped_length_from_geometry():
+    columns = {k: v for k, v in LONDON_ON.columns.items() if k != "length"}
+    schema = Schema(name="no length", columns=columns)
+    data = schema.normalize(projected({}, {}))
+    assert list(data["length"]) == [30.0, 40.0] and "Length" in data.columns
+
+
+def test_missing_length_needs_projected_crs():
+    data = london_rows({"Length": None}).set_crs("EPSG:4326")
+    with pytest.raises(ValueError, match=r"1 pipes have no length.*not projected"):
+        LONDON_ON.normalize(data)
+
+
+def test_reproject():
+    schema = Schema(name="utm", columns=LONDON_ON.columns, crs="EPSG:32617")
+    data = london_rows({}).set_crs("EPSG:4326")
+    data.geometry = [LineString([(-81.25, 42.98), (-81.25, 42.99)])]
+    assert schema.normalize(data).crs == "EPSG:32617"
+
+
+LONDON_TOML = """
+name = "London from TOML"
+abandoned = "Abandoned"
+abandoned_values = [1]
+null_nodes = ["Abandoned"]
+nonpositive_inverts_missing = true
+size_unit = "mm"
+
+[columns]
+pipe_id = "OBJECTID"
+from_node = "UpstreamID"
+to_node = "DownstreamID"
+length = "Length"
+us_invert = "UpstreamInvert"
+ds_invert = "DownstreamInvert"
+drop_invert = "DropStructureInvert"
+shape = "PipeShape"
+diameter = "Diameter"
+height = "Height"
+width = "Width"
+flow_type = "FlowType"
+material = "Material"
+
+[shapes]
+R = "CIRCULAR"
+Round = "CIRCULAR"
+REC = "RECT_CLOSED"
+EGG = "EGG"
+ARC = "ARCH"
+ELH = "HORIZ_ELLIPSE"
+ELV = "VERT_ELLIPSE"
+
+[flow_types]
+SAN = "sanitary"
+STM = "storm"
+COM = "combined"
+"""
+
+
+def test_from_toml(tmp_path):
+    path = tmp_path / "london.toml"
+    path.write_text(LONDON_TOML)
+    schema = Schema.from_toml(str(path))
+    assert schema == Schema(**{**LONDON_ON.__dict__, "name": "London from TOML"})
+    assert as_schema(path) == schema and as_schema(LONDON_ON) is LONDON_ON
+
+
+def test_network_from_toml_path(network, tmp_path):
+    path = tmp_path / "london.toml"
+    path.write_text(LONDON_TOML)
+    other = quiet(Network, str(FIXTURE), schema=str(path))
+    assert other.schema.name == "London from TOML"
+    assert set(other.graph.edges) == set(network.graph.edges)
+
+
+def test_from_toml_unknown_key(tmp_path):
+    path = tmp_path / "bad.toml"
+    path.write_text(LONDON_TOML.replace("size_unit", "size_units"))
+    with pytest.raises(ValueError, match=r"Unknown keys .*\['size_units'\]"):
+        Schema.from_toml(path)
