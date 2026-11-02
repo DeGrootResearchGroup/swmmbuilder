@@ -1,5 +1,25 @@
 # SewerNetworkx
- Python module used take GeoJSON data of a sewer network and create subnetworks and .inp files for pyswmm
+
+Python package that loads a city's GIS sewer network (GeoJSON or any format geopandas reads),
+selects subnetworks of it, and writes them as SWMM `.inp` files for pyswmm.
+
+```python
+from sewernetworkx import Network, maps, swmm
+
+net = Network("london.geojson")                     # schema=LONDON_ON by default
+sub = net.catchment("OUT")                          # every node draining to OUT
+sub = net.catchment("J1", max_hops=2, outlet="OUT") # truncated, plus the path down to OUT
+sub = net.subnetwork(["J1", "J2", "OUT"])           # given nodes and the pipes between them
+
+sub.validate(outfalls=["OUT"])                      # TopologyReport: splits, cycles, dead ends
+sub.to_inp("model.inp", outfalls=["OUT"])           # or {"OUT": "FIXED"} for other types
+model = swmm.build_model(sub, ["OUT"], manning_n_by_material={"PVC": 0.011})  # without a file
+sub.to_node_list("nodes.txt")                       # Subnetwork.from_node_list(net, "nodes.txt")
+maps.generate_gmap(sub, "map.html")                 # geographic CRS only
+```
+
+A `Subnetwork`'s `graph` is a `networkx.MultiDiGraph` in the direction of flow, with one edge per
+pipe keyed by pipe ID, so parallel pipes are kept.
 
 ## Logging
 
@@ -83,7 +103,7 @@ give a warning on loading, and those pipes are rejected if they are written to a
 vertices, with node inverts, conduit offsets and Manning's n already decided, so the model can be
 inspected or tested without a file. `write_inp(subnetwork, path, ...)` checks the template and
 the topology, builds the model and renders it into the template in one write;
-`SubNetwork.write_pyswmm` calls it.
+`Subnetwork.to_inp` calls it.
 
 The default template is the one shipped in the package,
 `sewernetworkx/templates/template.inp` (`examples/pyswmm_template/template.inp` is a copy kept in
@@ -104,10 +124,9 @@ written.
 
 A node's invert is the lowest invert of the subnetwork pipes connected to it, including the
 drop-structure invert (`DropStructureInvert` in London) of pipes entering it. Each conduit's
-inlet/outlet offset is its GIS pipe invert minus the node invert (`LINK_OFFSETS DEPTH`), so conduits keep their GIS inverts; any that
-slope uphill are reported with a warning. `height_correction={node: invert}` overrides a node's
-invert, and the offsets are measured from it. The `inlet_offset`/`outlet_offset` arguments of
-`write_pyswmm` are deprecated and ignored.
+inlet/outlet offset is its GIS pipe invert minus the node invert (`LINK_OFFSETS DEPTH`), so
+conduits keep their GIS inverts; any that slope uphill are reported with a warning.
+`height_correction={node: invert}` overrides a node's invert, and the offsets are measured from it.
 
 ## Tests
 

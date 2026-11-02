@@ -202,7 +202,7 @@ def node_inverts(subnetwork, height_correction=None):
 
     Parameters
     ----------
-    subnetwork : SubNetwork
+    subnetwork : Subnetwork
         The subnetwork.
 
     height_correction : dict, optional
@@ -218,10 +218,10 @@ def node_inverts(subnetwork, height_correction=None):
     ValueError
         If a node has no pipe with an invert.
     """
-    nodes = set(subnetwork.subgraph.nodes)
-    inverts = _lowest_inverts(subnetwork.subnetwork_pipes(), nodes)
+    nodes = set(subnetwork.nodes)
+    inverts = _lowest_inverts(subnetwork.pipes(), nodes)
     if nodes - set(inverts):
-        inverts.update(_lowest_inverts(subnetwork.full_data, nodes - set(inverts)))
+        inverts.update(_lowest_inverts(subnetwork.network.full_data, nodes - set(inverts)))
     missing = sorted(nodes - set(inverts))
     if missing:
         raise ValueError(f"No pipe invert found for nodes: {', '.join(map(str, missing))}")
@@ -332,9 +332,18 @@ class SwmmModel:
         return template
 
 
+def outfall_types(outfalls):
+    """{node: outfall type} from a mapping, or from an iterable of nodes (all 'FREE')."""
+    if isinstance(outfalls, str):
+        return {outfalls: "FREE"}
+    if hasattr(outfalls, "items"):
+        return dict(outfalls)
+    return {node: "FREE" for node in outfalls}
+
+
 def build_model(
     subnetwork,
-    outfalls=None,
+    outfalls,
     max_depth=0.0,
     init_depth=0.0,
     surcharge_depth=0.0,
@@ -355,12 +364,12 @@ def build_model(
 
     Parameters
     ----------
-    subnetwork : SubNetwork
-        The subnetwork; its ``subgraph`` selects the nodes and pipes.
+    subnetwork : Subnetwork
+        The subnetwork.
 
-    outfalls : dict, optional
-        {node: outfall type, e.g. 'FREE'}. Defaults to the subnetwork's ``outfall_node`` and
-        ``outfall_node_type``. Every other node is a junction.
+    outfalls : dict or iterable of str
+        {node: outfall type, e.g. 'FREE'}, or the outfall nodes, which are then FREE. Every other
+        node is a junction.
 
     max_depth, init_depth, surcharge_depth, ponding_area : float
         Junction parameters (default 0.0).
@@ -384,16 +393,19 @@ def build_model(
     Raises
     ----------
     ValueError
-        If a pipe has an unknown or missing shape code or size, or a node has no invert.
+        If an outfall is not in the subnetwork, a pipe has an unknown or missing shape code or
+        size, or a node has no invert.
     """
-    if outfalls is None:
-        outfalls = dict(zip(subnetwork._outfalls(), subnetwork._outfall_types(), strict=True))
-    pipes = subnetwork.subnetwork_pipes()
+    outfalls = outfall_types(outfalls)
+    unknown = sorted(set(outfalls) - set(subnetwork.nodes))
+    if unknown:
+        raise ValueError(f"Outfalls not in the subnetwork: {', '.join(map(str, unknown))}")
+    pipes = subnetwork.pipes()
     sections = xsections(pipes, subnetwork.schema)
     inverts = node_inverts(subnetwork, height_correction)
     model = SwmmModel()
 
-    for node in subnetwork.subgraph.nodes:
+    for node in subnetwork.nodes:
         invert = inverts[node]
         if height_correction is not None and node in height_correction:
             logger.info("Node %s: invert set to %s by height_correction", node, invert)
@@ -404,8 +416,8 @@ def build_model(
                 Junction(node, invert, max_depth, init_depth, surcharge_depth, ponding_area)
             )
 
-    positions = subnetwork.node_positions(subnetwork.subgraph.nodes)
-    for node in subnetwork.subgraph.nodes:
+    positions = subnetwork.node_positions()
+    for node in subnetwork.nodes:
         if node in positions:
             model.coordinates[node] = positions[node]
         else:
@@ -459,21 +471,24 @@ def build_model(
     return model
 
 
-def write_inp(subnetwork, path, template_path=None, dead_ends="raise", **options):
+def write_inp(subnetwork, path, outfalls, template_path=None, dead_ends="raise", **options):
     """Write a subnetwork to a SWMM .inp file.
 
-    The template is checked with :func:`check_template` and the subnetwork with its
-    ``validate()``: flow splits (including parallel pipes) and cycles are refused unless the
+    The template is checked with :func:`check_template` and the subnetwork with
+    :meth:`Subnetwork.validate`: flow splits (including parallel pipes) and cycles are refused unless the
     template uses ``FLOW_ROUTING DYNWAVE``. Nothing is written if the template, the topology or
     the model (see :func:`build_model`) is invalid.
 
     Parameters
     ----------
-    subnetwork : SubNetwork
+    subnetwork : Subnetwork
         The subnetwork.
 
     path : str, Path
         The .inp file to write.
+
+    outfalls : dict or iterable of str
+        The outfalls; see :func:`build_model`.
 
     template_path : str, Path, optional
         The .inp template (default: :func:`default_template_path`, which uses FLOW_UNITS LPS).
@@ -498,15 +513,13 @@ def write_inp(subnetwork, path, template_path=None, dead_ends="raise", **options
     template = read_template(template_path)
     check_template(template)
 
-    report = subnetwork.validate()
+    outfalls = outfall_types(outfalls)
+    report = subnetwork.validate(outfalls)
     check_topology(report, template_routing(template), dead_ends)
-    if dead_ends == "outfall" and report.dead_ends:
-        outfalls = options.get("outfalls")
-        if outfalls is None:
-            outfalls = dict(zip(subnetwork._outfalls(), subnetwork._outfall_types(), strict=True))
-        options["outfalls"] = {**outfalls, **{node: "FREE" for node in report.dead_ends}}
+    if dead_ends == "outfall":
+        outfalls = {**outfalls, **{node: "FREE" for node in report.dead_ends}}
 
-    model = build_model(subnetwork, **options)
+    model = build_model(subnetwork, outfalls, **options)
     logger.info("Writing %s", path)
     Path(path).write_text(model.render(template))
     return model

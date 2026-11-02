@@ -1,5 +1,13 @@
 import pytest
-from conftest import DENDRITIC, OVERFLOW, read_sections, run_swmm, subnetwork_with_edges, write_inp
+from conftest import (
+    DENDRITIC,
+    OVERFLOW,
+    read_sections,
+    run_swmm,
+    subnetwork,
+    with_pipes,
+    write_inp,
+)
 
 # GIS values for the fixture pipes used below (see tests/data/make_fixture.py).
 GIS = {
@@ -28,7 +36,7 @@ def node_inverts(sections):
 
 @pytest.fixture
 def dendritic_inp(network, tmp_path):
-    return write_inp(subnetwork_with_edges(network, DENDRITIC), tmp_path, routing="DYNWAVE")
+    return write_inp(subnetwork(network, DENDRITIC), tmp_path, routing="DYNWAVE")
 
 
 def test_every_node_and_pipe_is_written(dendritic_inp):
@@ -67,7 +75,7 @@ def test_rectangular_and_egg_sections(dendritic_inp):
 
 
 def test_missing_shape_raises(network, tmp_path):
-    sub = subnetwork_with_edges(network, DENDRITIC + [("E1", "J2")])
+    sub = subnetwork(network, DENDRITIC + [("E1", "J2")])
     with pytest.raises(ValueError, match="1012"):
         write_inp(sub, tmp_path, routing="DYNWAVE")
 
@@ -97,8 +105,8 @@ def test_written_inp_runs_in_swmm(dendritic_inp, tmp_path):
 
 
 def test_validate_reports_topology(network):
-    sub = subnetwork_with_edges(network, DENDRITIC + OVERFLOW + [("D2", "J2")], outfalls=("OUT",))
-    report = sub.validate()
+    sub = subnetwork(network, DENDRITIC + OVERFLOW + [("D2", "J2")])
+    report = sub.validate(["OUT"])
     assert report.splits == {"J1": [1006, 1007], "J2": [1005, 1008]}
     assert report.parallel_pipes == {("J1", "J2"): [1006, 1007]}
     assert report.dead_ends == ["OV2"]  # D2 has an outlet; OUT is an outfall
@@ -106,39 +114,39 @@ def test_validate_reports_topology(network):
     assert not report.is_dendritic
 
 
-def test_validate_finds_cycles(network):
-    sub = subnetwork_with_edges(network, [("A1", "A2"), ("A2", "J1"), ("J1", "A1"), ("A2", "OUT")])
+def test_validate_finds_cycles():
+    sub = with_pipes(("J1", "A1")).subnetwork(["A1", "A2", "J1"])
     assert sub.validate().cycles == [["A1", "A2", "J1"]]
 
 
 def test_dendritic_network_validates_clean(network):
     edges = [("A1", "A2"), ("A2", "J1"), ("B2", "J1"), ("C1", "J1")]
-    report = subnetwork_with_edges(network, edges, outfalls=("J1",)).validate()
+    report = subnetwork(network, edges).validate(["J1"])
     assert report.is_dendritic and not report.dead_ends and not report.parallel_pipes
 
 
 def test_split_rejected_under_kinematic_wave(network, tmp_path):
-    sub = subnetwork_with_edges(network, DENDRITIC + OVERFLOW, outfalls=("OUT", "OV2"))
+    sub = subnetwork(network, DENDRITIC + OVERFLOW)
     with pytest.raises(ValueError, match=r"(?s)node J2 .*DYNWAVE"):
-        write_inp(sub, tmp_path)
+        write_inp(sub, tmp_path, outfalls=("OUT", "OV2"))
     assert not (tmp_path / "model.inp").exists()
 
 
 def test_parallel_pipes_rejected_under_kinematic_wave(network, tmp_path):
     with pytest.raises(ValueError, match=r"node J1 has more than one outlet pipe \(1006, 1007\)"):
-        write_inp(subnetwork_with_edges(network, DENDRITIC), tmp_path)
+        write_inp(subnetwork(network, DENDRITIC), tmp_path)
 
 
-def test_cycle_rejected_under_kinematic_wave(network, tmp_path):
-    sub = subnetwork_with_edges(network, [("A1", "A2"), ("A2", "A1")], outfalls=("A1",))
+def test_cycle_rejected_under_kinematic_wave(tmp_path):
+    sub = with_pipes(("A2", "A1")).subnetwork(["A1", "A2"])
     with pytest.raises(ValueError, match="cycle A1 -> A2 -> A1"):
-        write_inp(sub, tmp_path)
+        write_inp(sub, tmp_path, outfalls=("A1",))
 
 
 def test_multiple_outfalls_written_once(network, tmp_path):
-    sub = subnetwork_with_edges(network, DENDRITIC + OVERFLOW, outfalls=("OUT", "OV2"))
-    sub.outfall_node_type = ["FREE", "NORMAL"]
-    rows = read_sections(write_inp(sub, tmp_path, routing="DYNWAVE"))["OUTFALLS"]
+    sub = subnetwork(network, DENDRITIC + OVERFLOW)
+    outfalls = {"OUT": "FREE", "OV2": "NORMAL"}
+    rows = read_sections(write_inp(sub, tmp_path, routing="DYNWAVE", outfalls=outfalls))["OUTFALLS"]
     # Invert = lowest downstream invert of the pipes entering the outfall.
     assert sorted((r[0], float(r[1]), r[2]) for r in rows) == [
         ("OUT", 103.30, "FREE"),
@@ -147,34 +155,33 @@ def test_multiple_outfalls_written_once(network, tmp_path):
 
 
 def test_dead_end_rejected(network, tmp_path):
-    sub = subnetwork_with_edges(
-        network, [("A1", "A2"), ("A2", "J1")]
-    )  # J1 has no outlet; OUT absent
+    sub = subnetwork(network, [("A1", "A2"), ("A2", "J1")])  # J1 has no outlet; OUT absent
     with pytest.raises(ValueError, match=r"dead ends .*: J1"):
-        write_inp(sub, tmp_path)
+        write_inp(sub, tmp_path, outfalls=())
 
 
 def test_dead_end_written_as_outfall(network, tmp_path):
-    sub = subnetwork_with_edges(network, [("A1", "A2"), ("A2", "J1"), ("B2", "J1")])
-    s = read_sections(write_inp(sub, tmp_path, dead_ends="outfall"))
+    sub = subnetwork(network, [("A1", "A2"), ("A2", "J1"), ("B2", "J1")])
+    s = read_sections(write_inp(sub, tmp_path, outfalls=(), dead_ends="outfall"))
     assert [(r[0], float(r[1]), r[2]) for r in s["OUTFALLS"]] == [("J1", 103.95, "FREE")]
     assert {r[0] for r in s["JUNCTIONS"]} == {"A1", "A2", "B2"}
 
 
 def test_manning_n_by_material(network, tmp_path):
-    sub = subnetwork_with_edges(network, [("A1", "A2"), ("B2", "J1")], outfalls=())
+    sub = subnetwork(network, [("A1", "A2"), ("A2", "J1"), ("B2", "J1")])
     path = write_inp(
-        sub, tmp_path, dead_ends="outfall", manning_n=0.02, manning_n_by_material={"PVC": 0.011}
+        sub, tmp_path, outfalls=("J1",), manning_n=0.02, manning_n_by_material={"PVC": 0.011}
     )
     n = {r[0]: float(r[4]) for r in read_sections(path)["CONDUITS"]}
-    # A1-A2 is PVC; B2-J1 is CONC, which is not in the mapping, so it falls back to manning_n.
-    # (E1-J2, the fixture pipe with no Material, also has no PipeShape and is rejected, #4.)
-    assert n == {"1000": 0.011, "1003": 0.02}
+    # A1-A2 and A2-J1 are PVC; B2-J1 is CONC, which is not in the mapping, so it falls back to
+    # manning_n. (E1-J2, the fixture pipe with no Material, also has no PipeShape and is
+    # rejected, #4.)
+    assert n == {"1000": 0.011, "1001": 0.011, "1003": 0.02}
 
 
 def test_adverse_gis_pipe_is_reported(network, tmp_path):
     """D1-D2 is adverse in the GIS inverts: it is written as is, and reported."""
-    sub = subnetwork_with_edges(network, DENDRITIC + [("D1", "D2"), ("D2", "J2")])
+    sub = subnetwork(network, DENDRITIC + [("D1", "D2"), ("D2", "J2")])
     with pytest.warns(UserWarning, match=r"adverse slope.*1010 \(D1") as record:
         path = write_inp(sub, tmp_path, routing="DYNWAVE")
     assert len([w for w in record if "adverse" in str(w.message)]) == 1
@@ -187,7 +194,7 @@ def test_adverse_gis_pipe_is_reported(network, tmp_path):
 
 def test_height_correction_overrides_node_invert(network, tmp_path):
     path = write_inp(
-        subnetwork_with_edges(network, DENDRITIC),
+        subnetwork(network, DENDRITIC),
         tmp_path,
         routing="DYNWAVE",
         height_correction={"J2": 103.40},
@@ -202,15 +209,8 @@ def test_height_correction_overrides_node_invert(network, tmp_path):
 def test_height_correction_above_pipe_invert_warns(network, tmp_path):
     with pytest.warns(UserWarning, match="below the invert of node J2"):
         write_inp(
-            subnetwork_with_edges(network, DENDRITIC),
+            subnetwork(network, DENDRITIC),
             tmp_path,
             routing="DYNWAVE",
             height_correction={"J2": 103.55},
-        )
-
-
-def test_offset_arguments_are_deprecated(network, tmp_path):
-    with pytest.warns(DeprecationWarning, match="inlet_offset"):
-        write_inp(
-            subnetwork_with_edges(network, DENDRITIC), tmp_path, routing="DYNWAVE", inlet_offset=0.1
         )

@@ -1,12 +1,12 @@
-"""Node and pipe coordinates (#5): [COORDINATES]/[VERTICES] in the .inp, add_coordinates and
-generate_gmap."""
+"""Node and pipe coordinates (#5): [COORDINATES]/[VERTICES] in the .inp, node_positions and
+maps.generate_gmap."""
 
 import json
 
 import pytest
-from conftest import DENDRITIC, FIXTURE, OVERFLOW, read_sections, subnetwork_with_edges, write_inp
+from conftest import DENDRITIC, FIXTURE, OVERFLOW, read_sections, subnetwork, write_inp
 
-from sewernetworkx import sewers
+from sewernetworkx import maps
 
 
 def fixture_geometry():
@@ -26,8 +26,8 @@ EDGES = DENDRITIC + OVERFLOW
 
 @pytest.fixture
 def sections(network, tmp_path):
-    sub = subnetwork_with_edges(network, EDGES, outfalls=("OUT", "OV2"))
-    return read_sections(write_inp(sub, tmp_path, routing="DYNWAVE"))
+    sub = subnetwork(network, EDGES)
+    return read_sections(write_inp(sub, tmp_path, routing="DYNWAVE", outfalls=("OUT", "OV2")))
 
 
 def test_coordinates_section(sections):
@@ -50,18 +50,14 @@ def test_vertices_section(sections):
         assert [v for xy in written[name] for v in xy] == pytest.approx(flat, abs=1e-12), name
 
 
-def test_add_coordinates_uses_pipe_endpoints(network):
-    sub = subnetwork_with_edges(network, EDGES)
-    sub.scale = 10.0
-    sub.add_coordinates()
-    assert set(sub.coords) == {n for e in EDGES for n in e}
-    # OV2 is only a downstream end, of the multi-vertex OV1 -> OV2 pipe: it must sit at the last
-    # vertex, not the midpoint vertex.
-    for node, (x, y) in sub.coords.items():
-        assert (x, y) == pytest.approx((10 * NODES[node][0], 10 * NODES[node][1])), node
+def test_node_positions_use_pipe_endpoints(network):
+    positions = subnetwork(network, EDGES).node_positions()
+    assert set(positions) == {n for e in EDGES for n in e}
+    for node, xy in positions.items():
+        assert xy == pytest.approx(NODES[node]), node
 
 
-def test_generate_gmap_divides_by_scale(network, tmp_path, monkeypatch):
+def test_generate_gmap(network, tmp_path, monkeypatch):
     calls = {"markers": {}, "lines": []}
 
     class FakePlotter:
@@ -77,13 +73,11 @@ def test_generate_gmap_divides_by_scale(network, tmp_path, monkeypatch):
         def draw(self, file_name):
             pass
 
-    monkeypatch.setattr(sewers.gmplot, "GoogleMapPlotter", FakePlotter)
-    sub = subnetwork_with_edges(network, DENDRITIC)
-    sub.scale = 10.0
-    sub.add_coordinates()
-    sub.generate_gmap(str(tmp_path / "map.html"), scale=10.0)
+    monkeypatch.setattr(maps.gmplot, "GoogleMapPlotter", FakePlotter)
+    sub = subnetwork(network, DENDRITIC)
+    maps.generate_gmap(sub, str(tmp_path / "map.html"))
     for node, (lat, lng) in calls["markers"].items():
         assert (lng, lat) == pytest.approx(NODES[node]), node
-    first = next(iter(sub.coords))
+    first = next(iter(sub.node_positions()))
     assert calls["centre"][::-1] == pytest.approx(NODES[first])
-    assert len(calls["lines"]) == len(DENDRITIC)
+    assert len(calls["lines"]) == len(DENDRITIC)  # parallel J1 -> J2 pipes drawn once
