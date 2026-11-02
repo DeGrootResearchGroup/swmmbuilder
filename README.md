@@ -190,9 +190,9 @@ The default template is the one shipped in the package,
 sync by a test). It uses SI units, `FLOW_UNITS LPS`, because the GIS lengths, inverts and sizes are
 in metres. A custom template (`template_path=`) must use `CMS`, `LPS` or `MLD`, and may only
 contain the `{nodes}`, `{outfalls}`, `{storage}`, `{conduits}`, `{pumps}`, `{xsections}`,
-`{curves}`, `{dwf}`, `{patterns}`, `{coordinates}` and `{vertices}` placeholders; anything else (including US units)
-raises `ValueError`. Node `[COORDINATES]` and pipe `[VERTICES]` are written in the units of the GIS
-geometry.
+`{curves}`, `{dwf}`, `{patterns}`, `{coordinates}` and `{vertices}` placeholders; anything else
+(including US units) raises `ValueError`. Node `[COORDINATES]` and pipe `[VERTICES]` are written in
+the units of the GIS geometry.
 
 ## Pumps
 
@@ -253,15 +253,53 @@ template's `flow_units` (default `LPS`).
 
 Cross-sections come from the schema's shape codes. For London (`PipeShape`, sizes in mm, written
 in m): `R`/`Round` → `CIRCULAR(Diameter)`, `REC` → `RECT_CLOSED(Height, Width)`, `EGG` →
-`EGG(Height)`, `ARC` → `ARCH`, `ELH`/`ELV` → `HORIZ_ELLIPSE`/`VERT_ELLIPSE` (`Height, Width`). An
-unknown or missing shape or size raises `ValueError` listing the pipe IDs, before anything is
-written.
+`EGG(Height)`, `ARC` → `ARCH`, `ELH`/`ELV` → `HORIZ_ELLIPSE`/`VERT_ELLIPSE` (`Height, Width`). A
+round pipe with no diameter whose height equals its width takes that value as its diameter (logged
+and flagged; see below). An unknown or missing shape or size raises `ValueError`, before anything
+is written.
 
 A node's invert is the lowest invert of the subnetwork pipes connected to it, including the
 drop-structure invert (`DropStructureInvert` in London) of pipes entering it. Each conduit's
 inlet/outlet offset is its GIS pipe invert minus the node invert (`LINK_OFFSETS DEPTH`), so
 conduits keep their GIS inverts; any that slope uphill are reported with a warning.
 `height_correction={node: invert}` overrides a node's invert, and the offsets are measured from it.
+
+## Data gaps
+
+`sub.data_gaps()` lists every gap in a subnetwork's data at once: pipes with an unknown or missing
+shape code (`unknown_shape`) or a missing size (`no_size`), pipe ends with no invert
+(`no_us_invert`, `no_ds_invert`; written at the node invert), and nodes with no invert from any pipe
+(`no_node_invert`). `validate()` reports their counts in `data_gaps`, and `to_inp` refuses a
+subnetwork with any `unknown_shape`, `no_size` or `no_node_invert` gap left, listing all of them.
+
+Gaps can be filled by rules that the user chooses; none is applied by default. Every filled value
+is logged and flagged in the report's `filled_from` column (with `value`, `source` and the `order`
+of the fills), so nothing filled looks like City data. The same options go to `data_gaps` (to see
+what would be filled) and `to_inp` (whose returned model keeps the report as `model.data_gaps`):
+
+```python
+from swmmbuilder import LONDON_ON
+
+fills = dict(
+    size_overrides={145041: 0.25, 207149: dict(height=0.6)},  # values from the City, in m
+    shape_codes={"": "CIRCULAR"},       # missing and blank shape codes are ""
+    size_fill="downstream",             # copy from the downstream pipe of the same shape,
+                                        # else the largest upstream one ("upstream": reversed)
+    invert_fill="interpolate",          # by length between the nearest known inverts
+    headwater_slope=0.005,              # no known invert upstream: downstream invert + slope
+    force_main_discharge=LONDON_ON.design["force_main_discharge"],
+)
+report = sub.data_gaps(**fills)
+sub.to_inp("model.inp", **fills)
+```
+
+`force_main_discharge` sets the missing downstream invert of a force main's last pipe from the
+receiving node's invert (known, or filled first by `invert_fill`/`headwater_slope`), plus
+`height_above_receiving_invert` (default: `max_height_above_receiving_invert`); a callable
+`(pipe, receiving_invert) -> invert` can be passed instead. Design values like this sit in the
+schema's optional `[design]` table, apart from the column mapping, and are used only when passed:
+London's (`london_on.toml`) is the Design Specifications & Requirements Manual's limit of 200 mm
+above the receiving maintenance hole's flow line (Ch. 4, s. 4.8).
 
 ## Tests
 

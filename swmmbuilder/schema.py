@@ -121,6 +121,9 @@ REQUIRED_COLUMNS = ("pipe_id", "from_node", "to_node")
 UNITS = {"m": 1, "cm": 100, "mm": 1000, "ft": 1 / 0.3048, "in": 1 / 0.0254}
 
 INVERT_COLUMNS = ("us_invert", "ds_invert", "drop_invert")
+
+# Design rules a schema's ``design`` table may hold (see :func:`swmmbuilder.gaps.fill_gaps`).
+DESIGN_RULES = ("force_main_discharge",)
 SIZE_COLUMNS = ("diameter", "height", "width")
 
 
@@ -177,6 +180,12 @@ class Schema:
         ``'ft'``, ``'in'``.
     crs : str or None
         If set, the geometry is reprojected to this CRS on loading.
+    design : dict
+        Design rule -> its parameters, from a design standard (see :data:`DESIGN_RULES`), e.g.
+        ``{'force_main_discharge': {'max_height_above_receiving_invert': 0.2}}``. They are used
+        only when passed to the .inp writer, e.g.
+        ``to_inp(..., force_main_discharge=schema.design['force_main_discharge'])``, so a schema
+        can map the columns without adopting the standard.
     """
 
     name: str
@@ -198,6 +207,7 @@ class Schema:
     invert_unit: str = "m"
     size_unit: str = "m"
     crs: str | None = None
+    design: dict = field(default_factory=dict)
 
     def __post_init__(self):
         unknown = set(self.columns) - set(CANONICAL_COLUMNS)
@@ -217,6 +227,12 @@ class Schema:
             raise ValueError(
                 f"Schema {self.name!r} maps node columns that cannot be mapped: "
                 f"{sorted(unknown)}. Canonical node columns: {list(NODE_COLUMNS)}."
+            )
+        unknown = set(self.design) - set(DESIGN_RULES)
+        if unknown:
+            raise ValueError(
+                f"Schema {self.name!r} has unknown design rules: {sorted(unknown)}. "
+                f"Known rules: {list(DESIGN_RULES)}."
             )
         for unit in (self.length_unit, self.invert_unit, self.size_unit):
             if unit not in UNITS:
