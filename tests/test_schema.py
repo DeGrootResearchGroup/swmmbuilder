@@ -8,7 +8,7 @@ from shapely.geometry import LineString
 
 from sewernetworkx import LONDON_ON, Network, Schema
 from sewernetworkx.schema import CANONICAL_COLUMNS, as_schema
-from sewernetworkx.sewers import xsection
+from sewernetworkx.swmm import xsection
 
 
 def london_rows(*rows):
