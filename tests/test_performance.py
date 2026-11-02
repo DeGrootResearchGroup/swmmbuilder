@@ -5,7 +5,7 @@ import time
 
 from conftest import read_sections, subnetwork, write_inp
 
-from sewernetworkx import Network
+from swmmbuilder import Network
 
 N_PIPES = 3000
 # Generous: the writer takes ~0.2 s here; the old per-edge table scan took ~80 s.

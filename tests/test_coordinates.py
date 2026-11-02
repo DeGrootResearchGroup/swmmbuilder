@@ -7,7 +7,7 @@ import geopandas as gpd
 import pytest
 from conftest import DENDRITIC, FIXTURE, OVERFLOW, read_sections, subnetwork, write_inp
 
-from sewernetworkx import Network, maps
+from swmmbuilder import Network, maps
 
 
 def fixture_geometry():

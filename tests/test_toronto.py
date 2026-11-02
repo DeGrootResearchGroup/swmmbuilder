@@ -6,7 +6,7 @@ import json
 import pytest
 from conftest import TESTS, read_sections, run_swmm, write_inp
 
-from sewernetworkx import TORONTO_ON, Network, maps
+from swmmbuilder import TORONTO_ON, Network, maps
 
 TORONTO = TESTS / "data" / "toronto_catchment.geojson"
 # The catchment drains to MH5130118747, and pipe SL963 takes it on to OUTFALL.

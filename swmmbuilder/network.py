@@ -1,4 +1,4 @@
-"""A city's sewer network: its pipes, loaded through a :class:`~sewernetworkx.Schema`, and the
+"""A city's sewer network: its pipes, loaded through a :class:`~swmmbuilder.Schema`, and the
 flow graph between their nodes."""
 
 import logging
@@ -56,7 +56,7 @@ class Network:
     Attributes
     ----------
     full_data : geopandas.GeoDataFrame
-        The pipes, with the canonical columns of :mod:`sewernetworkx.schema`.
+        The pipes, with the canonical columns of :mod:`swmmbuilder.schema`.
 
     schema : Schema
         The schema the data were loaded with.

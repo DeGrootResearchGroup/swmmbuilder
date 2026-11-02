@@ -1,4 +1,4 @@
-"""A subnetwork: a selection of nodes of a :class:`~sewernetworkx.Network` and the pipes between
+"""A subnetwork: a selection of nodes of a :class:`~swmmbuilder.Network` and the pipes between
 them."""
 
 from dataclasses import dataclass, field
@@ -95,7 +95,7 @@ class Subnetwork:
 
         :meth:`from_node_list` rebuilds the same subnetwork from this file.
         """
-        lines = ["# SewerNetworkx node list: one node ID per line", *self.nodes]
+        lines = ["# swmmbuilder node list: one node ID per line", *self.nodes]
         Path(path).write_text("\n".join(lines) + "\n")
 
     @property
@@ -164,7 +164,7 @@ class Subnetwork:
         return report
 
     def to_inp(self, path, outfalls, **options):
-        """Write the subnetwork to a SWMM .inp file; see :func:`sewernetworkx.swmm.write_inp`.
+        """Write the subnetwork to a SWMM .inp file; see :func:`swmmbuilder.swmm.write_inp`.
 
         Returns
         ----------
