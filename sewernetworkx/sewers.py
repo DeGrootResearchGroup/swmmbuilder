@@ -7,10 +7,8 @@ of levels, and generates a .inp file to be used by pyswmm.
 
 import logging
 import os
-import re
 import warnings
 from dataclasses import dataclass, field
-from importlib import resources
 from pathlib import Path
 
 import geopandas as gpd
@@ -18,105 +16,14 @@ import gmplot
 import networkx as nx
 import pandas as pd
 
+from . import swmm
+from .geometry import line_coords
 from .schema import CANONICAL_COLUMNS, LONDON_ON, as_schema
 
 logger = logging.getLogger(__name__)
 
-# SWMM's SI flow units. With any of these, lengths, elevations and section sizes are in metres,
-# matching the GIS data; with a US unit (CFS, GPM, MGD) SWMM would read them as feet.
-SI_FLOW_UNITS = ("CMS", "LPS", "MLD")
-
 # Canonical flow types that Network keeps by default: sanitary sewers only.
 DEFAULT_FLOW_TYPES = frozenset({"sanitary"})
-
-# Placeholders that write_pyswmm fills in the template.
-TEMPLATE_PLACEHOLDERS = ("nodes", "outfalls", "conduits", "xsections", "coordinates", "vertices")
-
-
-def default_template_path():
-    """Path-like (Traversable) to the SI template shipped with the package."""
-    return resources.files("sewernetworkx") / "templates" / "template.inp"
-
-
-def check_template(content):
-    """Check that a .inp template is one the writer can fill.
-
-    Parameters
-    ----------
-    content : str
-        Text of the .inp template.
-
-    Raises
-    ----------
-    ValueError
-        If FLOW_UNITS is missing or not an SI unit (the GIS data are metric), or if the template
-        contains a placeholder the writer does not fill (e.g. ``{pumps}``: pumps are not supported).
-    """
-    match = re.search(r"^\s*FLOW_UNITS\s+(\S+)", content, re.MULTILINE | re.IGNORECASE)
-    if match is None:
-        raise ValueError(
-            "The template has no FLOW_UNITS option (SWMM would default to CFS, US units). "
-            f"Set FLOW_UNITS to one of {', '.join(SI_FLOW_UNITS)}."
-        )
-    flow_units = match.group(1).upper()
-    if flow_units not in SI_FLOW_UNITS:
-        raise ValueError(
-            f"The template sets FLOW_UNITS {flow_units}, a US unit, so SWMM would read the metric "
-            "GIS lengths, elevations and sizes as feet. "
-            f"Set FLOW_UNITS to one of {', '.join(SI_FLOW_UNITS)}."
-        )
-
-    unknown = sorted(set(re.findall(r"\{(\w+)\}", content)) - set(TEMPLATE_PLACEHOLDERS))
-    if unknown:
-        raise ValueError(
-            f"The template contains placeholders that are not filled: {unknown}. "
-            f"Supported placeholders: {list(TEMPLATE_PLACEHOLDERS)}."
-        )
-
-
-def line_coords(geometry):
-    """(x, y) vertices of a pipe geometry, in order from upstream to downstream.
-
-    The parts of a MultiLineString are joined in order. Any z values are dropped.
-    """
-    parts = geometry.geoms if geometry.geom_type == "MultiLineString" else [geometry]
-    return [(c[0], c[1]) for part in parts for c in part.coords]
-
-
-def xsection(pipe):
-    """SWMM cross-section of a pipe, from its canonical shape and sizes (in m).
-
-    CIRCULAR uses the diameter and EGG the full height; the other shapes use the full height
-    and maximum width.
-
-    Parameters
-    ----------
-    pipe : mapping
-        A row of the canonical data (see :mod:`sewernetworkx.schema`).
-
-    Returns
-    ----------
-    tuple or None
-        (shape, geom1, geom2), or None if the shape is unknown or missing, or a size it needs is
-        missing or not positive.
-    """
-    shape = pipe.get("shape")
-    if pd.isna(shape):
-        return None
-    if shape == "CIRCULAR":
-        sizes = [pipe.get("diameter")]
-    elif shape == "EGG":
-        sizes = [pipe.get("height")]
-    else:
-        sizes = [pipe.get("height"), pipe.get("width")]
-    if any(pd.isna(s) or s <= 0 for s in sizes):
-        return None
-    return shape, *sizes, *[0.0] * (2 - len(sizes))
-
-
-def _invert(value):
-    """An invert elevation, or None if it is missing."""
-    return None if pd.isna(value) else float(value)
 
 
 def _pipe_records(data):
@@ -763,285 +670,6 @@ class SubNetwork(Network):
         pipes = {p for down, up in self.subgraph.edges for p in self._edge_pipes(up, down)}
         return self.full_data[self.full_data["pipe_id"].isin(pipes)].sort_values("pipe_id")
 
-    def node_inverts(self, height_correction=None):
-        """Invert elevation of every node in ``subgraph``.
-
-        A node's invert is the lowest invert of the subnetwork pipes connected to it, including
-        the drop-structure inverts of the pipes entering it, so that every pipe sits at or above
-        its nodes (the pipes are then attached with offsets). A node with no subnetwork pipe takes
-        the lowest invert of the network pipes connected to it.
-
-        Parameters
-        ----------
-        height_correction : dict, optional
-            {node: invert} overriding the computed inverts.
-
-        Returns
-        ----------
-        dict
-            {node: invert}
-
-        Raises
-        ----------
-        ValueError
-            If a node has no pipe with an invert.
-        """
-        nodes = set(self.subgraph.nodes)
-        inverts = self._lowest_inverts(self.subnetwork_pipes(), nodes)
-        if nodes - set(inverts):
-            inverts.update(self._lowest_inverts(self.full_data, nodes - set(inverts)))
-        missing = sorted(nodes - set(inverts))
-        if missing:
-            raise ValueError(f"No pipe invert found for nodes: {', '.join(map(str, missing))}")
-        for node, invert in (height_correction or {}).items():
-            if node in nodes:
-                inverts[node] = float(invert)
-        return inverts
-
-    @staticmethod
-    def _lowest_inverts(pipes, nodes):
-        """{node: lowest invert of the pipes connected to it} for the nodes in ``nodes``."""
-        found = {}
-        for up, down, inv_up, inv_down, drop in zip(
-            pipes["from_node"],
-            pipes["to_node"],
-            pipes["us_invert"],
-            pipes["ds_invert"],
-            pipes["drop_invert"],
-            strict=True,
-        ):
-            for node, value in ((up, inv_up), (down, inv_down), (down, drop)):
-                value = _invert(value)
-                if node in nodes and value is not None:
-                    found[node] = min(found.get(node, value), value)
-        return found
-
-    def xsections(self, pipes):
-        """{pipe_id: (shape, geom1, geom2)} for the rows in ``pipes`` (see :func:`xsection`).
-
-        Raises
-        ----------
-        ValueError
-            If any pipe has an unknown or missing shape code, or is missing a size; the message
-            lists every such pipe.
-        """
-        sections, bad = {}, []
-        for _, pipe in pipes.iterrows():
-            section = xsection(pipe)
-            if section is None:
-                bad.append(f"{pipe['pipe_id']} (shape code {pipe.get('shape_code')!r})")
-            sections[pipe["pipe_id"]] = section
-        if bad:
-            raise ValueError(
-                "Cannot build a cross-section for pipes with an unknown or missing shape code or "
-                f"size: {', '.join(bad)}. Known shape codes in schema {self.schema.name!r}: "
-                f"{list(self.schema.shapes)}."
-            )
-        return sections
-
-    def write_nodes_pyswmm(
-        self,
-        pyswmm_file,
-        max_depth,
-        init_depth,
-        surcharge_depth,
-        ponding_area,
-        height_correction,
-        extra_outfalls=(),
-    ):
-        """Add subnetwork data into the Nodes section of a .inp file.
-
-        Each outfall is written once; every other node is a junction. Node inverts come from
-        :meth:`node_inverts`.
-
-        Parameters
-        ----------
-        pyswmm_file : str
-            Path to the write out PySWMM input file (.inp).
-
-        max_depth : float)
-            Maximum depth for node (default is 0.0).
-
-        init_depth : float
-            Initial depth for node (default is 0.0).
-
-        surcharge_depth : float
-            Surcharge depth for node (default is 0.0).
-
-        ponding_area : float
-            Ponding area for node (default is 0.0).
-
-        height_correction : dict
-            User defined node inverts, overriding those computed by :meth:`node_inverts`.
-
-        extra_outfalls : iterable of str
-            Further nodes to write as FREE outfalls, e.g. dead ends.
-
-        Notes
-        -----
-        Also fills the {coordinates} placeholder with each node's position in the units of the
-        GIS geometry (unscaled; see node_positions).
-        """
-
-        with open(pyswmm_file) as file:
-            content = file.read()
-
-        outfall_types = dict(zip(self._outfalls(), self._outfall_types(), strict=True))
-        outfall_types.update({node: "FREE" for node in extra_outfalls})
-        inverts = self.node_inverts(height_correction)
-
-        nodes_content = ""
-        outfall_content = ""
-        # Iterate through the nodes in the graph and build the content
-        for node in self.subgraph.nodes:
-            invert = inverts[node]
-            if height_correction is not None and node in height_correction:
-                logger.info("Node %s: invert set to %s by height_correction", node, invert)
-
-            if node in outfall_types:
-                outfall_content += (
-                    f"{node:<16} {invert:<11}  {outfall_types[node]:<28} {'NO':<10}\n"
-                )
-            else:
-                nodes_content += (
-                    f"{node:<16} {invert:<11} {max_depth:<11} {init_depth:<11}"
-                    f"{surcharge_depth:<11} {ponding_area:<11}\n"
-                )
-
-        coordinates_content = ""
-        positions = self.node_positions(self.subgraph.nodes)
-        for node in self.subgraph.nodes:
-            if node in positions:
-                x, y = positions[node]
-                coordinates_content += f"{node:<16} {x:<18} {y:<18}\n"
-            else:
-                logger.warning("Node %s has no position; it is left out of [COORDINATES]", node)
-
-        # Replace {nodes} placeholder with the built nodes content
-        modified_content = (
-            content.replace("{nodes}", nodes_content)
-            .replace("{outfalls}", outfall_content)
-            .replace("{coordinates}", coordinates_content)
-        )
-
-        # Write the modified content back to the file
-        with open(pyswmm_file, "w") as file:
-            file.write(modified_content)
-
-    def write_conduits_pyswmm(
-        self,
-        pyswmm_file,
-        manning_n,
-        init_flow,
-        max_flow,
-        barrels,
-        manning_n_by_material=None,
-        height_correction=None,
-    ):
-        """Add subnetwork data into the Conduits and XSection section of a .inp file.
-
-        Parameters
-        ----------
-
-        pyswmm_file : str
-            Path to the write out PySWMM input file (.inp).
-
-        manning_n : float
-            Manning N coefficient for conduit (default is 0.01).
-
-        init_flow : float
-            Initial flow value for conduit (default is 0.0).
-
-        max_flow : float
-            Maximum flow value for conduit (default is 0.0).
-
-        barrels : float
-            Barrel value for conduit (default is 0.0).
-
-        manning_n_by_material : dict, optional
-            material -> Manning N. Pipes whose material is not in the mapping use ``manning_n``.
-
-        height_correction : dict, optional
-            User defined node inverts, overriding those computed by :meth:`node_inverts`.
-
-        Notes
-        -----
-        The inlet and outlet offsets are the pipe's GIS inverts minus its nodes' inverts
-        (LINK_OFFSETS DEPTH), so each conduit has the GIS pipe inverts. Conduits that slope uphill
-        are reported with a warning. Also fills the {vertices} placeholder with the interior
-        vertices of multi-vertex pipes, in the units of the GIS geometry (unscaled).
-        """
-
-        with open(pyswmm_file) as file:
-            content = file.read()
-
-        pipes = self.subnetwork_pipes()
-        sections = self.xsections(pipes)
-        inverts = self.node_inverts(height_correction)
-
-        conduits_content = ""
-        xsection_content = ""
-        vertices_content = ""
-        adverse = []
-
-        for _, row in pipes.iterrows():
-            name = row["pipe_id"]
-            inlet = row["from_node"]
-            outlet = row["to_node"]
-            length = row["length"]
-            roughness = (manning_n_by_material or {}).get(row["material"], manning_n)
-            shape, geom1, geom2 = sections[name]
-
-            ends = []
-            for node, pipe_invert in (
-                (inlet, row["us_invert"]),
-                (outlet, row["ds_invert"]),
-            ):
-                pipe_invert = _invert(pipe_invert)
-                offset = 0.0 if pipe_invert is None else round(pipe_invert - inverts[node], 4)
-                if offset < 0:
-                    warnings.warn(
-                        f"Pipe {name}: invert {pipe_invert} is below the invert of node {node} "
-                        f"({inverts[node]}); its offset there is set to 0.",
-                        stacklevel=2,
-                    )
-                    offset = 0.0
-                ends.append((offset, inverts[node] + offset))
-            (inlet_offset, inlet_elev), (outlet_offset, outlet_elev) = ends
-            if outlet_elev > inlet_elev:
-                adverse.append(f"{name} ({inlet} {inlet_elev:.3f} -> {outlet} {outlet_elev:.3f})")
-
-            conduits_content += (
-                f"{name:<16} {inlet:<16} {outlet:<16}"
-                f"{length:<11} {roughness:<11} "
-                f"{inlet_offset:<11} {outlet_offset:<11}"
-                f"{init_flow:<11} {max_flow:<11}\n"
-            )
-
-            xsection_content += (
-                f"{name:<16} {shape:<16} {geom1:<16}{geom2:<11} {0.0:<11} {0.0:<11} {barrels:<11}\n"
-            )
-
-            for x, y in line_coords(row["geometry"])[1:-1]:
-                vertices_content += f"{name:<16} {x:<18} {y:<18}\n"
-
-        if adverse:
-            warnings.warn(
-                f"Conduits with an adverse slope (outlet invert above inlet invert): "
-                f"{', '.join(adverse)}.",
-                stacklevel=2,
-            )
-
-        # Replace variable in template file with conduit information
-        modified_content = (
-            content.replace("{conduits}", conduits_content)
-            .replace("{xsections}", xsection_content)
-            .replace("{vertices}", vertices_content)
-        )
-
-        with open(pyswmm_file, "w") as file:
-            file.write(modified_content)
-
     def write_pyswmm(
         self,
         output_file=None,
@@ -1061,14 +689,15 @@ class SubNetwork(Network):
         height_correction=None,
         dead_ends="raise",
     ):
-        """Generate a PySWMM input file based on a networkx digraph and GeoPandas DataFrame.
+        """Write the subnetwork to ``output_folder/output_file`` with :func:`swmm.write_inp`.
 
         The subnetwork is checked with :meth:`validate` first. Flow splits (including parallel
         pipes) and cycles are refused unless the template uses ``FLOW_ROUTING DYNWAVE``.
 
         Node inverts are the lowest invert of the pipes connected to each node (see
-        :meth:`node_inverts`), and conduits are attached with offsets so that they keep their GIS
-        inverts. Pipe cross-sections come from the shape codes, mapped by the schema's ``shapes``.
+        :func:`swmm.node_inverts`), and conduits are attached with offsets so that they keep their
+        GIS inverts. Pipe cross-sections come from the shape codes, mapped by the schema's
+        ``shapes``. The outfalls are ``outfall_node``, with the types ``outfall_node_type``.
 
         Parameters
         ----------
@@ -1145,90 +774,23 @@ class SubNetwork(Network):
                 stacklevel=2,
             )
 
-        if template_path is None:
-            template = default_template_path().read_text()
-        else:
-            if not os.path.exists(template_path):
-                raise FileNotFoundError(
-                    f"The template file does not exist at the specified path: {template_path}"
-                )
-            with open(template_path) as file:
-                template = file.read()
-
-        check_template(template)
-
-        if dead_ends not in ("raise", "outfall"):
-            raise ValueError("dead_ends must be 'raise' or 'outfall'.")
-        report = self.validate()
-        self._check_topology(report, self._template_routing(template), dead_ends)
-
-        # Fail before writing anything if a pipe or node cannot be represented
-        self.xsections(self.subnetwork_pipes())
-        self.node_inverts(height_correction)
-
-        # Always create a copy of the template file
-        if output_folder is not None:
-            output_file_path = os.path.join(output_folder, output_file)
-        else:
-            # If output_folder is None, create a copy in the current working directory
-            output_file_path = os.path.join(os.getcwd(), output_file)
-
-        with open(output_file_path, "w") as file:
-            file.write(template)
-        logger.info("Writing %s", output_file_path)
-
-        # Write nodes to pyswmm .inp file
-        self.write_nodes_pyswmm(
-            output_file_path,
-            max_depth,
-            init_depth,
-            surcharge_depth,
-            ponding_area,
-            height_correction,
-            extra_outfalls=report.dead_ends if dead_ends == "outfall" else (),
+        folder = os.getcwd() if output_folder is None else output_folder
+        swmm.write_inp(
+            self,
+            os.path.join(folder, output_file),
+            template_path=template_path,
+            dead_ends=dead_ends,
+            max_depth=max_depth,
+            init_depth=init_depth,
+            surcharge_depth=surcharge_depth,
+            ponding_area=ponding_area,
+            manning_n=manning_n,
+            manning_n_by_material=manning_n_by_material,
+            init_flow=init_flow,
+            max_flow=max_flow,
+            barrels=barrels,
+            height_correction=height_correction,
         )
-
-        # Write conduits to pyswmm inp file
-        self.write_conduits_pyswmm(
-            output_file_path,
-            manning_n,
-            init_flow,
-            max_flow,
-            barrels,
-            manning_n_by_material,
-            height_correction,
-        )
-
-    @staticmethod
-    def _template_routing(template):
-        """FLOW_ROUTING of the text of an .inp template; SWMM's default, KINWAVE, if it is not set."""
-        match = re.search(r"^\s*FLOW_ROUTING\s+(\w+)", template, flags=re.MULTILINE | re.IGNORECASE)
-        return match.group(1).upper() if match else "KINWAVE"
-
-    @staticmethod
-    def _check_topology(report, routing, dead_ends):
-        problems = []
-        if routing != "DYNWAVE":
-            for node, pipes in report.splits.items():
-                problems.append(
-                    f"node {node} has more than one outlet pipe ({', '.join(map(str, pipes))})"
-                )
-            for cycle in report.cycles:
-                problems.append(f"cycle {' -> '.join(cycle + cycle[:1])}")
-        if dead_ends == "raise" and report.dead_ends:
-            problems.append(
-                f"dead ends with no outlet that are not outfalls: {', '.join(report.dead_ends)} "
-                "(pass dead_ends='outfall' to write them as outfalls)"
-            )
-        if not problems:
-            return
-        message = "Invalid subnetwork topology:\n  " + "\n  ".join(problems)
-        if routing != "DYNWAVE" and not report.is_dendritic:
-            message += (
-                f"\n{routing} routing requires a dendritic network; use a template with "
-                "FLOW_ROUTING DYNWAVE for flow splits, parallel pipes and loops."
-            )
-        raise ValueError(message)
 
     def generate_gmap(self, file_name, scale=1, origin=None):
         """Generate an hmtl file to show the sewer network overlaid on Google Maps.

@@ -78,7 +78,14 @@ give a warning on loading, and those pipes are rejected if they are written to a
 
 ## SWMM template
 
-`SubNetwork.write_pyswmm` fills the template shipped in the package,
+`.inp` files are written by `sewernetworkx.swmm`. `build_model(subnetwork, ...)` returns a
+`SwmmModel`: plain records of the junctions, outfalls, conduits, cross-sections, coordinates and
+vertices, with node inverts, conduit offsets and Manning's n already decided, so the model can be
+inspected or tested without a file. `write_inp(subnetwork, path, ...)` checks the template and
+the topology, builds the model and renders it into the template in one write;
+`SubNetwork.write_pyswmm` calls it.
+
+The default template is the one shipped in the package,
 `sewernetworkx/templates/template.inp` (`examples/pyswmm_template/template.inp` is a copy kept in
 sync by a test). It uses SI units, `FLOW_UNITS LPS`, because the GIS lengths, inverts and sizes are
 in metres. A custom template (`template_path=`) must use `CMS`, `LPS` or `MLD`, and may only
