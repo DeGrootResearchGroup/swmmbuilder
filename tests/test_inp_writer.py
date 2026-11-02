@@ -38,14 +38,10 @@ def test_every_node_and_pipe_is_written(dendritic_inp):
     assert set(conduits_by_pair(s)) == set(DENDRITIC)
 
 
-@pytest.mark.xfail(strict=True, reason="#5: the {pumps} template placeholder is never filled")
 def test_template_placeholders_filled(dendritic_inp):
     assert "{" not in dendritic_inp.read_text()
 
 
-@pytest.mark.xfail(
-    strict=True, reason="#5: template uses FLOW_UNITS MGD (US units) while geometry is metric"
-)
 def test_flow_units_are_si(dendritic_inp):
     opts = {row[0]: row[1] for row in read_sections(dendritic_inp)["OPTIONS"] if len(row) > 1}
     assert opts["FLOW_UNITS"] in {"CMS", "LPS", "MLD"}
@@ -107,9 +103,6 @@ def test_no_adverse_conduits_in_dendritic_network(dendritic_inp):
             assert inv[a] + float(row[5]) >= inv[b] + float(row[6]), (a, b)
 
 
-@pytest.mark.xfail(
-    strict=True, reason="#5: written .inp fails in SWMM (ERROR 203 {pumps} never filled)"
-)
 def test_written_inp_runs_in_swmm(dendritic_inp, tmp_path):
     assert run_swmm(dendritic_inp, tmp_path) == []
 

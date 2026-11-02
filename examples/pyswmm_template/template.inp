@@ -1,9 +1,11 @@
 [TITLE]
+;;SewerNetworkx template. SI units: FLOW_UNITS LPS (flow in L/s; lengths, elevations
+;;and sizes in m). The placeholders in braces are filled by SubNetwork.write_pyswmm.
 
 [OPTIONS]
 ;;Options            Value
 ;;------------------ ------------
-FLOW_UNITS           MGD
+FLOW_UNITS           LPS
 INFILTRATION         HORTON
 FLOW_ROUTING         KINWAVE
 START_DATE           10/01/2016
@@ -65,11 +67,6 @@ DRY_ONLY     NO
 ;;-------------- ------------ ---------------- ---------- ---------- ---------- ----------
 {xsections}
 
-[PUMPS]
-;;Name           Node1        Node2            Pcurve      Status    Startup    Shutoff
-;;-------------- ------------ ---------------- ---------- ---------- ---------- ----------
-{pumps}
-
 [LOSSES]
 ;;Link           Inlet      Outlet     Average    Flap Gate  SeepageRate
 ;;-------------- ---------- ---------- ---------- ---------- ----------
@@ -83,3 +80,13 @@ DRY_ONLY     NO
 [TIMESERIES]
 ;;Name           Date       Time       Value
 ;;-------------- ---------- ---------- ----------
+
+[COORDINATES]
+;;Node           X-Coord            Y-Coord
+;;-------------- ------------------ ------------------
+{coordinates}
+
+[VERTICES]
+;;Link           X-Coord            Y-Coord
+;;-------------- ------------------ ------------------
+{vertices}

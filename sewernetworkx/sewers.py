@@ -7,16 +7,72 @@ of levels, and generates a .inp file to be used by pyswmm.
 
 import os
 import re
-import shutil
 import warnings
 from dataclasses import dataclass, field
+from importlib import resources
 from pathlib import Path
 
 import geopandas as gpd
 import gmplot
 import networkx as nx
 import pandas as pd
-import pkg_resources
+
+# SWMM's SI flow units. With any of these, lengths, elevations and section sizes are in metres,
+# matching the GIS data; with a US unit (CFS, GPM, MGD) SWMM would read them as feet.
+SI_FLOW_UNITS = ("CMS", "LPS", "MLD")
+
+# Placeholders that write_pyswmm fills in the template.
+TEMPLATE_PLACEHOLDERS = ("nodes", "outfalls", "conduits", "xsections", "coordinates", "vertices")
+
+
+def default_template_path():
+    """Path-like (Traversable) to the SI template shipped with the package."""
+    return resources.files("sewernetworkx") / "templates" / "template.inp"
+
+
+def check_template(content):
+    """Check that a .inp template is one the writer can fill.
+
+    Parameters
+    ----------
+    content : str
+        Text of the .inp template.
+
+    Raises
+    ----------
+    ValueError
+        If FLOW_UNITS is missing or not an SI unit (the GIS data are metric), or if the template
+        contains a placeholder the writer does not fill (e.g. ``{pumps}``: pumps are not supported).
+    """
+    match = re.search(r"^\s*FLOW_UNITS\s+(\S+)", content, re.MULTILINE | re.IGNORECASE)
+    if match is None:
+        raise ValueError(
+            "The template has no FLOW_UNITS option (SWMM would default to CFS, US units). "
+            f"Set FLOW_UNITS to one of {', '.join(SI_FLOW_UNITS)}."
+        )
+    flow_units = match.group(1).upper()
+    if flow_units not in SI_FLOW_UNITS:
+        raise ValueError(
+            f"The template sets FLOW_UNITS {flow_units}, a US unit, so SWMM would read the metric "
+            "GIS lengths, elevations and sizes as feet. "
+            f"Set FLOW_UNITS to one of {', '.join(SI_FLOW_UNITS)}."
+        )
+
+    unknown = sorted(set(re.findall(r"\{(\w+)\}", content)) - set(TEMPLATE_PLACEHOLDERS))
+    if unknown:
+        raise ValueError(
+            f"The template contains placeholders that are not filled: {unknown}. "
+            f"Supported placeholders: {list(TEMPLATE_PLACEHOLDERS)}."
+        )
+
+
+def line_coords(geometry):
+    """(x, y) vertices of a pipe geometry, in order from upstream to downstream.
+
+    The parts of a MultiLineString are joined in order. Any z values are dropped.
+    """
+    parts = geometry.geoms if geometry.geom_type == "MultiLineString" else [geometry]
+    return [(c[0], c[1]) for part in parts for c in part.coords]
 
 
 def _pipe_records(data):
@@ -538,44 +594,38 @@ class SubNetwork(Network):
         None
         """
 
-        for index, row in self.reduced_keys_data.iterrows():
-            upstream_id = row["UpstreamID"]
-            downstream_id = row["DownstreamID"]
-            if upstream_id == self.start:
-                # print('Plant node')
-                coordinates = row["geometry"].coords[0]
-                self.coords[downstream_id] = (
-                    coordinates[0] * self.scale,
-                    coordinates[1] * self.scale,
-                )
-            elif upstream_id in self.subgraph.nodes():
-                # print('Found upstream node')
-                coordinates = row["geometry"].coords[0]
-                self.coords[upstream_id] = (
-                    coordinates[0] * self.scale,
-                    coordinates[1] * self.scale,
-                )
+        for node, (x, y) in self.node_positions(self.subgraph.nodes()).items():
+            self.coords[node] = (x * self.scale, y * self.scale)
 
-        # Check if each node in network_nodes has a position in pos
         missing_nodes = set(self.subgraph.nodes()) - set(self.coords.keys())
         if missing_nodes:
-            print(
-                f"Warning: Nodes {missing_nodes} do not have positions. Attempting to find positions for missing nodes."
-            )
-
-            for index, row in self.reduced_keys_data.iterrows():
-                downstream_id = row["DownstreamID"]
-
-                if downstream_id in missing_nodes:
-                    coordinates = row["geometry"].coords[1]
-                    self.coords[downstream_id] = (
-                        coordinates[0] * self.scale,
-                        coordinates[1] * self.scale,
-                    )
-                    missing_nodes.remove(downstream_id)
-
-        if missing_nodes:
             print(f"Error: Positions for nodes {missing_nodes} could not be found.")
+
+    def node_positions(self, nodes):
+        """Unscaled (x, y) position of each node, from the GIS pipe geometry.
+
+        A node is placed at the upstream end of a pipe leaving it or, if no pipe leaves it, at the
+        downstream end of a pipe entering it.
+
+        Parameters
+        ----------
+        nodes : iterable
+            Nodes to place.
+
+        Returns
+        ----------
+        dict
+            {node: (x, y)} for the nodes that were found; nodes with no pipe are left out.
+        """
+        nodes = set(nodes)
+        upstream_ends, downstream_ends = {}, {}
+        for _, pipe in self.reduced_keys_data.iterrows():
+            upstream_id, downstream_id = pipe["UpstreamID"], pipe["DownstreamID"]
+            if upstream_id in nodes and upstream_id not in upstream_ends:
+                upstream_ends[upstream_id] = line_coords(pipe["geometry"])[0]
+            if downstream_id in nodes and downstream_id not in downstream_ends:
+                downstream_ends[downstream_id] = line_coords(pipe["geometry"])[-1]
+        return {**downstream_ends, **upstream_ends}
 
     def explore_nodes(self, G, direction):
         """Generate sewer network based on supplied direction
@@ -855,6 +905,10 @@ class SubNetwork(Network):
         extra_outfalls : iterable of str
             Further nodes to write as FREE outfalls, e.g. dead ends.
 
+        Notes
+        -----
+        Also fills the {coordinates} placeholder with each node's position in the units of the
+        GIS geometry (unscaled; see node_positions).
         """
 
         with open(pyswmm_file) as file:
@@ -885,9 +939,20 @@ class SubNetwork(Network):
                     f"{surcharge_depth:<11} {ponding_area:<11}\n"
                 )
 
+        coordinates_content = ""
+        positions = self.node_positions(self.subgraph.nodes)
+        for node in self.subgraph.nodes:
+            if node in positions:
+                x, y = positions[node]
+                coordinates_content += f"{node:<16} {x:<18} {y:<18}\n"
+            else:
+                print(f"Warning: Node {node} has no position; it is left out of [COORDINATES]")
+
         # Replace {nodes} placeholder with the built nodes content
-        modified_content = content.replace("{nodes}", nodes_content).replace(
-            "{outfalls}", outfall_content
+        modified_content = (
+            content.replace("{nodes}", nodes_content)
+            .replace("{outfalls}", outfall_content)
+            .replace("{coordinates}", coordinates_content)
         )
 
         # Write the modified content back to the file
@@ -923,6 +988,10 @@ class SubNetwork(Network):
         barrels : float
             Barrel value for conduit (default is 0.0).
 
+        Notes
+        -----
+        Also fills the {vertices} placeholder with the interior vertices of multi-vertex pipes, in
+        the units of the GIS geometry (unscaled).
         """
 
         with open(pyswmm_file) as file:
@@ -930,6 +999,7 @@ class SubNetwork(Network):
 
         conduits_content = ""
         xsection_content = ""
+        vertices_content = ""
 
         # Get information from nx.digraph to fill in data
         for edges in self.subgraph.edges:
@@ -965,9 +1035,14 @@ class SubNetwork(Network):
                         f"{width:<11} {0.0:<11} {0.0:<11} {barrels:<11}\n"
                     )
 
+                    for x, y in line_coords(row["geometry"])[1:-1]:
+                        vertices_content += f"{name:<16} {x:<18} {y:<18}\n"
+
         # Replace variable in template file with conduit information
-        modified_content = content.replace("{conduits}", conduits_content).replace(
-            "{xsections}", xsection_content
+        modified_content = (
+            content.replace("{conduits}", conduits_content)
+            .replace("{xsections}", xsection_content)
+            .replace("{vertices}", vertices_content)
         )
 
         with open(pyswmm_file, "w") as file:
@@ -1032,7 +1107,12 @@ class SubNetwork(Network):
             Barrel value for conduit (default is 0.0).
 
         template_path : str
-            Path to the pyswmm model template file (default is "template.inp").
+            Path to the pyswmm model template file. The default is the template shipped with the
+            package (``sewernetworkx/templates/template.inp``), which uses SI units (FLOW_UNITS
+            LPS). A custom template must use an SI FLOW_UNITS (CMS, LPS or MLD), since the GIS
+            lengths, inverts and sizes are in metres, and may only contain the placeholders
+            {nodes}, {outfalls}, {conduits}, {xsections}, {coordinates} and {vertices}.
+            Pumps are not supported yet, so a template with a {pumps} placeholder is rejected.
 
         output_folder : str
             Path to were the new .inp file will be written.
@@ -1055,19 +1135,21 @@ class SubNetwork(Network):
             raise ValueError("The 'output_path' must be specified.")
 
         if template_path is None:
-            # Get the package directory and construct the path to the template file
-            package_dir = pkg_resources.resource_filename(__name__, "")
-            template_path = os.path.join(package_dir, "examples", "pyswmm_template", "template.inp")
+            template = default_template_path().read_text()
+        else:
+            if not os.path.exists(template_path):
+                raise FileNotFoundError(
+                    f"The template file does not exist at the specified path: {template_path}"
+                )
+            with open(template_path) as file:
+                template = file.read()
 
-        if not os.path.exists(template_path):
-            raise FileNotFoundError(
-                f"The template file does not exist at the specified path: {template_path}"
-            )
+        check_template(template)
 
         if dead_ends not in ("raise", "outfall"):
             raise ValueError("dead_ends must be 'raise' or 'outfall'.")
         report = self.validate()
-        self._check_topology(report, self._template_routing(template_path), dead_ends)
+        self._check_topology(report, self._template_routing(template), dead_ends)
 
         # Always create a copy of the template file
         if output_folder is not None:
@@ -1076,7 +1158,8 @@ class SubNetwork(Network):
             # If output_folder is None, create a copy in the current working directory
             output_file_path = os.path.join(os.getcwd(), output_file)
 
-        shutil.copy(template_path, output_file_path)
+        with open(output_file_path, "w") as file:
+            file.write(template)
         print(f"Template file copied to: {output_file_path}")
 
         # Write nodes to pyswmm .inp file
@@ -1096,10 +1179,9 @@ class SubNetwork(Network):
         )
 
     @staticmethod
-    def _template_routing(template_path):
-        """FLOW_ROUTING of an .inp template; SWMM's default, KINWAVE, if it is not set."""
-        text = Path(template_path).read_text()
-        match = re.search(r"^\s*FLOW_ROUTING\s+(\w+)", text, flags=re.MULTILINE | re.IGNORECASE)
+    def _template_routing(template):
+        """FLOW_ROUTING of the text of an .inp template; SWMM's default, KINWAVE, if it is not set."""
+        match = re.search(r"^\s*FLOW_ROUTING\s+(\w+)", template, flags=re.MULTILINE | re.IGNORECASE)
         return match.group(1).upper() if match else "KINWAVE"
 
     @staticmethod
@@ -1154,18 +1236,18 @@ class SubNetwork(Network):
                     "running 'generate.gmap'."
                 )
 
-            node, coords = list(self.coords.items())[0]
+            coords = next(iter(self.coords.values()))
             gmap = gmplot.GoogleMapPlotter(coords[1] / scale, coords[0] / scale, zoom=18)
 
         for node, coords in self.coords.items():
-            gmap.marker(coords[1] / 10, coords[0] / 10, "cornflowerblue", label=str(node))
+            gmap.marker(coords[1] / scale, coords[0] / scale, "cornflowerblue", label=str(node))
 
         for edge in self.subgraph.edges():
             start_node_pos = self.coords[edge[0]]
             end_node_pos = self.coords[edge[1]]
             gmap.plot(
-                [start_node_pos[1] / 10, end_node_pos[1] / 10],
-                [start_node_pos[0] / 10, end_node_pos[0] / 10],
+                [start_node_pos[1] / scale, end_node_pos[1] / scale],
+                [start_node_pos[0] / scale, end_node_pos[0] / scale],
                 "red",
                 edge_width=2,
             )
