@@ -18,6 +18,7 @@ from pathlib import Path
 
 import pandas as pd
 
+from .gaps import _invert, fill_gaps, lowest_inverts, xsection
 from .geometry import line_coords
 
 logger = logging.getLogger(__name__)
@@ -149,61 +150,6 @@ def check_topology(report, routing, dead_ends):
             "FLOW_ROUTING DYNWAVE for flow splits, parallel pipes and loops."
         )
     raise ValueError(message)
-
-
-def xsection(pipe):
-    """SWMM cross-section of a pipe, from its canonical shape and sizes (in m).
-
-    CIRCULAR uses the diameter and EGG the full height; the other shapes use the full height
-    and maximum width.
-
-    Parameters
-    ----------
-    pipe : mapping
-        A row of the canonical data (see :mod:`swmmbuilder.schema`).
-
-    Returns
-    ----------
-    tuple or None
-        (shape, geom1, geom2), or None if the shape is unknown or missing, or a size it needs is
-        missing or not positive.
-    """
-    shape = pipe.get("shape")
-    if pd.isna(shape):
-        return None
-    if shape == "CIRCULAR":
-        sizes = [pipe.get("diameter")]
-    elif shape == "EGG":
-        sizes = [pipe.get("height")]
-    else:
-        sizes = [pipe.get("height"), pipe.get("width")]
-    if any(pd.isna(s) or s <= 0 for s in sizes):
-        return None
-    return shape, *sizes, *[0.0] * (2 - len(sizes))
-
-
-def xsections(pipes, schema):
-    """{pipe_id: (shape, geom1, geom2)} for the rows in ``pipes`` (see :func:`xsection`).
-
-    Raises
-    ----------
-    ValueError
-        If any pipe has an unknown or missing shape code, or is missing a size; the message
-        lists every such pipe.
-    """
-    sections, bad = {}, []
-    for _, pipe in pipes.iterrows():
-        section = xsection(pipe)
-        if section is None:
-            bad.append(f"{pipe['pipe_id']} (shape code {pipe.get('shape_code')!r})")
-        sections[pipe["pipe_id"]] = section
-    if bad:
-        raise ValueError(
-            "Cannot build a cross-section for pipes with an unknown or missing shape code or "
-            f"size: {', '.join(bad)}. Known shape codes in schema {schema.name!r}: "
-            f"{list(schema.shapes)}."
-        )
-    return sections
 
 
 @dataclass
@@ -559,29 +505,6 @@ def check_force_main_equation(rule, equation):
         )
 
 
-def _invert(value):
-    """An invert elevation, or None if it is missing."""
-    return None if pd.isna(value) else float(value)
-
-
-def lowest_inverts(pipes, nodes):
-    """{node: lowest invert of the pipes connected to it} for the nodes in ``nodes``."""
-    found = {}
-    for up, down, inv_up, inv_down, drop in zip(
-        pipes["from_node"],
-        pipes["to_node"],
-        pipes["us_invert"],
-        pipes["ds_invert"],
-        pipes["drop_invert"],
-        strict=True,
-    ):
-        for node, value in ((up, inv_up), (down, inv_down), (down, drop)):
-            value = _invert(value)
-            if node in nodes and value is not None:
-                found[node] = min(found.get(node, value), value)
-    return found
-
-
 def node_inverts(subnetwork, height_correction=None):
     """Invert elevation of every node of a subnetwork.
 
@@ -703,6 +626,9 @@ class SwmmModel:
         {node: (x, y)}, in the units of the GIS geometry.
     vertices : dict
         {link: [(x, y), ...]}: the interior vertices of each conduit or pump.
+    data_gaps : pandas.DataFrame or None
+        The gap report of :func:`swmmbuilder.gaps.fill_gaps`: every gap of the subnetwork's data
+        and how it was filled, if it was.
     """
 
     junctions: list = field(default_factory=list)
@@ -714,6 +640,7 @@ class SwmmModel:
     curves: list = field(default_factory=list)
     coordinates: dict = field(default_factory=dict)
     vertices: dict = field(default_factory=dict)
+    data_gaps: pd.DataFrame | None = None
 
     def sections(self):
         """{placeholder: text} for every placeholder in :data:`TEMPLATE_PLACEHOLDERS`."""
@@ -805,10 +732,13 @@ def build_model(
     force_main_roughness=None,
     force_main_roughness_by_pipe=None,
     force_main_surcharge_depth=100.0,
+    **fills,
 ):
     """The :class:`SwmmModel` of a subnetwork.
 
-    Node inverts come from :func:`node_inverts`. Each conduit is attached to its nodes with
+    Gaps in the data are found, and filled as the fill options say, by
+    :func:`swmmbuilder.gaps.fill_gaps` (see also :meth:`Subnetwork.data_gaps`). Node inverts are
+    those of :func:`node_inverts`, plus any filled ones. Each conduit is attached to its nodes with
     offsets (pipe invert - node invert, for LINK_OFFSETS DEPTH), so that it keeps its GIS
     inverts; conduits that slope uphill are reported with a warning. The topology is not checked
     here (see :func:`write_inp`).
@@ -889,12 +819,18 @@ def build_model(
     force_main_surcharge_depth : float
         Surcharge depth (m) of the force mains' interior and discharge nodes (default 100).
 
+    **fills
+        Fill rules for gaps in the data, all off by default: ``size_overrides``, ``shape_codes``,
+        ``size_fill``, ``invert_fill``, ``headwater_slope`` and ``force_main_discharge``; see
+        :func:`swmmbuilder.gaps.fill_gaps`.
+
     Raises
     ----------
     ValueError
-        If an outfall is not in the subnetwork, a pipe has an unknown or missing shape code or
-        size, a node has no invert, a pump, wet well or pump station is invalid, a pipe is both
-        pumped and part of a station's force main, a force main has no roughness or is not
+        If an outfall is not in the subnetwork, a gap that stops the model from being written
+        remains after the fills (a conduit with no cross-section, a node with no invert; every
+        such gap is listed), a pump, wet well, pump station or fill rule is invalid, a pipe is
+        both pumped and part of a station's force main, a force main has no roughness or is not
         circular, or an ideal pump is not the only outlet link of its inlet node (SWMM's
         ERROR 134).
     """
@@ -927,7 +863,22 @@ def build_model(
         raise ValueError(
             f"PUMP1 pumps need a wet well at their inlet node (pass wet_wells): {', '.join(dry)}"
         )
-    sections = xsections(pipes[~pipes["pipe_id"].isin(list(pumps))], subnetwork.schema)
+    filled = fill_gaps(subnetwork, pumps=pumps, height_correction=height_correction, **fills)
+    remaining = filled.remaining
+    if len(remaining):
+        lines = [f"{row.element} {row.id}: {row.detail}" for row in remaining.itertuples()]
+        raise ValueError(
+            f"Cannot write the subnetwork: {len(lines)} gaps in the data remain (see "
+            "Subnetwork.data_gaps() for the full report, and its fill options):\n  "
+            + "\n  ".join(lines)
+            + f"\nKnown shape codes in schema {subnetwork.schema.name!r}: "
+            f"{list(subnetwork.schema.shapes)}."
+        )
+    pipes, inverts = filled.pipes, filled.inverts
+    sections = {
+        name: xsection(row)
+        for name, row in zip(pipes["pipe_id"], pipes.to_dict("records"), strict=True)
+    }
     roughness_of = force_main_roughnesses(
         pipes[pipes["pipe_id"].isin(list(force_mains))],
         sections,
@@ -936,8 +887,7 @@ def build_model(
     )
     outlets = dict(zip(pipes["pipe_id"], pipes["to_node"], strict=True))
     pressurised = {outlets[p] for chain in chains.values() for p in chain[:-1]}
-    inverts = node_inverts(subnetwork, height_correction)
-    model = SwmmModel()
+    model = SwmmModel(data_gaps=filled.report)
 
     for node in subnetwork.nodes:
         invert = inverts[node]

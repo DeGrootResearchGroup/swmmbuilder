@@ -9,10 +9,10 @@ import geopandas as gpd
 import networkx as nx
 import pandas as pd
 
+from .gaps import lowest_inverts
 from .geometry import line_coords
 from .schema import LONDON_ON, NODE_COLUMNS, as_schema
 from .subnetwork import Subnetwork
-from .swmm import lowest_inverts
 
 logger = logging.getLogger(__name__)
 

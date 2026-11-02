@@ -6,7 +6,7 @@ from pathlib import Path
 
 import networkx as nx
 
-from . import swmm
+from . import gaps, swmm
 from .geometry import line_coords
 
 
@@ -51,6 +51,10 @@ class TopologyReport:
         Node -> {'pipes_in': (node layer, graph), 'pipes_out': (node layer, graph)}, for every node
         whose pipe counts in its node layer differ from those of the network's graph (only the
         counts that differ are listed).
+
+    data_gaps : dict
+        Gap kind -> number of gaps of that kind in the data, with no fills (see
+        :meth:`Subnetwork.data_gaps`), for the kinds that occur.
     """
 
     splits: dict = field(default_factory=dict)
@@ -63,6 +67,7 @@ class TopologyReport:
     orphan_force_mains: list = field(default_factory=list)
     force_main_ends: dict = field(default_factory=dict)
     pipe_count_mismatches: dict = field(default_factory=dict)
+    data_gaps: dict = field(default_factory=dict)
 
     @property
     def is_dendritic(self):
@@ -237,9 +242,9 @@ class Subnetwork:
         TopologyReport
             Flow splits, cycles, dead ends (classified by node type) and parallel pipes, plus the
             force mains (with the pump stations that have none, the force mains that start at no
-            pump station and the chains that end badly) and the nodes whose recorded pipe counts
-            differ from the graph. Splits and
-            cycles are only allowed with dynamic-wave routing; dead ends are never valid.
+            pump station and the chains that end badly), the nodes whose recorded pipe counts
+            differ from the graph and the counts of gaps in the data. Splits and cycles are only
+            allowed with dynamic-wave routing; dead ends are never valid.
         """
         outfalls = set(self.outfalls if outfalls is None else outfalls)
         report = TopologyReport()
@@ -300,7 +305,36 @@ class Subnetwork:
             if counts:
                 report.pipe_count_mismatches[node] = counts
 
+        counts = self.data_gaps()["gap"].value_counts()
+        report.data_gaps = {gap: int(counts[gap]) for gap in gaps.GAP_KINDS if gap in counts}
         return report
+
+    def data_gaps(self, **fills):
+        """Every gap in the data of the subnetwork, and how the fill rules would fill it.
+
+        A gap is a pipe with an unknown or missing shape code or a missing size, a pipe end with
+        no invert, or a node with no invert from any pipe (see :mod:`swmmbuilder.gaps`). With no
+        options nothing is filled, except that a round pipe with no diameter whose height equals
+        its width takes that value as its diameter.
+
+        Parameters
+        ----------
+        **fills
+            The fill options of :meth:`to_inp` (``height_correction``, ``size_overrides``,
+            ``shape_codes``, ``size_fill``, ``invert_fill``, ``headwater_slope``,
+            ``force_main_discharge``, and ``pumps``, whose pipes need no cross-section); see
+            :func:`swmmbuilder.gaps.fill_gaps`.
+
+        Returns
+        ----------
+        pandas.DataFrame
+            One row per gap: ``element`` ('pipe' or 'node'), ``id``, ``gap``, ``detail``,
+            ``filled_from`` (the rule that filled it; NaN if it is not filled), ``value``,
+            ``source`` and ``order`` (the order of the fills).
+        """
+        if "pumps" in fills:
+            fills["pumps"] = swmm.resolve_pumps(self, fills["pumps"])
+        return gaps.fill_gaps(self, **fills).report
 
     def to_inp(self, path, outfalls=None, **options):
         """Write the subnetwork to a SWMM .inp file; see :func:`swmmbuilder.swmm.write_inp`.
