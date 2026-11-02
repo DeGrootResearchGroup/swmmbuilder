@@ -1,3 +1,3 @@
-from .sewers import Network, SubNetwork
+from .sewers import Network, SubNetwork, TopologyReport
 
-__all__ = ["Network", "SubNetwork"]
+__all__ = ["Network", "SubNetwork", "TopologyReport"]

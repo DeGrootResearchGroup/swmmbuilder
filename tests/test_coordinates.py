@@ -26,7 +26,8 @@ EDGES = DENDRITIC + OVERFLOW
 
 @pytest.fixture
 def sections(network, tmp_path):
-    return read_sections(write_inp(subnetwork_with_edges(network, EDGES), tmp_path))
+    sub = subnetwork_with_edges(network, EDGES, outfalls=("OUT", "OV2"))
+    return read_sections(write_inp(sub, tmp_path, routing="DYNWAVE"))
 
 
 def test_coordinates_section(sections):
