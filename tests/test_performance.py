@@ -3,7 +3,7 @@
 import json
 import time
 
-from conftest import quiet, read_sections, subnetwork_with_edges, write_inp
+from conftest import read_sections, subnetwork, write_inp
 
 from sewernetworkx import Network
 
@@ -54,12 +54,12 @@ def binary_tree_geojson(path, n_pipes):
 
 
 def test_writer_scales_to_thousands_of_pipes(tmp_path):
-    network = quiet(Network, str(binary_tree_geojson(tmp_path / "tree.geojson", N_PIPES)))
+    network = Network(str(binary_tree_geojson(tmp_path / "tree.geojson", N_PIPES)))
     edges = [(_node(i), _node((i - 1) // 2)) for i in range(1, N_PIPES + 1)]
-    sub = subnetwork_with_edges(network, edges, outfalls=(_node(0),), start=_node(0))
+    sub = subnetwork(network, edges)
 
     start = time.perf_counter()
-    inp = write_inp(sub, tmp_path)
+    inp = write_inp(sub, tmp_path, outfalls=(_node(0),))
     elapsed = time.perf_counter() - start
 
     sections = read_sections(inp)

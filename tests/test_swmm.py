@@ -1,19 +1,21 @@
 """The SWMM model of a subnetwork (swmm.build_model), without writing a file."""
 
 import pytest
-from conftest import DENDRITIC, TEMPLATE, subnetwork_with_edges
+from conftest import DENDRITIC, TEMPLATE, subnetwork
 
 from sewernetworkx import swmm
 
 
 @pytest.fixture
 def dendritic(network):
-    return subnetwork_with_edges(network, DENDRITIC)
+    return subnetwork(network, DENDRITIC)
 
 
 @pytest.fixture
 def model(dendritic):
-    return swmm.build_model(dendritic, manning_n=0.02, manning_n_by_material={"PVC": 0.011})
+    return swmm.build_model(
+        dendritic, ["OUT"], manning_n=0.02, manning_n_by_material={"PVC": 0.011}
+    )
 
 
 def test_junctions_and_outfalls(model):
@@ -32,7 +34,7 @@ def test_node_inverts_are_lowest_connected_invert(dendritic):
 
 def test_conduit_offsets_reproduce_gis_inverts(model, dendritic):
     inverts = swmm.node_inverts(dendritic)
-    pipes = dendritic.subnetwork_pipes().set_index("pipe_id")
+    pipes = dendritic.pipes().set_index("pipe_id")
     assert len(model.conduits) == len(pipes) == 8
     for c in model.conduits:
         assert inverts[c.inlet] + c.inlet_offset == pytest.approx(pipes.loc[c.name, "us_invert"])
@@ -40,7 +42,7 @@ def test_conduit_offsets_reproduce_gis_inverts(model, dendritic):
 
 
 def test_roughness_by_material(model, dendritic):
-    material = dendritic.subnetwork_pipes().set_index("pipe_id")["material"]
+    material = dendritic.pipes().set_index("pipe_id")["material"]
     for c in model.conduits:
         assert c.roughness == (0.011 if material[c.name] == "PVC" else 0.02)
 
@@ -51,8 +53,13 @@ def test_xsections(model):
     assert sections[1000] == ("CIRCULAR", pytest.approx(0.2), 0.0, 1.0)
 
 
-def test_outfalls_override(dendritic):
-    model = swmm.build_model(dendritic, outfalls={"OUT": "FIXED"})
+def test_outfalls_must_be_in_subnetwork(dendritic):
+    with pytest.raises(ValueError, match="Outfalls not in the subnetwork: OV2"):
+        swmm.build_model(dendritic, ["OUT", "OV2"])
+
+
+def test_outfall_types(dendritic):
+    model = swmm.build_model(dendritic, {"OUT": "FIXED"})
     assert [(o.name, o.type) for o in model.outfalls] == [("OUT", "FIXED")]
 
 
@@ -66,16 +73,16 @@ def test_render_fills_every_placeholder(model):
 
 
 def test_write_inp_writes_nothing_when_invalid(network, tmp_path):
-    sub = subnetwork_with_edges(network, DENDRITIC + [("E1", "J2")])  # E1-J2 has no shape
+    sub = subnetwork(network, DENDRITIC + [("E1", "J2")])  # E1-J2 has no shape
     path = tmp_path / "bad.inp"
     with pytest.raises(ValueError, match="cross-section"):
-        swmm.write_inp(sub, path, template_path=_dynwave(tmp_path))
+        swmm.write_inp(sub, path, ["OUT"], template_path=_dynwave(tmp_path))
     assert not path.exists()
 
 
 def test_write_inp_returns_the_model(dendritic, tmp_path):
     path = tmp_path / "model.inp"
-    model = swmm.write_inp(dendritic, path, template_path=_dynwave(tmp_path))
+    model = swmm.write_inp(dendritic, path, ["OUT"], template_path=_dynwave(tmp_path))
     assert path.read_text() == model.render(_dynwave(tmp_path).read_text())
 
 

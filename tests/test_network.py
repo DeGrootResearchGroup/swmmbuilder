@@ -1,14 +1,9 @@
 import logging
 
 import geopandas as gpd
-import pytest
-from conftest import FIXTURE, REPO, quiet, subnetwork_with_edges
+from conftest import FIXTURE, REPO
 
 from sewernetworkx import Network
-
-
-def pipe_pairs(sub):
-    return {(up, down) for down, up in sub.network_data.values()}
 
 
 def test_storm_pipes_removed(network):
@@ -16,19 +11,18 @@ def test_storm_pipes_removed(network):
 
 
 def test_pipes_abandoned_by_id_removed(network):
-    sub = subnetwork_with_edges(network, [])
-    assert ("Abandoned", "A1") not in pipe_pairs(sub)
+    assert "Abandoned" not in network.graph
+    assert network.graph.has_node("A1")
 
 
 def test_pipes_flagged_abandoned_removed(network):
-    sub = subnetwork_with_edges(network, [])
-    assert ("X1", "A2") not in pipe_pairs(sub)
+    assert not network.graph.has_edge("X1", "A2")
 
 
 def test_networks_are_independent():
-    first = quiet(Network, str(FIXTURE))
+    first = Network(str(FIXTURE))
     n_first, nodes_first = len(first.full_data), set(first.graph)
-    quiet(Network, str(REPO / "examples" / "geojson_test_data" / "test_data_small.geojson"))
+    Network(str(REPO / "examples" / "geojson_test_data" / "test_data_small.geojson"))
     assert len(first.full_data) == n_first
     assert set(first.graph) == nodes_first
 
@@ -39,13 +33,13 @@ def test_flagged_abandoned_pipes_not_in_graph(network):
 
 
 def test_keep_abandoned():
-    network = quiet(Network, str(FIXTURE), keep_abandoned=True)
+    network = Network(str(FIXTURE), keep_abandoned=True)
     assert network.graph.has_edge("X1", "A2")
     assert network.removed["abandoned"] == 0
 
 
 def test_flow_types_none_keeps_every_pipe():
-    network = quiet(Network, str(FIXTURE), flow_types=None)
+    network = Network(str(FIXTURE), flow_types=None)
     assert network.graph.has_edge("S1", "S2")
     assert network.removed["flow_type"] == {}
 
@@ -62,13 +56,6 @@ def test_missing_flow_type_dropped_and_logged(tmp_path, caplog):
     assert "Removed 1 pipes with flow type None" in caplog.text
 
 
-def test_remove_storm_deprecated():
-    with pytest.warns(DeprecationWarning, match="flow_types"):
-        network = quiet(Network, str(FIXTURE), remove_storm=False)
-    assert network.graph.has_edge("S1", "S2")
-
-
-def test_flow_types_accept_source_codes():
-    network = quiet(Network, str(FIXTURE), flow_types={"SAN", "STM"})
-    assert network.graph.has_edge("S1", "S2")
-    assert network.removed["flow_type"] == {}
+def test_network_from_geodataframe():
+    network = Network(gpd.read_file(FIXTURE))
+    assert set(network.graph.edges(keys=True)) == set(Network(FIXTURE).graph.edges(keys=True))

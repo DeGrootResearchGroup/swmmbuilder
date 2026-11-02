@@ -3,7 +3,7 @@ import warnings
 
 import geopandas as gpd
 import pytest
-from conftest import DENDRITIC, FIXTURE, quiet, read_sections, subnetwork_with_edges, write_inp
+from conftest import DENDRITIC, FIXTURE, read_sections, subnetwork, write_inp
 from shapely.geometry import LineString
 
 from sewernetworkx import LONDON_ON, Network, Schema
@@ -160,12 +160,10 @@ def numbers(sections):
 
 
 def test_other_schema_writes_same_inp(network, tmp_path):
-    other = quiet(Network, str(other_city(tmp_path / "other.geojson")), schema=OTHER)
+    other = Network(str(other_city(tmp_path / "other.geojson")), schema=OTHER)
     assert set(other.graph.edges) == set(network.graph.edges)
-    london = read_sections(
-        write_inp(subnetwork_with_edges(network, DENDRITIC), tmp_path, "a.inp", "DYNWAVE")
-    )
-    path = write_inp(subnetwork_with_edges(other, DENDRITIC), tmp_path, "b.inp", "DYNWAVE")
+    london = read_sections(write_inp(subnetwork(network, DENDRITIC), tmp_path, "a.inp", "DYNWAVE"))
+    path = write_inp(subnetwork(other, DENDRITIC), tmp_path, "b.inp", "DYNWAVE")
     assert numbers(read_sections(path)) == numbers(london)
 
 
@@ -265,7 +263,7 @@ def test_from_toml(tmp_path):
 def test_network_from_toml_path(network, tmp_path):
     path = tmp_path / "london.toml"
     path.write_text(LONDON_TOML)
-    other = quiet(Network, str(FIXTURE), schema=str(path))
+    other = Network(str(FIXTURE), schema=str(path))
     assert other.schema.name == "London from TOML"
     assert set(other.graph.edges) == set(network.graph.edges)
 
