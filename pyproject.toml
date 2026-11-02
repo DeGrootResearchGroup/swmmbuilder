@@ -52,6 +52,5 @@ ignore = [
     # `ruff format` owns line width; what it can't split (strings, URLs) is noise.
     "E501",
     # --- deferred to the open issues that rewrite this code (remove the ignore in that PR) ---
-    "B007",    # unused `index` from GeoDataFrame.iterrows loops           -> #2 / #7
     "RUF005",  # list concatenation in tests
 ]
