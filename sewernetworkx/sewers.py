@@ -8,7 +8,7 @@ of levels, and generates a .inp file to be used by pyswmm.
 import os
 import re
 import warnings
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from importlib import resources
 from pathlib import Path
 
@@ -27,7 +27,26 @@ SI_FLOW_UNITS = ("CMS", "LPS", "MLD")
 DEFAULT_FLOW_TYPES = frozenset({"sanitary"})
 
 # Placeholders that write_pyswmm fills in the template.
-TEMPLATE_PLACEHOLDERS = ("nodes", "outfalls", "conduits", "xsections", "coordinates", "vertices")
+TEMPLATE_PLACEHOLDERS = (
+    "nodes",
+    "outfalls",
+    "storage",
+    "conduits",
+    "pumps",
+    "xsections",
+    "curves",
+    "coordinates",
+    "vertices",
+)
+
+# SWMM pump curve types, and what the x values of each are (y is flow, in the FLOW_UNITS).
+PUMP_CURVE_TYPES = {
+    "PUMP1": "wet well volume",
+    "PUMP2": "inlet node depth",
+    "PUMP3": "head difference",
+    "PUMP4": "inlet node depth",
+    "PUMP5": "head difference",
+}
 
 
 def default_template_path():
@@ -47,7 +66,7 @@ def check_template(content):
     ----------
     ValueError
         If FLOW_UNITS is missing or not an SI unit (the GIS data are metric), or if the template
-        contains a placeholder the writer does not fill (e.g. ``{pumps}``: pumps are not supported).
+        contains a placeholder the writer does not fill (see ``TEMPLATE_PLACEHOLDERS``).
     """
     match = re.search(r"^\s*FLOW_UNITS\s+(\S+)", content, re.MULTILINE | re.IGNORECASE)
     if match is None:
@@ -109,6 +128,93 @@ def xsection(pipe):
     if any(pd.isna(s) or s <= 0 for s in sizes):
         return None
     return shape, *sizes, *[0.0] * (2 - len(sizes))
+
+
+@dataclass
+class Pump:
+    """A pump that replaces a pipe in the .inp file, as passed to :meth:`SubNetwork.write_pyswmm`.
+
+    Attributes
+    ----------
+    curve : list of (float, float) or str
+        Pump curve points (x, y), y being the flow in the template's FLOW_UNITS (L/s with the
+        shipped template) and x as given by ``curve_type``; or ``'*'`` for an ideal pump, which
+        pumps whatever flows into its inlet node.
+
+    curve_type : str
+        PUMP1 (x: wet well volume, m3; the inlet must be a wet well), PUMP2 (x: inlet depth, m,
+        stepwise), PUMP3 (x: head difference, m), PUMP4 (x: inlet depth, m, continuous) or PUMP5
+        (variable-speed PUMP3). Ignored for an ideal pump.
+
+    status : str
+        Initial status, 'ON' or 'OFF'.
+
+    startup, shutoff : float
+        Inlet node depths (m) at which the pump turns on and off; 0 for none.
+    """
+
+    curve: object
+    curve_type: str = "PUMP3"
+    status: str = "ON"
+    startup: float = 0.0
+    shutoff: float = 0.0
+
+    @classmethod
+    def coerce(cls, pump_id, value):
+        """A Pump from a Pump or a dict of its fields, checked; raise ValueError if it is invalid."""
+        pump = replace(value) if isinstance(value, cls) else cls(**value)
+        problems = []
+        if isinstance(pump.curve, str):
+            if pump.curve != "*":
+                problems.append(f"curve must be a list of (x, y) points or '*', not {pump.curve!r}")
+        else:
+            points = [tuple(pt) for pt in pump.curve]
+            if not points or any(len(pt) != 2 for pt in points):
+                problems.append("curve must be a non-empty list of (x, y) points")
+            else:
+                pump.curve = [(float(x), float(y)) for x, y in points]
+            if pump.curve_type.upper() not in PUMP_CURVE_TYPES:
+                problems.append(
+                    f"curve_type {pump.curve_type!r} is not one of {list(PUMP_CURVE_TYPES)}"
+                )
+            pump.curve_type = pump.curve_type.upper()
+        pump.status = pump.status.upper()
+        if pump.status not in ("ON", "OFF"):
+            problems.append(f"status must be 'ON' or 'OFF', not {pump.status!r}")
+        if problems:
+            raise ValueError(f"Pump {pump_id}: {'; '.join(problems)}.")
+        return pump
+
+
+@dataclass
+class WetWell:
+    """A node written as a [STORAGE] node of constant plan area, e.g. a pumping station wet well.
+
+    Attributes
+    ----------
+    max_depth : float
+        Depth (m) from the node invert to the top of the wet well.
+
+    area : float
+        Plan area (m2).
+
+    init_depth : float
+        Initial water depth (m).
+    """
+
+    max_depth: float
+    area: float
+    init_depth: float = 0.0
+
+    @classmethod
+    def coerce(cls, node, value):
+        """A WetWell from a WetWell or a dict of its fields; raise ValueError if it is invalid."""
+        well = replace(value) if isinstance(value, cls) else cls(**value)
+        if not (well.max_depth > 0 and well.area > 0 and well.init_depth >= 0):
+            raise ValueError(
+                f"Wet well {node}: max_depth and area must be positive and init_depth not negative."
+            )
+        return well
 
 
 def _invert(value):
@@ -1005,6 +1111,61 @@ class SubNetwork(Network):
                     found[node] = min(found.get(node, value), value)
         return found
 
+    def pumps(self, pumps):
+        """Check and resolve the ``pumps`` argument of :meth:`write_pyswmm`.
+
+        Parameters
+        ----------
+        pumps : dict or None
+            {pipe_id: Pump or dict of its fields}. The keys are matched to the subnetwork pipe IDs
+            as strings, so ``1010`` and ``'1010'`` are the same pipe.
+
+        Returns
+        ----------
+        dict
+            {pipe_id: Pump}, keyed by the pipe IDs of the data.
+
+        Raises
+        ----------
+        ValueError
+            If a pipe is not in the subnetwork or a pump is invalid.
+        """
+        if not pumps:
+            return {}
+        ids = {str(p): p for p in self.subnetwork_pipes()["pipe_id"]}
+        missing = sorted(str(k) for k in pumps if str(k) not in ids)
+        if missing:
+            raise ValueError(f"Pumped pipes not in the subnetwork: {', '.join(missing)}")
+        return {ids[str(k)]: Pump.coerce(k, v) for k, v in pumps.items()}
+
+    def wet_wells(self, wet_wells):
+        """Check the ``wet_wells`` argument of :meth:`write_pyswmm`.
+
+        Parameters
+        ----------
+        wet_wells : dict or None
+            {node: WetWell or dict of its fields}.
+
+        Returns
+        ----------
+        dict
+            {node: WetWell}
+
+        Raises
+        ----------
+        ValueError
+            If a node is not in the subnetwork or is an outfall, or a wet well is invalid.
+        """
+        if not wet_wells:
+            return {}
+        missing = sorted(str(n) for n in wet_wells if n not in self.subgraph)
+        if missing:
+            raise ValueError(f"Wet wells not in the subnetwork: {', '.join(missing)}")
+        outfalls = sorted(str(n) for n in wet_wells if n in set(self._outfalls()))
+        if outfalls:
+            raise ValueError(f"Wet wells cannot be outfalls: {', '.join(outfalls)}")
+        return {node: WetWell.coerce(node, v) for node, v in wet_wells.items()}
+
     def xsections(self, pipes):
         """{pipe_id: (shape, geom1, geom2)} for the rows in ``pipes`` (see :func:`xsection`).
 
@@ -1037,11 +1198,12 @@ class SubNetwork(Network):
         ponding_area,
         height_correction,
         extra_outfalls=(),
+        wet_wells=None,
     ):
         """Add subnetwork data into the Nodes section of a .inp file.
 
-        Each outfall is written once; every other node is a junction. Node inverts come from
-        :meth:`node_inverts`.
+        Each outfall is written once; wet wells are written to [STORAGE] and every other node is a
+        junction. Node inverts come from :meth:`node_inverts`.
 
         Parameters
         ----------
@@ -1066,6 +1228,9 @@ class SubNetwork(Network):
         extra_outfalls : iterable of str
             Further nodes to write as FREE outfalls, e.g. dead ends.
 
+        wet_wells : dict, optional
+            {node: WetWell or dict}, written to the {storage} placeholder (see :meth:`wet_wells`).
+
         Notes
         -----
         Also fills the {coordinates} placeholder with each node's position in the units of the
@@ -1078,9 +1243,11 @@ class SubNetwork(Network):
         outfall_types = dict(zip(self._outfalls(), self._outfall_types(), strict=True))
         outfall_types.update({node: "FREE" for node in extra_outfalls})
         inverts = self.node_inverts(height_correction)
+        wet_wells = self.wet_wells(wet_wells)
 
         nodes_content = ""
         outfall_content = ""
+        storage_content = ""
         # Iterate through the nodes in the graph and build the content
         for node in self.subgraph.nodes:
             invert = inverts[node]
@@ -1090,6 +1257,13 @@ class SubNetwork(Network):
             if node in outfall_types:
                 outfall_content += (
                     f"{node:<16} {invert:<11}  {outfall_types[node]:<28} {'NO':<10}\n"
+                )
+            elif node in wet_wells:
+                well = wet_wells[node]
+                # FUNCTIONAL area = 0 * depth^0 + area: a constant plan area.
+                storage_content += (
+                    f"{node:<16} {invert:<11} {well.max_depth:<11} {well.init_depth:<11} "
+                    f"{'FUNCTIONAL':<12} {0:<11} {0:<11} {well.area:<11} {0:<11} {0:<11}\n"
                 )
             else:
                 nodes_content += (
@@ -1110,6 +1284,7 @@ class SubNetwork(Network):
         modified_content = (
             content.replace("{nodes}", nodes_content)
             .replace("{outfalls}", outfall_content)
+            .replace("{storage}", storage_content)
             .replace("{coordinates}", coordinates_content)
         )
 
@@ -1126,6 +1301,7 @@ class SubNetwork(Network):
         barrels,
         manning_n_by_material=None,
         height_correction=None,
+        pumps=None,
     ):
         """Add subnetwork data into the Conduits and XSection section of a .inp file.
 
@@ -1153,6 +1329,10 @@ class SubNetwork(Network):
         height_correction : dict, optional
             User defined node inverts, overriding those computed by :meth:`node_inverts`.
 
+        pumps : dict, optional
+            {pipe_id: Pump or dict} (see :meth:`pumps`). These pipes are written to the {pumps}
+            placeholder, and their curves to {curves}, instead of as conduits.
+
         Notes
         -----
         The inlet and outlet offsets are the pipe's GIS inverts minus its nodes' inverts
@@ -1165,11 +1345,14 @@ class SubNetwork(Network):
             content = file.read()
 
         pipes = self.subnetwork_pipes()
-        sections = self.xsections(pipes)
+        pumps = self.pumps(pumps)
+        sections = self.xsections(pipes[~pipes["pipe_id"].isin(list(pumps))])
         inverts = self.node_inverts(height_correction)
 
         conduits_content = ""
         xsection_content = ""
+        pumps_content = ""
+        curves_content = ""
         vertices_content = ""
         adverse = []
 
@@ -1178,6 +1361,24 @@ class SubNetwork(Network):
             inlet = row["from_node"]
             outlet = row["to_node"]
             length = row["length"]
+
+            for x, y in line_coords(row["geometry"])[1:-1]:
+                vertices_content += f"{name:<16} {x:<18} {y:<18}\n"
+
+            if name in pumps:
+                pump = pumps[name]
+                curve = "*" if pump.curve == "*" else f"{name}_curve"
+                pumps_content += (
+                    f"{name:<16} {inlet:<16} {outlet:<16} {curve:<16} {pump.status:<6} "
+                    f"{pump.startup:<11} {pump.shutoff:<11}\n"
+                )
+                if curve != "*":
+                    for i, (x, y) in enumerate(pump.curve):
+                        kind = pump.curve_type if i == 0 else ""
+                        curves_content += f"{curve:<16} {kind:<9} {x:<11} {y:<11}\n"
+                    curves_content += "\n"
+                continue
+
             roughness = (manning_n_by_material or {}).get(row["material"], manning_n)
             shape, geom1, geom2 = sections[name]
 
@@ -1211,9 +1412,6 @@ class SubNetwork(Network):
                 f"{name:<16} {shape:<16} {geom1:<16}{geom2:<11} {0.0:<11} {0.0:<11} {barrels:<11}\n"
             )
 
-            for x, y in line_coords(row["geometry"])[1:-1]:
-                vertices_content += f"{name:<16} {x:<18} {y:<18}\n"
-
         if adverse:
             warnings.warn(
                 f"Conduits with an adverse slope (outlet invert above inlet invert): "
@@ -1225,6 +1423,8 @@ class SubNetwork(Network):
         modified_content = (
             content.replace("{conduits}", conduits_content)
             .replace("{xsections}", xsection_content)
+            .replace("{pumps}", pumps_content)
+            .replace("{curves}", curves_content)
             .replace("{vertices}", vertices_content)
         )
 
@@ -1249,6 +1449,8 @@ class SubNetwork(Network):
         output_folder=None,
         height_correction=None,
         dead_ends="raise",
+        pumps=None,
+        wet_wells=None,
     ):
         """Generate a PySWMM input file based on a networkx digraph and GeoPandas DataFrame.
 
@@ -1300,9 +1502,9 @@ class SubNetwork(Network):
             package (``sewernetworkx/templates/template.inp``), which uses SI units (FLOW_UNITS
             LPS). A custom template must use an SI FLOW_UNITS (CMS, LPS or MLD), since the GIS
             lengths, inverts and sizes are in metres, and may only contain the placeholders
-            {nodes}, {outfalls}, {conduits}, {xsections}, {coordinates} and {vertices}.
-            Pumps are not supported yet, so a template with a {pumps} placeholder is rejected.
-            The offsets are depths, so the template should set LINK_OFFSETS DEPTH (the default).
+            {nodes}, {outfalls}, {storage}, {conduits}, {pumps}, {xsections}, {curves},
+            {coordinates} and {vertices}; {storage}, {pumps} and {curves} are needed only with
+            ``wet_wells`` or ``pumps``. The offsets are depths, so the template should set LINK_OFFSETS DEPTH (the default).
 
         output_folder : str
             Path to were the new .inp file will be written.
@@ -1315,12 +1517,25 @@ class SubNetwork(Network):
             What to do with nodes that have no outlet pipe and are not outfalls: raise a
             ``ValueError`` (default) or write them as FREE outfalls.
 
+        pumps : dict, optional
+            {pipe_id: :class:`Pump` or dict of its fields}, e.g.
+            ``{1010: dict(curve=[(0, 5.0), (5, 3.0), (10, 0.0)], curve_type='PUMP3')}``. Each pipe
+            is written as a pump from its upstream to its downstream node, replacing its conduit,
+            and its curve to [CURVES]. Curve flows are in the template's FLOW_UNITS (L/s with the
+            shipped template). The GIS data do not identify pumps, so they must be given here.
+
+        wet_wells : dict, optional
+            {node: :class:`WetWell` or dict of its fields}, e.g. ``{'D1': dict(max_depth=3.0,
+            area=4.0)}``. These nodes are written as [STORAGE] nodes of constant plan area
+            instead of junctions. The inlet of a PUMP1 pump must be a wet well.
+
         Raises
         ----------
         ValueError
             If the topology is invalid for the template's flow routing, there are dead ends and
-            ``dead_ends`` is 'raise', a pipe has an unknown or missing shape code or size, or a
-            node has no invert.
+            ``dead_ends`` is 'raise', a pipe has an unknown or missing shape code or size, a
+            node has no invert, a pump or wet well is invalid, or the template lacks a placeholder
+            that ``pumps`` or ``wet_wells`` needs.
         """
 
         if output_file is None:
@@ -1352,7 +1567,11 @@ class SubNetwork(Network):
         self._check_topology(report, self._template_routing(template), dead_ends)
 
         # Fail before writing anything if a pipe or node cannot be represented
-        self.xsections(self.subnetwork_pipes())
+        resolved_pumps = self.pumps(pumps)
+        resolved_wells = self.wet_wells(wet_wells)
+        self._check_pumps(template, resolved_pumps, resolved_wells)
+        pipes = self.subnetwork_pipes()
+        self.xsections(pipes[~pipes["pipe_id"].isin(list(resolved_pumps))])
         self.node_inverts(height_correction)
 
         # Always create a copy of the template file
@@ -1375,6 +1594,7 @@ class SubNetwork(Network):
             ponding_area,
             height_correction,
             extra_outfalls=report.dead_ends if dead_ends == "outfall" else (),
+            wet_wells=resolved_wells,
         )
 
         # Write conduits to pyswmm inp file
@@ -1386,7 +1606,36 @@ class SubNetwork(Network):
             barrels,
             manning_n_by_material,
             height_correction,
+            pumps=resolved_pumps,
         )
+
+    def _check_pumps(self, template, pumps, wet_wells):
+        """Raise ValueError if the template cannot hold the pumps and wet wells, or a PUMP1 pump
+        has no wet well at its inlet."""
+        needed = []
+        if pumps:
+            needed.append("pumps")
+            if any(p.curve != "*" for p in pumps.values()):
+                needed.append("curves")
+        if wet_wells:
+            needed.append("storage")
+        missing = [f"{{{name}}}" for name in needed if f"{{{name}}}" not in template]
+        if missing:
+            raise ValueError(
+                f"The template has no {', '.join(missing)} placeholder, so the pumps or wet wells "
+                "would not be written."
+            )
+
+        inlets = self.subnetwork_pipes().set_index("pipe_id")["from_node"]
+        dry = sorted(
+            f"{name} (inlet {inlets[name]})"
+            for name, pump in pumps.items()
+            if pump.curve != "*" and pump.curve_type == "PUMP1" and inlets[name] not in wet_wells
+        )
+        if dry:
+            raise ValueError(
+                f"PUMP1 pumps need a wet well at their inlet node (pass wet_wells): {', '.join(dry)}"
+            )
 
     @staticmethod
     def _template_routing(template):

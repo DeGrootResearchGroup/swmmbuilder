@@ -64,9 +64,9 @@ def test_missing_flow_units_rejected(sub, tmp_path):
         )
 
 
-def test_pumps_placeholder_rejected(sub, tmp_path):
-    path = custom_template(tmp_path, "[LOSSES]", "[PUMPS]\n{pumps}\n\n[LOSSES]")
-    with pytest.raises(ValueError, match="pumps"):
+def test_unknown_placeholder_rejected(sub, tmp_path):
+    path = custom_template(tmp_path, "[LOSSES]", "[WEIRS]\n{weirs}\n\n[LOSSES]")
+    with pytest.raises(ValueError, match="weirs"):
         quiet(
             sub.write_pyswmm,
             output_file="m.inp",
