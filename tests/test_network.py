@@ -23,11 +23,9 @@ def test_pipes_flagged_abandoned_removed(network):
     assert ("X1", "A2") not in pipe_pairs(sub)
 
 
-@pytest.mark.xfail(
-    strict=True, reason="#2: Network.full_data is a class attribute shared by all instances"
-)
 def test_networks_are_independent():
     first = quiet(Network, str(FIXTURE))
-    n_first = len(first.full_data)
+    n_first, nodes_first = len(first.full_data), set(first.graph)
     quiet(Network, str(REPO / "examples" / "geojson_test_data" / "test_data_small.geojson"))
     assert len(first.full_data) == n_first
+    assert set(first.graph) == nodes_first

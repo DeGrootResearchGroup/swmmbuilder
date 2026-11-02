@@ -7,11 +7,27 @@ of levels, and generates a .inp file to be used by pyswmm.
 
 import os
 import shutil
+import warnings
+from pathlib import Path
 
 import geopandas as gpd
 import gmplot
 import networkx as nx
+import pandas as pd
 import pkg_resources
+
+
+def _pipe_records(data):
+    """Yield (OBJECTID, UpstreamID, DownstreamID, Length) for every pipe with two node IDs.
+
+    Pipes with a missing node ID, or a node ID of 'Abandoned', are skipped.
+    """
+    for oid, up, down, length in zip(
+        data["OBJECTID"], data["UpstreamID"], data["DownstreamID"], data["Length"], strict=True
+    ):
+        if pd.isna(up) or pd.isna(down) or "Abandoned" in (up, down):
+            continue
+        yield oid, up, down, length
 
 
 class Network:
@@ -22,26 +38,47 @@ class Network:
     file_path : str, Path
         Name of GeoJSON file
 
+    Attributes
+    ----------
+    full_data : geopandas.GeoDataFrame
+        Pipe data read from the GeoJSON file.
+
+    graph : networkx.MultiDiGraph
+        One edge per pipe, in the direction of flow (UpstreamID -> DownstreamID), keyed by
+        OBJECTID so that parallel pipes are kept. Each edge has the attributes ``pipe`` (OBJECTID)
+        and ``length``. Nodes and edges are inserted in sorted order, so traversals do not depend
+        on the order of the file.
+
     Notes
     -----
     remove_store is used as a flag to automatically remove any sewer pipe
     flagged as a storm drain.
     """
 
-    full_data = None
-
     def __init__(self, file_path, remove_storm=True):
         """Class initialization"""
 
         self.file_path = file_path
         data = gpd.read_file(self.file_path)
-        Network.full_data = gpd.GeoDataFrame(data, geometry="geometry")
+        self.full_data = gpd.GeoDataFrame(data, geometry="geometry")
 
         if remove_storm:
             print("Removing storm sewers")
             key = "FlowType"
-            condition = Network.full_data[key] != "STM"
-            Network.full_data = Network.full_data[condition]
+            condition = self.full_data[key] != "STM"
+            self.full_data = self.full_data[condition]
+
+        self.graph = self._build_graph(self.full_data)
+
+    @staticmethod
+    def _build_graph(data):
+        """Build the flow-direction MultiDiGraph of the pipes in ``data``."""
+        records = sorted(_pipe_records(data), key=lambda r: (r[1], r[2], r[0]))
+        G = nx.MultiDiGraph()
+        G.add_nodes_from(sorted({n for _, up, down, _ in records for n in (up, down)}))
+        for oid, up, down, length in records:
+            G.add_edge(up, down, key=oid, pipe=oid, length=length)
+        return G
 
     """
     # Needs to be updated
@@ -112,12 +149,24 @@ class SubNetwork(Network):
         scale : int
 
     file_path : str, Path
-        Path to GeoJSON file.
+        Path to GeoJSON file. If given, the pipes are read from this file instead of
+        ``network_data``.
+
+    Notes
+    -----
+    Select the subnetwork with one of :meth:`catchment`, :meth:`from_nodes` or
+    :meth:`from_node_list`; each sets ``subgraph`` deterministically. ``subgraph`` is a
+    ``networkx.DiGraph`` whose edges are stored as (downstream, upstream), the orientation the
+    .inp writer expects, with the attribute ``pipes``: the sorted OBJECTIDs of the (possibly
+    parallel) pipes between the two nodes.
     """
 
     def __init__(self, subnetwork_data, file_path=None):
         if file_path:
             super().__init__(file_path)
+            source = self
+        else:
+            source = subnetwork_data.get("network_data")
 
         required_keys = [
             "network_data",
@@ -172,20 +221,147 @@ class SubNetwork(Network):
             "ShapeSTLength",
         ]
 
-        self.reduced_keys_data = subnetwork_data["network_data"].full_data.copy()
+        self.full_data = source.full_data
+        self.graph = source.graph
+        self.reduced_keys_data = source.full_data.copy()
 
         for keys in keys_to_remove:
             if keys in self.reduced_keys_data.columns:
                 self.reduced_keys_data.drop(keys, axis=1, inplace=True)
 
         print("Creating Pipes")
-        for index, pipe in self.reduced_keys_data.iterrows():
-            if pipe["UpstreamID"] is not None and pipe["DownstreamID"] is not None:
-                if pipe["UpstreamID"] != "Abandoned" and pipe["DownstreamID"] != "Abandoned":
-                    self.network_data[pipe["OBJECTID"]] = (pipe["DownstreamID"], pipe["UpstreamID"])
+        for oid, up, down, _ in _pipe_records(self.reduced_keys_data):
+            self.network_data[oid] = (down, up)
+
+    def catchment(self, node, max_hops=None, max_length=None, outlet=None):
+        """Select the catchment of ``node``: every node that drains to it.
+
+        With ``max_hops`` or ``max_length`` the catchment is truncated, and the path from ``node``
+        down to the outlet is added so that the subnetwork still discharges there.
+
+        Parameters
+        ----------
+        node : str
+            Node whose catchment is selected. Pass the outlet itself for its whole catchment.
+
+        max_hops : int, optional
+            Keep only nodes at most this many pipes upstream of ``node``.
+
+        max_length : float, optional
+            Keep only nodes whose shortest upstream path to ``node`` is at most this long, in the
+            units of the ``Length`` column.
+
+        outlet : str or list of str, optional
+            Outlet(s) to connect ``node`` to. Defaults to ``outfall_node``. A shortest path (by
+            length) is added to every listed outlet that ``node`` drains to.
+
+        Returns
+        ----------
+        networkx.DiGraph
+            The new ``subgraph``.
+        """
+        self._check_nodes([node])
+        upstream = self.graph.reverse(copy=False)
+
+        if max_hops is None:
+            selected = set(nx.descendants(upstream, node))
+        else:
+            selected = set(nx.single_source_shortest_path_length(upstream, node, cutoff=max_hops))
+        if max_length is not None:
+            within = nx.single_source_dijkstra_path_length(
+                upstream, node, cutoff=max_length, weight=self._pipe_length
+            )
+            selected &= set(within)
+        selected.add(node)
+
+        if max_hops is not None or max_length is not None:
+            outlets = self.outfall_node if outlet is None else outlet
+            outlets = [outlets] if isinstance(outlets, str) else list(outlets)
+            self._check_nodes(outlets)
+            reachable = [o for o in sorted(outlets) if nx.has_path(self.graph, node, o)]
+            if not reachable:
+                raise ValueError(f"Node {node} does not drain to any of the outlets {outlets}.")
+            for o in reachable:
+                selected.update(nx.dijkstra_path(self.graph, node, o, weight=self._pipe_length))
+
+        return self.from_nodes(selected)
+
+    def from_nodes(self, nodes):
+        """Select the subnetwork made of ``nodes`` and every pipe between two of them.
+
+        Parameters
+        ----------
+        nodes : iterable of str
+            Node IDs.
+
+        Returns
+        ----------
+        networkx.DiGraph
+            The new ``subgraph``.
+        """
+        nodes = sorted(set(nodes))
+        self._check_nodes(nodes)
+        induced = self.graph.subgraph(nodes)
+
+        subgraph = nx.DiGraph()
+        subgraph.add_nodes_from(nodes)
+        pipes = {}
+        for up, down, oid in induced.edges(keys=True):
+            pipes.setdefault((down, up), []).append(oid)
+        for edge in sorted(pipes):
+            subgraph.add_edge(*edge, pipes=sorted(pipes[edge]))
+
+        self.subgraph = subgraph
+        return subgraph
+
+    def to_node_list(self, path):
+        """Write the nodes of ``subgraph`` to a text file, one per line, in sorted order.
+
+        :meth:`from_node_list` rebuilds the same subnetwork from this file.
+
+        Parameters
+        ----------
+        path : str, Path
+            File to write.
+        """
+        lines = ["# SewerNetworkx node list: one node ID per line"]
+        lines += sorted(self.subgraph.nodes)
+        Path(path).write_text("\n".join(lines) + "\n")
+
+    def from_node_list(self, path):
+        """Select the subnetwork whose nodes are listed in a file written by :meth:`to_node_list`.
+
+        Blank lines and lines starting with '#' are ignored.
+
+        Parameters
+        ----------
+        path : str, Path
+            File to read.
+
+        Returns
+        ----------
+        networkx.DiGraph
+            The new ``subgraph``.
+        """
+        lines = (line.strip() for line in Path(path).read_text().splitlines())
+        return self.from_nodes(line for line in lines if line and not line.startswith("#"))
+
+    def _check_nodes(self, nodes):
+        missing = sorted(n for n in nodes if n not in self.graph)
+        if missing:
+            raise ValueError(f"Nodes not in the network: {', '.join(map(str, missing))}")
+
+    @staticmethod
+    def _pipe_length(u, v, pipes):
+        """Dijkstra weight: the shortest of the (possibly parallel) pipes from u to v."""
+        return min(attrs["length"] for attrs in pipes.values())
 
     def create_sub_network(self, ignore_successors=False, ignore_predecessors=False):
         """Create subnetwork, generate node colouring, and generate node locations.
+
+        .. deprecated::
+            The selected nodes are not a well-defined function of ``depth``. Use
+            :meth:`catchment`, :meth:`from_nodes` or :meth:`from_node_list` instead.
 
         Returns
         ----------
@@ -195,17 +371,22 @@ class SubNetwork(Network):
         ignore_predecessors : bool
             ignore predecessors from starting node
         """
+        warnings.warn(
+            "create_sub_network is deprecated; use catchment, from_nodes or from_node_list.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         print("Creating subnetwork for plotting")
 
         G = self._initialize_digraph()
 
         # Generate subnetwork starting with successors of starting node
         print("Checking successor nodes")
-        successors_subgraph = self.explore_nodes(G, direction="successors")
+        successors_subgraph = self._explore_nodes(G, direction="successors")
 
         # Generate subnetwork with predecessors of starting node
         print("Checking predecessor nodes")
-        predecessors_subgraph = self.explore_nodes(G, direction="predecessors")
+        predecessors_subgraph = self._explore_nodes(G, direction="predecessors")
 
         if ignore_successors:
             connected_subgraph = predecessors_subgraph
@@ -300,6 +481,19 @@ class SubNetwork(Network):
     def explore_nodes(self, G, direction):
         """Generate sewer network based on supplied direction
 
+        .. deprecated::
+            Used by the deprecated :meth:`create_sub_network`.
+        """
+        warnings.warn(
+            "explore_nodes is deprecated; use catchment, from_nodes or from_node_list.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return self._explore_nodes(G, direction)
+
+    def _explore_nodes(self, G, direction):
+        """Generate sewer network based on supplied direction
+
         Parameters
         ----------
         G : networkx.digraph(),
@@ -318,7 +512,7 @@ class SubNetwork(Network):
 
         while current_depth < self.depth:
             new_nodes = set()
-            for node in list(connected_subgraph):
+            for node in sorted(connected_subgraph):
                 # Find the next node in the sewer network
                 next_nodes = set(getattr(G, direction)(node))
                 if all(
@@ -326,7 +520,7 @@ class SubNetwork(Network):
                 ):
                     if len(next_nodes) > 1:
                         print(f"Branch Detected at node: {node}")
-                        branch_nodes = self.explore_branch(
+                        branch_nodes = self._explore_branch(
                             next_nodes, new_nodes, G, direction, opposite_direction
                         )
                         new_nodes.update(branch_nodes)
@@ -347,7 +541,7 @@ class SubNetwork(Network):
                                 current_depth += 1
                                 inner_depth = current_depth
                                 while inner_depth < self.depth:
-                                    branch_nodes = self.explore_branch(
+                                    branch_nodes = self._explore_branch(
                                         opposite_nodes, new_nodes, G, opposite_direction, direction
                                     )
                                     new_nodes.update(branch_nodes)
@@ -365,6 +559,20 @@ class SubNetwork(Network):
 
     @staticmethod
     def explore_branch(branch_nodes, new_nodes, G, direction, opposite_direction):
+        """Exploring branches found in explore_nodes function
+
+        .. deprecated::
+            Used by the deprecated :meth:`create_sub_network`.
+        """
+        warnings.warn(
+            "explore_branch is deprecated; use catchment, from_nodes or from_node_list.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return SubNetwork._explore_branch(branch_nodes, new_nodes, G, direction, opposite_direction)
+
+    @staticmethod
+    def _explore_branch(branch_nodes, new_nodes, G, direction, opposite_direction):
         """Exploring branches found in explore_nodes function
 
         Parameters
@@ -389,7 +597,7 @@ class SubNetwork(Network):
         new_nodes : set
             nodes to be added to the subnetwork from branches
         """
-        for branch in list(branch_nodes):
+        for branch in sorted(branch_nodes):
             print(f"Exploring branch from node: {branch}")
             new_nodes.add(branch)
             # print(f'{direction.capitalize()} of {branch} is: {list(getattr(G, direction)(branch))}')
