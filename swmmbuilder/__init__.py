@@ -11,7 +11,7 @@ from .schema import (
     Schema,
 )
 from .subnetwork import Subnetwork, TopologyReport
-from .swmm import Pump, WetWell
+from .swmm import Pump, PumpStation, WetWell
 
 __all__ = [
     "BARRIE_ON",
@@ -24,6 +24,7 @@ __all__ = [
     "WINDSOR_ON",
     "Network",
     "Pump",
+    "PumpStation",
     "Schema",
     "Subnetwork",
     "TopologyReport",

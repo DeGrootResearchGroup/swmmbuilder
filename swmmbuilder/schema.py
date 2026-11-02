@@ -177,6 +177,10 @@ class Schema:
         ``'ft'``, ``'in'``.
     crs : str or None
         If set, the geometry is reprojected to this CRS on loading.
+    design : dict
+        Design-rule presets of the city's standards, e.g. ``design['force_main_roughness']`` for
+        the ``force_main_roughness`` option of :func:`swmmbuilder.swmm.build_model`. They are
+        never applied unless passed explicitly.
     """
 
     name: str
@@ -198,6 +202,7 @@ class Schema:
     invert_unit: str = "m"
     size_unit: str = "m"
     crs: str | None = None
+    design: dict = field(default_factory=dict)
 
     def __post_init__(self):
         unknown = set(self.columns) - set(CANONICAL_COLUMNS)

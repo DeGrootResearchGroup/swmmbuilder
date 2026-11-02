@@ -81,3 +81,14 @@ pipes_out = "PipesOut"
 flow_monitor = "FlowMonitor"
 access = "Location"
 verified = "Verified"
+
+# Design rules of London's Design Specifications & Requirements Manual (Ch. 4, Sewage Pumping
+# Stations, Jan 2025), used only when passed explicitly, e.g.
+# force_main_roughness=LONDON_ON.design["force_main_roughness"].
+#
+# s. 4.8: force-main Hazen-Williams C by diameter, regardless of material: 100-150 mm 100,
+# 200-250 mm 110, 300-600 mm 120, over 600 mm 130. Rows are (upper diameter in mm, C).
+[design.force_main_roughness]
+equation = "H-W"
+by = "diameter"
+table = [[150, 100], [250, 110], [600, 120], [inf, 130]]
