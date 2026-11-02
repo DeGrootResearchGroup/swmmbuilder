@@ -18,9 +18,13 @@ dependencies = [
   "pyproj",
   "pyswmm",
   "gmplot",
+  "matplotlib",
+  "shapely>=2",
 ]
 
 [project.optional-dependencies]
+# Web-tile basemaps (maps.add_basemap) and interactive maps (maps.to_leaflet).
+maps = ["contextily", "xyzservices", "folium"]
 # `lint` pins the linter (same series as aquakin) so a new ruff release cannot turn the gate red
 # without a deliberate bump.
 lint = ["ruff>=0.15,<0.16"]
@@ -28,6 +32,7 @@ test = [
   "pytest>=7",
   "pytest-timeout>=2",
   "pytest-cov>=5",
+  "folium",
 ]
 
 [tool.setuptools]

@@ -179,7 +179,8 @@ class Schema:
         Units of the source lengths, inverts and sizes: one of ``'m'``, ``'cm'``, ``'mm'``,
         ``'ft'``, ``'in'``.
     crs : str or None
-        If set, the geometry is reprojected to this CRS on loading.
+        If set, the geometry is reprojected to this CRS on loading. Data with no CRS are taken
+        to be in this CRS already.
     design : dict
         Design rule -> its parameters, from a design standard (see :data:`DESIGN_RULES`), e.g.
         ``{'force_main_discharge': {'max_height_above_receiving_invert': 0.2}}``. They are used
@@ -208,6 +209,14 @@ class Schema:
     size_unit: str = "m"
     crs: str | None = None
     design: dict = field(default_factory=dict)
+
+    def _reprojected(self, data):
+        """``data`` in :attr:`crs`, if set (data with no CRS are taken to be in it already)."""
+        if self.crs is None:
+            return data
+        if data.crs is None:
+            return data.set_crs(self.crs)
+        return data.to_crs(self.crs)
 
     def __post_init__(self):
         unknown = set(self.columns) - set(CANONICAL_COLUMNS)
@@ -326,8 +335,7 @@ class Schema:
                 f"Cannot load the data with schema {self.name!r}: {'; '.join(problems)}."
             )
 
-        if self.crs is not None:
-            data = data.to_crs(self.crs)
+        data = self._reprojected(data)
 
         def source(canonical):
             column = sources.get(canonical)
@@ -417,8 +425,7 @@ class Schema:
                 f"Cannot load the node layer with schema {self.name!r}: its node_id column "
                 f"{candidates.get('node_id')} is not in the data."
             )
-        if self.crs is not None:
-            data = data.to_crs(self.crs)
+        data = self._reprojected(data)
 
         def source(canonical):
             column = next((s for s in candidates.get(canonical, []) if s in data.columns), None)

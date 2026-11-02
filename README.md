@@ -15,7 +15,7 @@ sub.validate(outfalls=["OUT"])                      # TopologyReport: splits, cy
 sub.to_inp("model.inp", outfalls=["OUT"])           # or {"OUT": "FIXED"} for other types
 model = swmm.build_model(sub, ["OUT"], manning_n_by_material={"PVC": 0.011})  # without a file
 sub.to_node_list("nodes.txt")                       # Subnetwork.from_node_list(net, "nodes.txt")
-maps.generate_gmap(sub, "map.html")                 # reprojected to WGS 84 for the map
+maps.to_leaflet(sub, "map.html")                    # interactive map; see Maps below
 ```
 
 A `Subnetwork`'s `graph` is a `networkx.MultiDiGraph` in the direction of flow, with one edge per
@@ -79,6 +79,64 @@ sub.to_inp("model.inp")  # outfalls default to the outfall nodes of the subnetwo
   `overflow`, `weir`, `pipes_in`, `pipes_out`, `flow_monitor`, `access` and `verified` are passed
   through for downstream use, e.g. choosing accessible or flow-monitored sampling sites.
 
+## Maps
+
+`swmmbuilder.maps` draws values computed elsewhere (concentrations, flows, each upstream
+area's share of a pipe's load, ...) on the network: pandas Series or DataFrames indexed by pipe
+ID, node ID or group name. Static plots use matplotlib and draw in a metric CRS (the network's
+CRS if projected, else its UTM zone; see `maps.plot_crs`). Each one styles the axes as a map
+(no ticks or frame, a scale bar; `maps.map_axes`, or `style=False`) and returns a `DrawnLayer`
+with its artist and its key.
+
+```python
+import matplotlib.pyplot as plt
+
+fig, ax = plt.subplots()
+zones = maps.node_group_polygons(sub, {"Z1": ["A1", "A2"], "Z2": ["B1", "B2"], "rest": [...]})
+colours = maps.category_colors(zones.index)       # one palette for zones and ribbons
+groups = maps.plot_groups(ax, zones, colors=colours, label="Zone", legend=False)
+pipes = maps.plot_pipes(ax, sub, concentration, norm="log", width=flow, legend=False)
+ribbons = maps.plot_ribbons(ax, sub, loads, colours, title="Upstream zone", legend=False)
+site = maps.plot_markers(ax, sub, ["OUT"], labels={"OUT": "Treatment plant"}, legend=False)
+maps.add_legends(ax, groups, pipes, ribbons)      # stacked to the right of the map
+maps.add_basemap(ax, sub)                         # web tiles; or layer="roads.gpkg" for offline
+
+maps.to_leaflet(sub, "map.html", [maps.PipeLayer(concentration, name="Concentration"),
+                                  maps.GroupLayer(zones), maps.MarkerLayer(["OUT"])])
+maps.to_geojson(sub, "pipes.geojson", values=concentration)
+sub.to_geodataframe("pipes", values=concentration)  # or "nodes" (rows of net.nodes)
+```
+
+- **Pipes.** `plot_pipes` colours pipes by value (missing values in grey) and, with `width=`,
+  scales line widths by the square root of the value by default (`width_scale="linear"` or
+  `"log"`), drawing thick pipes last. `context=True` draws them lighter and thinner, as context
+  beneath zones or ribbons.
+- **Ribbons.** `plot_ribbons` splits each pipe into strands, one per category, as wide as its
+  share. By default the ribbon width is proportional to the pipe's total load, with the largest
+  2.5 % of the network's extent wide (`max_width=` in metres to override); ribbons under 5 % of
+  that (`min_width=`) leave their pipes as thin grey context. Pipes are joined into one ribbon
+  along main stems (the widest ribbon through each junction) until the width or a share
+  visibly changes (`merge_tol=`), and the joins are mitred, so a trunk reads as one band.
+- **Zones.** `node_group_polygons` makes Voronoi tiles (or concave hulls) clipped to the network
+  footprint, the area near the pipes, so zones cover the serviced area. Its default distance is
+  twice the median pipe length, at most 5 % of the extent (`maps.footprint_distance`;
+  `footprint=` in metres to override, `False` for the convex hull).
+  `plot_groups` fills them lightly by category (with a legend) or by value (with a colour bar),
+  and can hatch sets of zones.
+- **Keys.** With `legend=True` (the default) each plot adds its colour bar or legend to a column
+  to the right of the map, below those already there. To compose several layers, pass
+  `legend=False` and call `maps.add_legends(ax, *layers)` once.
+- **Units.** Pipe line widths and marker sizes are in points: they stay the same when you zoom.
+  Ribbon widths, footprints and buffers are in metres: they scale with the map. Their defaults
+  are relative to the size of the network drawn, so they suit a street and a city alike.
+
+`python examples/maps_gallery.py` renders every static plot on two Toronto test catchments, of
+31 pipes (about 560 m across) and 2,692 pipes (about 9 km across), so the defaults can be checked
+at both scales; `--pipes` and `--outlet` render another network with the London schema. CI
+uploads the images as the `maps-gallery` artifact. Web-tile basemaps and `to_leaflet` need the
+optional `maps` extra (`pip install "swmmbuilder[maps]"`: contextily, xyzservices, folium).
+`generate_gmap` (Google Maps) is deprecated in favour of `to_leaflet`.
+
 ## Logging
 
 Progress and data problems (pipes dropped on loading, nodes with no position, height corrections)
@@ -100,7 +158,9 @@ logging.basicConfig(level=logging.INFO)
 only those (see `swmmbuilder/schema.py`). These schemas ship with the package, as TOML files in
 `swmmbuilder/schemas/`:
 
-- `LONDON_ON` (the default): London, ON's GIS export.
+- `LONDON_ON` (the default): London, ON's GIS export. The City's GeoJSON is in WGS 84; it
+  reprojects to UTM zone 17N (EPSG:2958, NAD83(CSRS)), so that missing lengths can be computed
+  and the .inp coordinates are in metres.
 - `TORONTO_ON`: the [Sewer Gravity Mains](https://open.toronto.ca/dataset/sewer-gravity-mains/)
   dataset of the City of Toronto Open Data Portal. It reprojects to MTM zone 10 (EPSG:2952), so the
   .inp coordinates are in metres. Toronto publishes only a diameter, so only circular pipes get a
@@ -136,7 +196,8 @@ source columns, and `shapes` and `flow_types` map source codes (or set `default_
 name = "My city"
 null_values = ["None"]   # values that mean "missing" in any mapped column
 size_unit = "mm"         # m, cm, mm, ft or in; also length_unit and invert_unit
-crs = "EPSG:32617"       # optional: reproject to this (projected) CRS on loading
+crs = "EPSG:32617"       # optional: reproject to this (projected) CRS on loading (data with
+                         # no CRS are taken to be in it already)
 
 [columns]
 pipe_id = "PIPE"

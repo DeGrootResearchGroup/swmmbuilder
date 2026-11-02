@@ -7,6 +7,7 @@ import geopandas as gpd
 import pandas as pd
 import pytest
 from conftest import TESTS, read_sections, run_swmm, write_inp
+from pyproj import Transformer
 
 from swmmbuilder import Network, Schema, Subnetwork, strip_leading_zeros
 from swmmbuilder.swmm import build_model
@@ -63,8 +64,9 @@ def test_node_types_fall_back_to_inventory_types():
 
 def test_nodes_table_and_graph_attributes(net):
     assert set(net.nodes.index) == set(net.graph)
-    assert net.nodes.crs == "EPSG:32617"
-    assert net.nodes.loc["PS1", "geometry"].coords[0] == (480100.0, 4760100.0)
+    assert net.nodes.crs == "EPSG:2958"  # the London schema reprojects the UTM 17N layers
+    expected = Transformer.from_crs(32617, 2958, always_xy=True).transform(480100.0, 4760100.0)
+    assert net.nodes.loc["PS1", "geometry"].coords[0] == pytest.approx(expected)
     assert net.graph.nodes["PS1"]["node_type"] == "pump_station"
     assert net.graph.nodes["M4"]["flow_monitor"]
     assert "rim_elevation" not in net.graph.nodes["M3"]  # missing values are left out

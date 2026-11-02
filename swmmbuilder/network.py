@@ -8,9 +8,10 @@ from pathlib import Path
 import geopandas as gpd
 import networkx as nx
 import pandas as pd
+from shapely import Point
 
 from .gaps import lowest_inverts
-from .geometry import line_coords
+from .geometry import node_positions, to_geodataframe
 from .schema import LONDON_ON, NODE_COLUMNS, as_schema
 from .subnetwork import Subnetwork
 
@@ -456,6 +457,22 @@ class Network:
 
         return self.subnetwork(selected)
 
+    def to_geodataframe(self, kind="pipes", values=None):
+        """The pipes or nodes as a GeoDataFrame, in the network's CRS, for plotting or export.
+
+        Parameters
+        ----------
+        kind : {'pipes', 'nodes'}
+            'pipes': the rows of ``full_data`` (geometry and canonical columns), indexed by
+            ``pipe_id``. 'nodes': the rows of :attr:`nodes` (point and canonical node
+            columns), indexed by ``node_id``.
+
+        values : pandas.Series, pandas.DataFrame or dict, optional
+            Values indexed by pipe or node ID, left-joined as extra columns (a Series by its
+            name, or 'value' if it has none). Pipes or nodes with no value get NaN.
+        """
+        return to_geodataframe(self.full_data, self.nodes, kind, values)
+
     def _check_nodes(self, nodes):
         missing = sorted(n for n in nodes if n not in self.graph)
         if missing:
@@ -473,12 +490,4 @@ def pipe_end_points(data, nodes):
     A node is placed at the upstream end of a pipe leaving it or, if no pipe leaves it, at the
     downstream end of a pipe entering it.
     """
-    from shapely.geometry import Point
-
-    upstream_ends, downstream_ends = {}, {}
-    for up, down, geometry in zip(data["from_node"], data["to_node"], data.geometry, strict=True):
-        if up in nodes and up not in upstream_ends:
-            upstream_ends[up] = Point(line_coords(geometry)[0])
-        if down in nodes and down not in downstream_ends:
-            downstream_ends[down] = Point(line_coords(geometry)[-1])
-    return {**downstream_ends, **upstream_ends}
+    return {node: Point(xy) for node, xy in node_positions(data, nodes).items()}
