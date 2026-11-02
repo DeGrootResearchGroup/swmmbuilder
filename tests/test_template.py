@@ -2,14 +2,16 @@
 the writer cannot fill."""
 
 import pytest
-from conftest import DENDRITIC, TEMPLATE, quiet, read_sections, subnetwork_with_edges
+from conftest import TEMPLATE, quiet, read_sections, subnetwork_with_edges
 
 from sewernetworkx.sewers import SI_FLOW_UNITS, check_template, default_template_path
 
 
 @pytest.fixture
 def sub(network):
-    return subnetwork_with_edges(network, DENDRITIC)
+    # Without the parallel J1 -> J2 pipes, which the template's KINWAVE routing rejects (#3).
+    edges = [("A1", "A2"), ("A2", "J1"), ("B1", "B2"), ("B2", "J1"), ("C1", "J1")]
+    return subnetwork_with_edges(network, edges, outfalls=("J1",))
 
 
 def test_packaged_template_is_si_and_fillable():

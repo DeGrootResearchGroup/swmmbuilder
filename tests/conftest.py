@@ -57,11 +57,21 @@ def subnetwork_with_edges(network, edges, outfalls=("OUT",), start="J1"):
     return sub
 
 
-def write_inp(sub, tmp_path, name="model.inp", **kwargs):
+def write_inp(sub, tmp_path, name="model.inp", routing=None, **kwargs):
+    """Write sub to tmp_path/name from the shipped template, or from a copy of it with FLOW_ROUTING
+    set to routing. The fixture's J1 -> J2 parallel pipes are a split that KINWAVE (the shipped
+    template's routing) rejects, so tests that write them use routing="DYNWAVE"."""
+    template = TEMPLATE
+    if routing is not None:
+        template = tmp_path / f"template_{routing}.inp"
+        text = re.sub(
+            r"(?m)^FLOW_ROUTING\s+\w+", f"FLOW_ROUTING         {routing}", TEMPLATE.read_text()
+        )
+        template.write_text(text)
     quiet(
         sub.write_pyswmm,
         output_file=name,
-        template_path=str(TEMPLATE),
+        template_path=str(template),
         output_folder=str(tmp_path),
         **kwargs,
     )
