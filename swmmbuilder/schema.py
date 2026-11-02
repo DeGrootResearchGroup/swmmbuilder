@@ -124,7 +124,12 @@ INVERT_COLUMNS = ("us_invert", "ds_invert", "drop_invert")
 
 # Design rules a schema's ``design`` table may hold (see :func:`swmmbuilder.gaps.fill_gaps` and
 # the ``force_main_roughness`` option of :func:`swmmbuilder.swmm.build_model`).
-DESIGN_RULES = ("force_main_discharge", "force_main_roughness")
+DESIGN_RULES = (
+    "force_main_discharge",
+    "force_main_roughness",
+    "wet_well_defaults",
+    "force_main_checks",
+)
 SIZE_COLUMNS = ("diameter", "height", "width")
 
 
@@ -187,8 +192,9 @@ class Schema:
         ``{'force_main_discharge': {'max_height_above_receiving_invert': 0.2}}``. They are used
         only when passed to the .inp writer, e.g.
         ``to_inp(..., force_main_discharge=schema.design['force_main_discharge'])`` or
-        ``to_inp(..., force_main_roughness=schema.design['force_main_roughness'])``, so a schema
-        can map the columns without adopting the standard.
+        ``to_inp(..., force_main_roughness=schema.design['force_main_roughness'])``; likewise
+        ``wet_well_defaults`` and ``force_main_checks``. So a schema can map the columns without
+        adopting the standard.
     """
 
     name: str
