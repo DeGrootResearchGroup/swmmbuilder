@@ -1,0 +1,833 @@
+{
+ "type": "FeatureCollection",
+ "features": [
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -82.3688918567001,
+      42.9361101680152
+     ],
+     [
+      -82.3688565050365,
+      42.9368654252906
+     ]
+    ]
+   },
+   "properties": {
+    "OBJECTID": 2858,
+    "Asset_Type": "Sanitary",
+    "Asset_ID": "SAN3359",
+    "Street": "McGregor Sideroad",
+    "FromStreet": "Highway 40",
+    "ToStreet": "Gladwish Drive",
+    "MH_Upstream": "MH7927",
+    "MH_Downstream": "MH7926",
+    "Sewer_Area": "Plank Road",
+    "PS_NO": "57",
+    "Owner": "Sarnia",
+    "Mun_Area": "Urban",
+    "Material": "Asbestos Cement",
+    "Diam_m": "350",
+    "UpStreamIn": 186.95,
+    "DownStream": 186.84,
+    "Lifecycle_Status": "Active",
+    "created_date": 1786392398350,
+    "last_edited_date": 1786392398350,
+    "GlobalID": "3696a18f-55a3-4e0d-adf7-056a442bbeee",
+    "Clean_Status": "Not Cleaned",
+    "Clean_Date": null,
+    "Condition_Flow": null,
+    "Length_Run_Feet": null,
+    "Number_Runs": null,
+    "Clean_Frequency": "Standard",
+    "Clean_Comments": null,
+    "Shape__Length": 83.93155641047517
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -82.3712219850041,
+      42.9355639457255
+     ],
+     [
+      -82.3700574245532,
+      42.9355262922861
+     ]
+    ]
+   },
+   "properties": {
+    "OBJECTID": 2860,
+    "Asset_Type": "Sanitary",
+    "Asset_ID": "SAN3360",
+    "Street": "Highway 40",
+    "FromStreet": "NA",
+    "ToStreet": "McGregor Sideroad",
+    "MH_Upstream": "MH9388",
+    "MH_Downstream": "MH9387",
+    "Sewer_Area": "Plank Road",
+    "PS_NO": "57",
+    "Owner": "Sarnia",
+    "Mun_Area": "Urban",
+    "Material": "Asbestos Cement",
+    "Diam_m": "250",
+    "UpStreamIn": 189.78,
+    "DownStream": 189.51,
+    "Lifecycle_Status": "Active",
+    "created_date": 1786392398350,
+    "last_edited_date": 1786392398350,
+    "GlobalID": "57fd6eb2-955d-473b-aee9-4c8345673af7",
+    "Clean_Status": "Not Cleaned",
+    "Clean_Date": null,
+    "Condition_Flow": null,
+    "Length_Run_Feet": null,
+    "Number_Runs": null,
+    "Clean_Frequency": "Standard",
+    "Clean_Comments": null,
+    "Shape__Length": 95.1271366394845
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -82.3700574245532,
+      42.9355262922861
+     ],
+     [
+      -82.3688654475399,
+      42.9355180293511
+     ]
+    ]
+   },
+   "properties": {
+    "OBJECTID": 2861,
+    "Asset_Type": "Sanitary",
+    "Asset_ID": "SAN3361",
+    "Street": "Highway 40",
+    "FromStreet": "NA",
+    "ToStreet": "McGregor Sideroad",
+    "MH_Upstream": "MH9387",
+    "MH_Downstream": "MH9384",
+    "Sewer_Area": "Plank Road",
+    "PS_NO": "57",
+    "Owner": "Sarnia",
+    "Mun_Area": "Urban",
+    "Material": "Asbestos Cement",
+    "Diam_m": "250",
+    "UpStreamIn": 189.51,
+    "DownStream": 189.25,
+    "Lifecycle_Status": "Active",
+    "created_date": 1786392398350,
+    "last_edited_date": 1786392398350,
+    "GlobalID": "a6805a75-44d9-4aff-933f-caeb498ab6c7",
+    "Clean_Status": "Not Cleaned",
+    "Clean_Date": null,
+    "Condition_Flow": null,
+    "Length_Run_Feet": null,
+    "Number_Runs": null,
+    "Clean_Frequency": "Standard",
+    "Clean_Comments": null,
+    "Shape__Length": 97.27686610997287
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -82.3687975498125,
+      42.9407480587011
+     ],
+     [
+      -82.3687727860582,
+      42.9415792872669
+     ]
+    ]
+   },
+   "properties": {
+    "OBJECTID": 2893,
+    "Asset_Type": "Sanitary",
+    "Asset_ID": "SAN3390",
+    "Street": "McGregor Sideroad",
+    "FromStreet": "Gladwish Drive",
+    "ToStreet": "Plank Road",
+    "MH_Upstream": "MH7923",
+    "MH_Downstream": "MH7922",
+    "Sewer_Area": "Plank Road",
+    "PS_NO": "57",
+    "Owner": "Sarnia",
+    "Mun_Area": "Urban",
+    "Material": "Asbestos Cement",
+    "Diam_m": "525",
+    "UpStreamIn": 186.32,
+    "DownStream": 186.23,
+    "Lifecycle_Status": "Active",
+    "created_date": 1786392398350,
+    "last_edited_date": 1786392398350,
+    "GlobalID": "bdc0d02e-87ce-47d7-a520-c17b635664dc",
+    "Clean_Status": "Not Cleaned",
+    "Clean_Date": null,
+    "Condition_Flow": null,
+    "Length_Run_Feet": null,
+    "Number_Runs": null,
+    "Clean_Frequency": "Standard",
+    "Clean_Comments": null,
+    "Shape__Length": 92.3418287362475
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -82.3688097209691,
+      42.9396713774023
+     ],
+     [
+      -82.3687975498125,
+      42.9407480587011
+     ]
+    ]
+   },
+   "properties": {
+    "OBJECTID": 2894,
+    "Asset_Type": "Sanitary",
+    "Asset_ID": "SAN3391",
+    "Street": "McGregor Sideroad",
+    "FromStreet": "Gladwish Drive",
+    "ToStreet": "Plank Road",
+    "MH_Upstream": "MH9394",
+    "MH_Downstream": "MH7923",
+    "Sewer_Area": "Plank Road",
+    "PS_NO": "57",
+    "Owner": "Sarnia",
+    "Mun_Area": "Urban",
+    "Material": "Asbestos Cement",
+    "Diam_m": "450",
+    "UpStreamIn": 186.45,
+    "DownStream": 186.32,
+    "Lifecycle_Status": "Active",
+    "created_date": 1786392398350,
+    "last_edited_date": 1786392398350,
+    "GlobalID": "cef1614b-2110-451c-a3b3-8c52ea0d66ce",
+    "Clean_Status": "Not Cleaned",
+    "Clean_Date": null,
+    "Condition_Flow": null,
+    "Length_Run_Feet": null,
+    "Number_Runs": null,
+    "Clean_Frequency": "Standard",
+    "Clean_Comments": null,
+    "Shape__Length": 119.58482828517126
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -82.3688565050365,
+      42.9368654252906
+     ],
+     [
+      -82.3688277265977,
+      42.9378396892228
+     ]
+    ]
+   },
+   "properties": {
+    "OBJECTID": 2895,
+    "Asset_Type": "Sanitary",
+    "Asset_ID": "SAN3392",
+    "Street": "McGregor Sideroad",
+    "FromStreet": "Highway 40",
+    "ToStreet": "Gladwish Drive",
+    "MH_Upstream": "MH7926",
+    "MH_Downstream": "MH7925",
+    "Sewer_Area": "Plank Road",
+    "PS_NO": "57",
+    "Owner": "Sarnia",
+    "Mun_Area": "Urban",
+    "Material": "Asbestos Cement",
+    "Diam_m": "400",
+    "UpStreamIn": 186.84,
+    "DownStream": 186.71,
+    "Lifecycle_Status": "Active",
+    "created_date": 1786392398350,
+    "last_edited_date": 1786392398350,
+    "GlobalID": "736c8ee9-0c0b-409b-a262-71acd5701ed3",
+    "Clean_Status": "Not Cleaned",
+    "Clean_Date": null,
+    "Condition_Flow": null,
+    "Length_Run_Feet": null,
+    "Number_Runs": null,
+    "Clean_Frequency": "Standard",
+    "Clean_Comments": null,
+    "Shape__Length": 108.23123484000389
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -82.3688277265977,
+      42.9378396892228
+     ],
+     [
+      -82.3688176760883,
+      42.9385303038528
+     ]
+    ]
+   },
+   "properties": {
+    "OBJECTID": 2896,
+    "Asset_Type": "Sanitary",
+    "Asset_ID": "SAN3393",
+    "Street": "McGregor Sideroad",
+    "FromStreet": "Gladwish Drive",
+    "ToStreet": "Plank Road",
+    "MH_Upstream": "MH7925",
+    "MH_Downstream": "MH7924",
+    "Sewer_Area": "Plank Road",
+    "PS_NO": "57",
+    "Owner": "Sarnia",
+    "Mun_Area": "Urban",
+    "Material": "Asbestos Cement",
+    "Diam_m": "400",
+    "UpStreamIn": 186.71,
+    "DownStream": 186.63,
+    "Lifecycle_Status": "Active",
+    "created_date": 1786392398350,
+    "last_edited_date": 1786392398350,
+    "GlobalID": "da1b97df-3c97-40f9-add5-042a79c855ed",
+    "Clean_Status": "Not Cleaned",
+    "Clean_Date": null,
+    "Condition_Flow": null,
+    "Length_Run_Feet": null,
+    "Number_Runs": null,
+    "Clean_Frequency": "Standard",
+    "Clean_Comments": null,
+    "Shape__Length": 76.70689225545561
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -82.3688176760883,
+      42.9385303038528
+     ],
+     [
+      -82.3688097209691,
+      42.9396713774023
+     ]
+    ]
+   },
+   "properties": {
+    "OBJECTID": 2897,
+    "Asset_Type": "Sanitary",
+    "Asset_ID": "SAN3394",
+    "Street": "McGregor Sideroad",
+    "FromStreet": "Gladwish Drive",
+    "ToStreet": "Plank Road",
+    "MH_Upstream": "MH7924",
+    "MH_Downstream": "MH9394",
+    "Sewer_Area": "Plank Road",
+    "PS_NO": "57",
+    "Owner": "Sarnia",
+    "Mun_Area": "Urban",
+    "Material": "Asbestos Cement",
+    "Diam_m": "450",
+    "UpStreamIn": 186.63,
+    "DownStream": 186.55,
+    "Lifecycle_Status": "Active",
+    "created_date": 1786392398350,
+    "last_edited_date": 1786392398350,
+    "GlobalID": "fab92906-109d-44e5-96b3-0eace9cbd0c5",
+    "Clean_Status": "Not Cleaned",
+    "Clean_Date": null,
+    "Condition_Flow": null,
+    "Length_Run_Feet": null,
+    "Number_Runs": null,
+    "Clean_Frequency": "Standard",
+    "Clean_Comments": null,
+    "Shape__Length": 126.73401414737943
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -82.3670727413019,
+      42.9353556728178
+     ],
+     [
+      -82.3679221087232,
+      42.9353684144168
+     ]
+    ]
+   },
+   "properties": {
+    "OBJECTID": 2940,
+    "Asset_Type": "Sanitary",
+    "Asset_ID": "SAN3432",
+    "Street": "Highway 40",
+    "FromStreet": "McGregor Sideroad",
+    "ToStreet": "McGregor Sideroad",
+    "MH_Upstream": "MH9389",
+    "MH_Downstream": "MH9386",
+    "Sewer_Area": "Plank Road",
+    "PS_NO": "57",
+    "Owner": "Sarnia",
+    "Mun_Area": "Urban",
+    "Material": "PVC",
+    "Diam_m": "300",
+    "UpStreamIn": 187.71,
+    "DownStream": 187.56,
+    "Lifecycle_Status": "Active",
+    "created_date": 1786392398350,
+    "last_edited_date": 1786392398350,
+    "GlobalID": "385f2746-60d8-4701-b857-1f6ab7257930",
+    "Clean_Status": "Not Cleaned",
+    "Clean_Date": null,
+    "Condition_Flow": null,
+    "Length_Run_Feet": null,
+    "Number_Runs": null,
+    "Clean_Frequency": "Standard",
+    "Clean_Comments": null,
+    "Shape__Length": 69.32811477177646
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -82.3679221087232,
+      42.9353684144168
+     ],
+     [
+      -82.3688698698141,
+      42.9353750958552
+     ]
+    ]
+   },
+   "properties": {
+    "OBJECTID": 2941,
+    "Asset_Type": "Sanitary",
+    "Asset_ID": "SAN3433",
+    "Street": "Highway 40",
+    "FromStreet": "McGregor Sideroad",
+    "ToStreet": "McGregor Sideroad",
+    "MH_Upstream": "MH9386",
+    "MH_Downstream": "MH9385",
+    "Sewer_Area": "Plank Road",
+    "PS_NO": "57",
+    "Owner": "Sarnia",
+    "Mun_Area": "Urban",
+    "Material": "PVC",
+    "Diam_m": "300",
+    "UpStreamIn": 187.53,
+    "DownStream": 187.36,
+    "Lifecycle_Status": "Active",
+    "created_date": 1786392398350,
+    "last_edited_date": 1786392398350,
+    "GlobalID": "054f6318-c49e-47bf-b887-c156cb73b2e4",
+    "Clean_Status": "Not Cleaned",
+    "Clean_Date": null,
+    "Condition_Flow": null,
+    "Length_Run_Feet": null,
+    "Number_Runs": null,
+    "Clean_Frequency": "Standard",
+    "Clean_Comments": null,
+    "Shape__Length": 77.34676966102505
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -82.3688698698141,
+      42.9353750958552
+     ],
+     [
+      -82.3688654475399,
+      42.9355180293511
+     ]
+    ]
+   },
+   "properties": {
+    "OBJECTID": 2942,
+    "Asset_Type": "Sanitary",
+    "Asset_ID": "SAN3434",
+    "Street": "Highway 40",
+    "FromStreet": "NA",
+    "ToStreet": "Highway 40",
+    "MH_Upstream": "MH9385",
+    "MH_Downstream": "MH9384",
+    "Sewer_Area": "Plank Road",
+    "PS_NO": "34",
+    "Owner": "Sarnia",
+    "Mun_Area": "Urban",
+    "Material": "PVC",
+    "Diam_m": "300",
+    "UpStreamIn": 187.36,
+    "DownStream": 187.25,
+    "Lifecycle_Status": "Active",
+    "created_date": 1786392398350,
+    "last_edited_date": 1786392398350,
+    "GlobalID": "59acf61d-5f01-40f5-b228-fbc9878f7823",
+    "Clean_Status": "Not Cleaned",
+    "Clean_Date": null,
+    "Condition_Flow": null,
+    "Length_Run_Feet": null,
+    "Number_Runs": null,
+    "Clean_Frequency": "Standard",
+    "Clean_Comments": null,
+    "Shape__Length": 15.878877505977464
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -82.3688654475399,
+      42.9355180293511
+     ],
+     [
+      -82.3688918567001,
+      42.9361101680152
+     ]
+    ]
+   },
+   "properties": {
+    "OBJECTID": 2943,
+    "Asset_Type": "Sanitary",
+    "Asset_ID": "SAN3435",
+    "Street": "McGregor Sideroad",
+    "FromStreet": "Highway 40",
+    "ToStreet": "Gladwish Drive",
+    "MH_Upstream": "MH9384",
+    "MH_Downstream": "MH7927",
+    "Sewer_Area": "Plank Road",
+    "PS_NO": "57",
+    "Owner": "Sarnia",
+    "Mun_Area": "Urban",
+    "Material": "Asbestos Cement",
+    "Diam_m": "350",
+    "UpStreamIn": 187.23,
+    "DownStream": 186.95,
+    "Lifecycle_Status": "Active",
+    "created_date": 1786392398350,
+    "last_edited_date": 1786392398350,
+    "GlobalID": "c43a816b-758e-42a7-a6c6-eca06c2e8c24",
+    "Clean_Status": "Not Cleaned",
+    "Clean_Date": null,
+    "Condition_Flow": null,
+    "Length_Run_Feet": null,
+    "Number_Runs": null,
+    "Clean_Frequency": "Standard",
+    "Clean_Comments": null,
+    "Shape__Length": 65.80063775627323
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -82.3665885319942,
+      42.9326743026149
+     ],
+     [
+      -82.366753864114,
+      42.9328758515478
+     ]
+    ]
+   },
+   "properties": {
+    "OBJECTID": 2944,
+    "Asset_Type": "Sanitary",
+    "Asset_ID": "SAN3437",
+    "Street": "McGregor Sideroad",
+    "FromStreet": "NA",
+    "ToStreet": "Highway 40",
+    "MH_Upstream": "MH7871",
+    "MH_Downstream": "MH9392",
+    "Sewer_Area": "Plank Road",
+    "PS_NO": "57",
+    "Owner": "Sarnia",
+    "Mun_Area": "Urban",
+    "Material": "PVC",
+    "Diam_m": "300",
+    "UpStreamIn": 188.47,
+    "DownStream": 188.39,
+    "Lifecycle_Status": "Active",
+    "created_date": 1786392398350,
+    "last_edited_date": 1786392398350,
+    "GlobalID": "050bd0a7-9496-49ce-915d-ae4904d0756d",
+    "Clean_Status": "Not Cleaned",
+    "Clean_Date": null,
+    "Condition_Flow": null,
+    "Length_Run_Feet": null,
+    "Number_Runs": null,
+    "Clean_Frequency": "Standard",
+    "Clean_Comments": null,
+    "Shape__Length": 26.13681505189624
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -82.366753864114,
+      42.9328758515478
+     ],
+     [
+      -82.3668519739329,
+      42.9337228166405
+     ]
+    ]
+   },
+   "properties": {
+    "OBJECTID": 2945,
+    "Asset_Type": "Sanitary",
+    "Asset_ID": "SAN3438",
+    "Street": "McGregor Sideroad",
+    "FromStreet": "NA",
+    "ToStreet": "Highway 40",
+    "MH_Upstream": "MH9392",
+    "MH_Downstream": "MH9391",
+    "Sewer_Area": "Plank Road",
+    "PS_NO": "57",
+    "Owner": "Sarnia",
+    "Mun_Area": "Urban",
+    "Material": "PVC",
+    "Diam_m": "300",
+    "UpStreamIn": 188.36,
+    "DownStream": 188.16,
+    "Lifecycle_Status": "Active",
+    "created_date": 1786392398350,
+    "last_edited_date": 1786392398350,
+    "GlobalID": "92667e4a-8b77-499e-a661-3d982742bea6",
+    "Clean_Status": "Not Cleaned",
+    "Clean_Date": null,
+    "Condition_Flow": null,
+    "Length_Run_Feet": null,
+    "Number_Runs": null,
+    "Clean_Frequency": "Standard",
+    "Clean_Comments": null,
+    "Shape__Length": 94.40744543783431
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -82.3668519739329,
+      42.9337228166405
+     ],
+     [
+      -82.3669769184236,
+      42.9346064959206
+     ]
+    ]
+   },
+   "properties": {
+    "OBJECTID": 2946,
+    "Asset_Type": "Sanitary",
+    "Asset_ID": "SAN3439",
+    "Street": "McGregor Sideroad",
+    "FromStreet": "NA",
+    "ToStreet": "Highway 40",
+    "MH_Upstream": "MH9391",
+    "MH_Downstream": "MH9390",
+    "Sewer_Area": "Plank Road",
+    "PS_NO": "57",
+    "Owner": "Sarnia",
+    "Mun_Area": "Urban",
+    "Material": "PVC",
+    "Diam_m": "300",
+    "UpStreamIn": 188.15,
+    "DownStream": 187.94,
+    "Lifecycle_Status": "Active",
+    "created_date": 1786392398350,
+    "last_edited_date": 1786392398350,
+    "GlobalID": "2e86c2aa-8693-4210-bbc9-6866b5d943e9",
+    "Clean_Status": "Not Cleaned",
+    "Clean_Date": null,
+    "Condition_Flow": null,
+    "Length_Run_Feet": null,
+    "Number_Runs": null,
+    "Clean_Frequency": "Standard",
+    "Clean_Comments": null,
+    "Shape__Length": 98.67319567697551
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -82.3669769184236,
+      42.9346064959206
+     ],
+     [
+      -82.3670727413019,
+      42.9353556728178
+     ]
+    ]
+   },
+   "properties": {
+    "OBJECTID": 2948,
+    "Asset_Type": "Sanitary",
+    "Asset_ID": "SAN3440",
+    "Street": "McGregor Sideroad",
+    "FromStreet": "NA",
+    "ToStreet": "Highway 40",
+    "MH_Upstream": "MH9390",
+    "MH_Downstream": "MH9389",
+    "Sewer_Area": "Plank Road",
+    "PS_NO": "57",
+    "Owner": "Sarnia",
+    "Mun_Area": "Urban",
+    "Material": "PVC",
+    "Diam_m": "300",
+    "UpStreamIn": 187.93,
+    "DownStream": 187.75,
+    "Lifecycle_Status": "Active",
+    "created_date": 1786392398350,
+    "last_edited_date": 1786392398350,
+    "GlobalID": "20074a7f-59f4-4236-b2cf-bcd5463e3b03",
+    "Clean_Status": "Not Cleaned",
+    "Clean_Date": null,
+    "Condition_Flow": null,
+    "Length_Run_Feet": null,
+    "Number_Runs": null,
+    "Clean_Frequency": "Standard",
+    "Clean_Comments": null,
+    "Shape__Length": 83.57324131658162
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -82.3666098431224,
+      42.9312059883345
+     ],
+     [
+      -82.3666013544315,
+      42.9318833781759
+     ]
+    ]
+   },
+   "properties": {
+    "OBJECTID": 2949,
+    "Asset_Type": "Sanitary",
+    "Asset_ID": "SAN3441",
+    "Street": "McGregor Sideroad",
+    "FromStreet": "NA",
+    "ToStreet": "Highway 40",
+    "MH_Upstream": "MH7873",
+    "MH_Downstream": "MH9393",
+    "Sewer_Area": "Plank Road",
+    "PS_NO": "57",
+    "Owner": "Sarnia",
+    "Mun_Area": "Urban",
+    "Material": "PVC",
+    "Diam_m": "300",
+    "UpStreamIn": 188.87,
+    "DownStream": 188.7,
+    "Lifecycle_Status": "Active",
+    "created_date": 1786392398350,
+    "last_edited_date": 1786392398350,
+    "GlobalID": "021cecf8-2039-453d-b10b-f6295f2d9285",
+    "Clean_Status": "Not Cleaned",
+    "Clean_Date": null,
+    "Condition_Flow": null,
+    "Length_Run_Feet": null,
+    "Number_Runs": null,
+    "Clean_Frequency": "Standard",
+    "Clean_Comments": null,
+    "Shape__Length": 75.23677517571932
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -82.3666013544315,
+      42.9318833781759
+     ],
+     [
+      -82.3665885319942,
+      42.9326743026149
+     ]
+    ]
+   },
+   "properties": {
+    "OBJECTID": 2950,
+    "Asset_Type": "Sanitary",
+    "Asset_ID": "SAN3442",
+    "Street": "McGregor Sideroad",
+    "FromStreet": "NA",
+    "ToStreet": "Highway 40",
+    "MH_Upstream": "MH9393",
+    "MH_Downstream": "MH7871",
+    "Sewer_Area": "Plank Road",
+    "PS_NO": "57",
+    "Owner": "Sarnia",
+    "Mun_Area": "Urban",
+    "Material": "PVC",
+    "Diam_m": "300",
+    "UpStreamIn": 188.67,
+    "DownStream": 188.48,
+    "Lifecycle_Status": "Active",
+    "created_date": 1786392398350,
+    "last_edited_date": 1786392398350,
+    "GlobalID": "3fec12a4-cd94-45b9-b49c-c74cb4de0786",
+    "Clean_Status": "Not Cleaned",
+    "Clean_Date": null,
+    "Condition_Flow": null,
+    "Length_Run_Feet": null,
+    "Number_Runs": null,
+    "Clean_Frequency": "Standard",
+    "Clean_Comments": null,
+    "Shape__Length": 87.84942899893709
+   }
+  }
+ ]
+}

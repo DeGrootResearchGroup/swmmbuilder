@@ -1,0 +1,37 @@
+# Windsor, ON: the SanitarySewer, StormSewer and CombinedSewer layers of the City of Windsor Open
+# Data Catalogue (https://opendata.citywindsor.ca; layers 14, 18 and 5 of
+# https://mappmycity.ca/arcgis/rest/services/OpenDataServices/Infrastructure/MapServer), which share
+# their fields. PIPE_SIZE is the diameter of circular pipes and the width of the others, whose
+# height is PIPE_HGT (0 for circular pipes). Every published EL pipe is taller than it is wide, so
+# EL is taken to be a vertical ellipse. An invert of 0 means none. Node IDs containing J (e.g.
+# 2CJ941) are pipe junctions with no maintenance hole. The geometry is reprojected to UTM zone 17N
+# (EPSG:26917, metres).
+name = "Windsor, ON"
+nonpositive_inverts_missing = true
+size_unit = "mm"
+crs = "EPSG:26917"
+
+[columns]
+pipe_id = "COMPKEY"
+from_node = "UPSTREAM_MH"
+to_node = "DWNSTREAM_MH"
+length = "PIPE_LENGTH"
+us_invert = "UPSTREAM_EL"
+ds_invert = "DWNSTREAM_EL"
+shape = "PIPE_SHAPE"
+diameter = "PIPE_SIZE"
+height = "PIPE_HGT"
+width = "PIPE_SIZE"
+flow_type = "SEWER_TYPE"
+material = "PIPE_TYPE"
+
+[shapes]
+CIRC = "CIRCULAR"
+EGG = "EGG"
+EL = "VERT_ELLIPSE"
+RECT = "RECT_CLOSED"
+
+[flow_types]
+SANITARY = "sanitary"
+STORM = "storm"
+COMBINED = "combined"

@@ -1,0 +1,24 @@
+# Peterborough, ON: the Sanitary Sewer Pipes (Non-pressurized) dataset of the City of Peterborough
+# Open Data portal
+# (https://services1.arcgis.com/JOTjMnANji9YTrZ2/arcgis/rest/services/San_Sewer_Pipe/FeatureServer/0).
+# The Storm Pipe dataset has the same columns. Only a diameter is published, so only Circular
+# pipes have a cross-section; Elliptical, Arched, Rectangular, Irregular and Unknown pipes are
+# reported on loading and rejected if they are written. Lengths are computed from the geometry,
+# reprojected to UTM zone 17N (EPSG:2958, NAD83(CSRS), metres).
+name = "Peterborough, ON"
+nonpositive_inverts_missing = true
+size_unit = "mm"
+crs = "EPSG:2958"
+
+[columns]
+pipe_id = "FACILITYID"
+from_node = "UP_MH_ID"
+to_node = "DOWN_MH_ID"
+us_invert = "UP_ELEVATION"
+ds_invert = "DOWN_ELEVATION"
+shape = "MAINSHAPE"
+diameter = "DIAMETER"
+material = "MATERIAL"
+
+[shapes]
+Circular = "CIRCULAR"
