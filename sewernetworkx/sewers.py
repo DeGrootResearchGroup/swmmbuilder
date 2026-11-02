@@ -248,16 +248,43 @@ class Network:
         if not isinstance(upstream_id, str):
             raise TypeError("Input must be a string")
 
-        # row = self.full_data[self.full_data['UpstreamID'] == upstream_id]
-        row = self.full_data[self.full_data["UpstreamID"] == upstream_id]
-        if not row.empty:
-            return row.iloc[0]["UpstreamInvert"]
-        else:
-            row = self.full_data[self.full_data["DownstreamID"] == upstream_id]
-            if not row.empty:
-                return row.iloc[0]["DownstreamInvert"]
-            else:
-                raise TypeError("Cant find either upstreaminvert of downstreaminvert")
+        inverts = self._pipe_index()["inverts"]
+        if upstream_id not in inverts:
+            raise TypeError("Cant find either upstreaminvert of downstreaminvert")
+        return inverts[upstream_id]
+
+    def _pipe_index(self):
+        """Lookup tables over ``full_data``, built on first use and rebuilt if it is replaced.
+
+        Returns
+        ----------
+        dict
+            ``'pairs'``: (UpstreamID, DownstreamID) -> row positions in ``full_data``, in file
+            order. ``'inverts'``: node -> UpstreamInvert of the first pipe leaving it or, if no
+            pipe leaves it, DownstreamInvert of the first pipe entering it.
+        """
+        cached = getattr(self, "_index", None)
+        if cached is not None and cached[0] is self.full_data:
+            return cached[1]
+
+        data = self.full_data
+        pairs, upstream, downstream = {}, {}, {}
+        for pos, (up, down, up_inv, down_inv) in enumerate(
+            zip(
+                data["UpstreamID"],
+                data["DownstreamID"],
+                data["UpstreamInvert"],
+                data["DownstreamInvert"],
+                strict=True,
+            )
+        ):
+            pairs.setdefault((up, down), []).append(pos)
+            upstream.setdefault(up, up_inv)
+            downstream.setdefault(down, down_inv)
+
+        index = {"pairs": pairs, "inverts": {**downstream, **upstream}}
+        self._index = (data, index)
+        return index
 
 
 class SubNetwork(Network):
@@ -658,12 +685,14 @@ class SubNetwork(Network):
         """
         nodes = set(nodes)
         upstream_ends, downstream_ends = {}, {}
-        for _, pipe in self.reduced_keys_data.iterrows():
-            upstream_id, downstream_id = pipe["UpstreamID"], pipe["DownstreamID"]
+        data = self.reduced_keys_data
+        for upstream_id, downstream_id, geometry in zip(
+            data["UpstreamID"], data["DownstreamID"], data["geometry"], strict=True
+        ):
             if upstream_id in nodes and upstream_id not in upstream_ends:
-                upstream_ends[upstream_id] = line_coords(pipe["geometry"])[0]
+                upstream_ends[upstream_id] = line_coords(geometry)[0]
             if downstream_id in nodes and downstream_id not in downstream_ends:
-                downstream_ends[downstream_id] = line_coords(pipe["geometry"])[-1]
+                downstream_ends[downstream_id] = line_coords(geometry)[-1]
         return {**downstream_ends, **upstream_ends}
 
     def explore_nodes(self, G, direction):
@@ -1051,43 +1080,43 @@ class SubNetwork(Network):
         xsection_content = ""
         vertices_content = ""
 
+        pairs = self._pipe_index()["pairs"]
+
         # Get information from nx.digraph to fill in data
         for edges in self.subgraph.edges:
             start_node, end_node = edges
 
-            for index, row in self.full_data.iterrows():
-                if row["UpstreamID"] == end_node and row["DownstreamID"] == start_node:
-                    print("Found pair")
+            for pos in pairs.get((end_node, start_node), []):
+                row = self.full_data.iloc[pos]
+                name = row["OBJECTID"]
+                inlet = row["UpstreamID"]
+                outlet = row["DownstreamID"]
+                length = row["Length"]
+                roughness = (manning_n_by_material or {}).get(row.get("Material"), manning_n)
 
-                    name = row["OBJECTID"]
-                    inlet = row["UpstreamID"]
-                    outlet = row["DownstreamID"]
-                    length = row["Length"]
-                    roughness = (manning_n_by_material or {}).get(row.get("Material"), manning_n)
+                if row["PipeShape"] == "R":
+                    shape = "RECT_CLOSED"
+                    height = row["Height"] / 1000
+                    width = row["Width"] / 1000
+                elif row["PipeShape"] == "Round":
+                    shape = "CIRCULAR"
+                    height = row["Height"] / 1000
+                    width = "0.0"
 
-                    if row["PipeShape"] == "R":
-                        shape = "RECT_CLOSED"
-                        height = row["Height"] / 1000
-                        width = row["Width"] / 1000
-                    elif row["PipeShape"] == "Round":
-                        shape = "CIRCULAR"
-                        height = row["Height"] / 1000
-                        width = "0.0"
+                conduits_content += (
+                    f"{name:<16} {inlet:<16} {outlet:<16}"
+                    f"{length:<11} {roughness:<11} "
+                    f"{inlet_offset:<11} {outlet_offset:<11}"
+                    f"{init_flow:<11} {max_flow:<11}\n"
+                )
 
-                    conduits_content += (
-                        f"{name:<16} {inlet:<16} {outlet:<16}"
-                        f"{length:<11} {roughness:<11} "
-                        f"{inlet_offset:<11} {outlet_offset:<11}"
-                        f"{init_flow:<11} {max_flow:<11}\n"
-                    )
+                xsection_content += (
+                    f"{name:<16} {shape:<16} {height:<16}"
+                    f"{width:<11} {0.0:<11} {0.0:<11} {barrels:<11}\n"
+                )
 
-                    xsection_content += (
-                        f"{name:<16} {shape:<16} {height:<16}"
-                        f"{width:<11} {0.0:<11} {0.0:<11} {barrels:<11}\n"
-                    )
-
-                    for x, y in line_coords(row["geometry"])[1:-1]:
-                        vertices_content += f"{name:<16} {x:<18} {y:<18}\n"
+                for x, y in line_coords(row["geometry"])[1:-1]:
+                    vertices_content += f"{name:<16} {x:<18} {y:<18}\n"
 
         # Replace variable in template file with conduit information
         modified_content = (
