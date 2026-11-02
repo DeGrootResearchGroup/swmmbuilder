@@ -1,0 +1,43 @@
+{
+ "type": "FeatureCollection",
+ "crs": {
+  "type": "name",
+  "properties": {
+   "name": "urn:ogc:def:crs:EPSG::32617"
+  }
+ },
+ "features": [
+  {
+   "type": "Feature",
+   "properties": {
+    "GIS_FeatureKey": "OF1",
+    "FlowType": "SAN",
+    "PipeInvert": 240.0,
+    "HeadwallElevation": 243.0
+   },
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     480250.0,
+     4760100.0
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "GIS_FeatureKey": "OF2",
+    "FlowType": "STM",
+    "PipeInvert": 245.5,
+    "HeadwallElevation": 248.0
+   },
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     480120.0,
+     4760140.0
+    ]
+   }
+  }
+ ]
+}

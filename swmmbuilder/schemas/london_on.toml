@@ -1,11 +1,18 @@
 # London, ON. In the London GIS, PipeShape 'R' means round; rectangular pipes are 'REC'. Sizes
 # are in mm, an invert of 0 means none, and a node ID of 'Abandoned' means no node.
+#
+# Older exports flag abandoned pipes in an Abandoned column; newer ones (2025 on) have
+# ConstructedStatus, StructureType and the inventory types of both end nodes instead. Both load
+# with this schema. The node layers (maintenance holes, Pumping_Stations, Sewer_Outfalls and
+# Sewer_Other_Nodes) share GIS_FeatureKey as the node ID; rims below 150 m or above 350 m are
+# data errors.
 name = "London, ON"
 abandoned = "Abandoned"
 abandoned_values = [1]
 null_nodes = ["Abandoned"]
 nonpositive_inverts_missing = true
 size_unit = "mm"
+rim_range = [150.0, 350.0]
 
 [columns]
 pipe_id = "OBJECTID"
@@ -21,6 +28,10 @@ height = "Height"
 width = "Width"
 flow_type = "FlowType"
 material = "Material"
+status = "ConstructedStatus"
+structure_type = "StructureType"
+us_node_type = "UpstreamInventoryType"
+ds_node_type = "DownstreamInventoryType"
 
 [shapes]
 R = "CIRCULAR"
@@ -35,3 +46,38 @@ ELV = "VERT_ELLIPSE"
 SAN = "sanitary"
 STM = "storm"
 COM = "combined"
+
+[statuses]
+Built = "built"
+Abandoned = "abandoned"
+Proposed = "proposed"
+Removed = "removed"
+
+[structure_types]
+SL = "gravity"
+OVF = "overflow"
+FM = "force_main"
+
+[node_types]
+MH = "maintenance_hole"
+PS = "pump_station"
+OF = "outfall"
+CAP = "cap"
+TEE = "tee"
+CHM = "chamber"
+
+[node_columns]
+node_id = "GIS_FeatureKey"
+node_type = "StructureType"
+name = "Fullname"
+invert = "PipeInvert"
+rim_elevation = ["LidElevation", "HeadwallElevation"]
+depth = "Depth"
+has_drop = "DropStructures"
+overflow = "Overflow"
+weir = "Weir"
+pipes_in = "PipesIn"
+pipes_out = "PipesOut"
+flow_monitor = "FlowMonitor"
+access = "Location"
+verified = "Verified"

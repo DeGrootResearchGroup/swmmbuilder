@@ -26,14 +26,29 @@ class TopologyReport:
     dead_ends : list
         Nodes with no outlet pipe that are not outfalls.
 
+    dead_end_types : dict
+        Dead end -> ``'capped'``, ``'outfall'`` (an outfall node that was not passed as an
+        outfall), ``'pump_station'`` or ``'unexplained'`` (a likely data gap), from the node type.
+
     parallel_pipes : dict
         (upstream, downstream) -> sorted pipe IDs, for every node pair joined by more than one pipe.
+
+    force_mains : list
+        Sorted pipe IDs of the force mains (pressurised pipes downstream of a pump).
+
+    pipe_count_mismatches : dict
+        Node -> {'pipes_in': (node layer, graph), 'pipes_out': (node layer, graph)}, for every node
+        whose pipe counts in its node layer differ from those of the network's graph (only the
+        counts that differ are listed).
     """
 
     splits: dict = field(default_factory=dict)
     cycles: list = field(default_factory=list)
     dead_ends: list = field(default_factory=list)
+    dead_end_types: dict = field(default_factory=dict)
     parallel_pipes: dict = field(default_factory=dict)
+    force_mains: list = field(default_factory=list)
+    pipe_count_mismatches: dict = field(default_factory=dict)
 
     @property
     def is_dendritic(self):
@@ -52,7 +67,7 @@ class Subnetwork:
         The network.
 
     nodes : iterable of str
-        Node IDs.
+        Node IDs (see :meth:`Network.resolve`).
 
     Attributes
     ----------
@@ -61,7 +76,8 @@ class Subnetwork:
 
     graph : networkx.MultiDiGraph
         The induced subgraph of ``network.graph``: edges in the direction of flow, keyed by
-        pipe_id (parallel pipes are separate edges), nodes and edges in sorted order.
+        pipe_id (parallel pipes are separate edges), nodes and edges in sorted order, with the
+        attributes of ``network.graph``.
 
     Raises
     ----------
@@ -70,13 +86,13 @@ class Subnetwork:
     """
 
     def __init__(self, network, nodes):
-        nodes = sorted(set(nodes))
+        nodes = sorted({network.resolve(n) for n in nodes})
         network._check_nodes(nodes)
         self.network = network
         # Built explicitly: networkx's subgraph views iterate their nodes in set order.
         selected = set(nodes)
         self.graph = nx.MultiDiGraph()
-        self.graph.add_nodes_from(nodes)
+        self.graph.add_nodes_from((n, network.graph.nodes[n]) for n in nodes)
         self.graph.add_edges_from(
             (up, down, key, attrs)
             for up, down, key, attrs in network.graph.edges(nodes, keys=True, data=True)
@@ -107,6 +123,12 @@ class Subnetwork:
     def schema(self):
         return self.network.schema
 
+    @property
+    def outfalls(self):
+        """The nodes whose node type is ``'outfall'``, sorted: the default outfalls of
+        :meth:`validate` and :meth:`to_inp`."""
+        return [n for n, t in self.graph.nodes(data="node_type") if t == "outfall"]
+
     def pipes(self):
         """The rows of ``network.full_data`` of the pipes in the subnetwork, sorted by pipe_id."""
         data = self.network.full_data
@@ -131,21 +153,22 @@ class Subnetwork:
                 downstream_ends[downstream_id] = line_coords(geometry)[-1]
         return {**downstream_ends, **upstream_ends}
 
-    def validate(self, outfalls=()):
+    def validate(self, outfalls=None):
         """Check the topology before the subnetwork is written to an .inp file.
 
         Parameters
         ----------
-        outfalls : iterable of str
-            The outfall nodes, which need no outlet pipe.
+        outfalls : iterable of str, optional
+            The outfall nodes, which need no outlet pipe (default: :attr:`outfalls`).
 
         Returns
         ----------
         TopologyReport
-            Flow splits, cycles, dead ends and parallel pipes. Splits and cycles are only allowed
-            with dynamic-wave routing; dead ends are never valid.
+            Flow splits, cycles, dead ends (classified by node type) and parallel pipes, plus the
+            force mains and the nodes whose recorded pipe counts differ from the graph. Splits and
+            cycles are only allowed with dynamic-wave routing; dead ends are never valid.
         """
-        outfalls = set(outfalls)
+        outfalls = set(self.outfalls if outfalls is None else outfalls)
         report = TopologyReport()
 
         for node in self.nodes:
@@ -166,9 +189,33 @@ class Subnetwork:
             report.cycles.append(cycle[i:] + cycle[:i])
         report.cycles.sort()
 
+        dead_end_types = {"cap": "capped", "outfall": "outfall", "pump_station": "pump_station"}
+        for node in report.dead_ends:
+            node_type = self.graph.nodes[node].get("node_type")
+            report.dead_end_types[node] = dead_end_types.get(node_type, "unexplained")
+
+        report.force_mains = sorted(
+            pipe
+            for _, _, pipe, structure in self.graph.edges(keys=True, data="structure_type")
+            if structure == "force_main"
+        )
+
+        full = self.network.graph
+        for node, attrs in self.graph.nodes(data=True):
+            counts = {
+                column: (int(attrs[column]), degree)
+                for column, degree in (
+                    ("pipes_in", full.in_degree(node)),
+                    ("pipes_out", full.out_degree(node)),
+                )
+                if column in attrs and attrs[column] != degree
+            }
+            if counts:
+                report.pipe_count_mismatches[node] = counts
+
         return report
 
-    def to_inp(self, path, outfalls, **options):
+    def to_inp(self, path, outfalls=None, **options):
         """Write the subnetwork to a SWMM .inp file; see :func:`swmmbuilder.swmm.write_inp`.
 
         Returns

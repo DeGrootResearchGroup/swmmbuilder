@@ -1,0 +1,603 @@
+{
+ "type": "FeatureCollection",
+ "crs": {
+  "type": "name",
+  "properties": {
+   "name": "urn:ogc:def:crs:EPSG::32617"
+  }
+ },
+ "features": [
+  {
+   "type": "Feature",
+   "properties": {
+    "OBJECTID": 5000,
+    "GIS_ID": 6000,
+    "FlowType": "SAN",
+    "UpstreamID": "M1",
+    "DownstreamID": "M2",
+    "UpstreamInventoryType": "MH",
+    "DownstreamInventoryType": "MH",
+    "Length": 50.0,
+    "PipeShape": "R",
+    "Diameter": 300,
+    "Height": 300,
+    "Width": 300,
+    "Material": "PVC",
+    "UpstreamInvert": 249.0,
+    "DownstreamInvert": 248.8,
+    "DropStructureInvert": 0.0,
+    "ConstructedStatus": "Built",
+    "StructureType": "SL",
+    "LocationArea": "TEST"
+   },
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      480000.0,
+      4760100.0
+     ],
+     [
+      480050.0,
+      4760100.0
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "OBJECTID": 5001,
+    "GIS_ID": 6001,
+    "FlowType": "SAN",
+    "UpstreamID": "M2",
+    "DownstreamID": "PS1",
+    "UpstreamInventoryType": "MH",
+    "DownstreamInventoryType": "PS",
+    "Length": 50.0,
+    "PipeShape": "R",
+    "Diameter": 300,
+    "Height": 300,
+    "Width": 300,
+    "Material": "PVC",
+    "UpstreamInvert": 248.7,
+    "DownstreamInvert": 248.5,
+    "DropStructureInvert": 0.0,
+    "ConstructedStatus": "Built",
+    "StructureType": "SL",
+    "LocationArea": "TEST"
+   },
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      480050.0,
+      4760100.0
+     ],
+     [
+      480100.0,
+      4760100.0
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "OBJECTID": 5002,
+    "GIS_ID": 6002,
+    "FlowType": "SAN",
+    "UpstreamID": "PS1",
+    "DownstreamID": "M3",
+    "UpstreamInventoryType": "PS",
+    "DownstreamInventoryType": "MH",
+    "Length": 50.0,
+    "PipeShape": "R",
+    "Diameter": 300,
+    "Height": 300,
+    "Width": 300,
+    "Material": "PVC",
+    "UpstreamInvert": 248.4,
+    "DownstreamInvert": 246.0,
+    "DropStructureInvert": 0.0,
+    "ConstructedStatus": "Built",
+    "StructureType": "FM",
+    "LocationArea": "TEST"
+   },
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      480100.0,
+      4760100.0
+     ],
+     [
+      480150.0,
+      4760100.0
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "OBJECTID": 5003,
+    "GIS_ID": 6003,
+    "FlowType": "SAN",
+    "UpstreamID": "M3",
+    "DownstreamID": "M4",
+    "UpstreamInventoryType": "MH",
+    "DownstreamInventoryType": "MH",
+    "Length": 50.0,
+    "PipeShape": "R",
+    "Diameter": 300,
+    "Height": 300,
+    "Width": 300,
+    "Material": "PVC",
+    "UpstreamInvert": 245.5,
+    "DownstreamInvert": 245.0,
+    "DropStructureInvert": 0.0,
+    "ConstructedStatus": "Built",
+    "StructureType": "SL",
+    "LocationArea": "TEST"
+   },
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      480150.0,
+      4760100.0
+     ],
+     [
+      480200.0,
+      4760100.0
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "OBJECTID": 5004,
+    "GIS_ID": 6004,
+    "FlowType": "SAN",
+    "UpstreamID": "M4",
+    "DownstreamID": "OF1",
+    "UpstreamInventoryType": "MH",
+    "DownstreamInventoryType": "OF",
+    "Length": 50.0,
+    "PipeShape": "R",
+    "Diameter": 300,
+    "Height": 300,
+    "Width": 300,
+    "Material": "PVC",
+    "UpstreamInvert": 244.9,
+    "DownstreamInvert": 240.5,
+    "DropStructureInvert": 0.0,
+    "ConstructedStatus": "Built",
+    "StructureType": "SL",
+    "LocationArea": "TEST"
+   },
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      480200.0,
+      4760100.0
+     ],
+     [
+      480250.0,
+      4760100.0
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "OBJECTID": 5005,
+    "GIS_ID": 6005,
+    "FlowType": "SAN",
+    "UpstreamID": "M3",
+    "DownstreamID": "OF2",
+    "UpstreamInventoryType": "MH",
+    "DownstreamInventoryType": "OF",
+    "Length": 50.0,
+    "PipeShape": "R",
+    "Diameter": 300,
+    "Height": 300,
+    "Width": 300,
+    "Material": "PVC",
+    "UpstreamInvert": 246.5,
+    "DownstreamInvert": 246.0,
+    "DropStructureInvert": 0.0,
+    "ConstructedStatus": "Built",
+    "StructureType": "OVF",
+    "LocationArea": "TEST"
+   },
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      480150.0,
+      4760100.0
+     ],
+     [
+      480120.0,
+      4760140.0
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "OBJECTID": 5006,
+    "GIS_ID": 6006,
+    "FlowType": "SAN",
+    "UpstreamID": "M8",
+    "DownstreamID": "DUP1",
+    "UpstreamInventoryType": "MH",
+    "DownstreamInventoryType": "MH",
+    "Length": 50.0,
+    "PipeShape": "R",
+    "Diameter": 300,
+    "Height": 300,
+    "Width": 300,
+    "Material": "PVC",
+    "UpstreamInvert": 247.0,
+    "DownstreamInvert": 246.0,
+    "DropStructureInvert": 0.0,
+    "ConstructedStatus": "Built",
+    "StructureType": "SL",
+    "LocationArea": "TEST"
+   },
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      480100.0,
+      4760200.0
+     ],
+     [
+      480150.0,
+      4760200.0
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "OBJECTID": 5007,
+    "GIS_ID": 6007,
+    "FlowType": "SAN",
+    "UpstreamID": "DUP2",
+    "DownstreamID": "M3",
+    "UpstreamInventoryType": "DATE",
+    "DownstreamInventoryType": "MH",
+    "Length": 100.0,
+    "PipeShape": "R",
+    "Diameter": 300,
+    "Height": 300,
+    "Width": 300,
+    "Material": "PVC",
+    "UpstreamInvert": 245.95,
+    "DownstreamInvert": 245.8,
+    "DropStructureInvert": 0.0,
+    "ConstructedStatus": "Built",
+    "StructureType": "SL",
+    "LocationArea": "TEST"
+   },
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      480150.2,
+      4760200.0
+     ],
+     [
+      480150.0,
+      4760100.0
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "OBJECTID": 5008,
+    "GIS_ID": 6008,
+    "FlowType": "SAN",
+    "UpstreamID": "X1",
+    "DownstreamID": "X2",
+    "UpstreamInventoryType": "MH",
+    "DownstreamInventoryType": "MH",
+    "Length": 25.0,
+    "PipeShape": "R",
+    "Diameter": 300,
+    "Height": 300,
+    "Width": 300,
+    "Material": "PVC",
+    "UpstreamInvert": 247.0,
+    "DownstreamInvert": 246.5,
+    "DropStructureInvert": 0.0,
+    "ConstructedStatus": "Built",
+    "StructureType": "SL",
+    "LocationArea": "TEST"
+   },
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      480180.0,
+      4760160.0
+     ],
+     [
+      480200.0,
+      4760150.0
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "OBJECTID": 5009,
+    "GIS_ID": 6009,
+    "FlowType": "SAN",
+    "UpstreamID": "X2",
+    "DownstreamID": "M4",
+    "UpstreamInventoryType": "MH",
+    "DownstreamInventoryType": "MH",
+    "Length": 50.0,
+    "PipeShape": "R",
+    "Diameter": 300,
+    "Height": 300,
+    "Width": 300,
+    "Material": "PVC",
+    "UpstreamInvert": 246.4,
+    "DownstreamInvert": 246.0,
+    "DropStructureInvert": 0.0,
+    "ConstructedStatus": "Built",
+    "StructureType": "SL",
+    "LocationArea": "TEST"
+   },
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      480200.0,
+      4760150.0
+     ],
+     [
+      480200.0,
+      4760100.0
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "OBJECTID": 5010,
+    "GIS_ID": 6010,
+    "FlowType": "SAN",
+    "UpstreamID": "Y1",
+    "DownstreamID": "M4",
+    "UpstreamInventoryType": "MH",
+    "DownstreamInventoryType": "MH",
+    "Length": 50.0,
+    "PipeShape": "R",
+    "Diameter": 300,
+    "Height": 300,
+    "Width": 300,
+    "Material": "PVC",
+    "UpstreamInvert": 248.5,
+    "DownstreamInvert": 247.0,
+    "DropStructureInvert": 0.0,
+    "ConstructedStatus": "Built",
+    "StructureType": "SL",
+    "LocationArea": "TEST"
+   },
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      480200.3,
+      4760150.0
+     ],
+     [
+      480200.0,
+      4760100.0
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "OBJECTID": 5011,
+    "GIS_ID": 6011,
+    "FlowType": "SAN",
+    "UpstreamID": "M5",
+    "DownstreamID": "CP1",
+    "UpstreamInventoryType": "MH",
+    "DownstreamInventoryType": "CAP",
+    "Length": 50.0,
+    "PipeShape": "R",
+    "Diameter": 300,
+    "Height": 300,
+    "Width": 300,
+    "Material": "PVC",
+    "UpstreamInvert": 250.0,
+    "DownstreamInvert": 249.5,
+    "DropStructureInvert": 0.0,
+    "ConstructedStatus": "Built",
+    "StructureType": "SL",
+    "LocationArea": "TEST"
+   },
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      480050.0,
+      4760050.0
+     ],
+     [
+      480000.0,
+      4760050.0
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "OBJECTID": 5012,
+    "GIS_ID": 6012,
+    "FlowType": "SAN",
+    "UpstreamID": "M6",
+    "DownstreamID": "M7",
+    "UpstreamInventoryType": "MH",
+    "DownstreamInventoryType": "MH",
+    "Length": 50.0,
+    "PipeShape": "R",
+    "Diameter": 300,
+    "Height": 300,
+    "Width": 300,
+    "Material": "PVC",
+    "UpstreamInvert": 250.0,
+    "DownstreamInvert": 249.0,
+    "DropStructureInvert": 0.0,
+    "ConstructedStatus": "Built",
+    "StructureType": "SL",
+    "LocationArea": "TEST"
+   },
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      480300.0,
+      4760050.0
+     ],
+     [
+      480350.0,
+      4760050.0
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "OBJECTID": 5013,
+    "GIS_ID": 6013,
+    "FlowType": "SAN",
+    "UpstreamID": "M9",
+    "DownstreamID": "M1",
+    "UpstreamInventoryType": "MH",
+    "DownstreamInventoryType": "MH",
+    "Length": 50.0,
+    "PipeShape": "R",
+    "Diameter": 300,
+    "Height": 300,
+    "Width": 300,
+    "Material": "PVC",
+    "UpstreamInvert": 250.0,
+    "DownstreamInvert": 249.2,
+    "DropStructureInvert": 0.0,
+    "ConstructedStatus": "Abandoned",
+    "StructureType": "SL",
+    "LocationArea": "TEST"
+   },
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      480000.0,
+      4760150.0
+     ],
+     [
+      480000.0,
+      4760100.0
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "OBJECTID": 5014,
+    "GIS_ID": 6014,
+    "FlowType": "SAN",
+    "UpstreamID": "M10",
+    "DownstreamID": "M1",
+    "UpstreamInventoryType": "MH",
+    "DownstreamInventoryType": "MH",
+    "Length": 50.0,
+    "PipeShape": "R",
+    "Diameter": 300,
+    "Height": 300,
+    "Width": 300,
+    "Material": "PVC",
+    "UpstreamInvert": 250.0,
+    "DownstreamInvert": 249.2,
+    "DropStructureInvert": 0.0,
+    "ConstructedStatus": "Proposed",
+    "StructureType": "SL",
+    "LocationArea": "TEST"
+   },
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      479950.0,
+      4760100.0
+     ],
+     [
+      480000.0,
+      4760100.0
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "OBJECTID": 5015,
+    "GIS_ID": 6015,
+    "FlowType": "SAN",
+    "UpstreamID": "M11",
+    "DownstreamID": "M2",
+    "UpstreamInventoryType": "MH",
+    "DownstreamInventoryType": "MH",
+    "Length": 50.0,
+    "PipeShape": "R",
+    "Diameter": 300,
+    "Height": 300,
+    "Width": 300,
+    "Material": "PVC",
+    "UpstreamInvert": 250.0,
+    "DownstreamInvert": 249.0,
+    "DropStructureInvert": 0.0,
+    "ConstructedStatus": "Removed",
+    "StructureType": "SL",
+    "LocationArea": "TEST"
+   },
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      480050.0,
+      4760150.0
+     ],
+     [
+      480050.0,
+      4760100.0
+     ]
+    ]
+   }
+  }
+ ]
+}
