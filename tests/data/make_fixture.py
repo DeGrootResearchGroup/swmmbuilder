@@ -1,4 +1,5 @@
-"""Generate fixture_network.geojson: a small sewer network with deliberate edge cases.
+"""Generate fixture_network.geojson: a small sewer network with deliberate edge cases, and the
+fixture_nodes_*.geojson node-layer network (see the second half of this file).
 
 Run from anywhere: ``python tests/data/make_fixture.py``. The schema matches the City of London
 (Ontario) sewer GeoJSON that SewerNetworkx was written for. Inverts in m, sizes in mm.
@@ -136,3 +137,168 @@ if __name__ == "__main__":
     fc = {"type": "FeatureCollection", "features": [feature(i, p) for i, p in enumerate(PIPES)]}
     out.write_text(json.dumps(fc, indent=1))
     print(f"wrote {out} ({len(PIPES)} pipes)")
+
+
+# --- Node layers (#19) -----------------------------------------------------------------------
+#
+# A second network in London's newer export schema (ConstructedStatus, StructureType and the
+# inventory types of both end nodes; no Abandoned column), with its maintenance-hole, pumping
+# station, outfall and other-node layers. Coordinates are in UTM 17N (EPSG:32617, m), so that
+# the coincident nodes can be placed a fraction of a metre apart. Layout (flow direction):
+#
+#     M1 -> M2 -> PS1 => M3 -> M4 -> OF1    PS1 is a pumping station, PS1 => M3 a force main
+#     M3 -> OF2                             overflow pipe (StructureType OVF) to an outfall
+#     M8 -> DUP1   DUP2 -> M3               DUP1 (maintenance hole) and DUP2 (DATE point) are
+#                                           0.2 m apart: one structure under two IDs
+#     X1 -> X2 -> M4    Y1 -> M4            X2 and Y1 are 0.3 m apart in plan but 2.1 m apart
+#                                           in invert: crossing pipes, not one node
+#     M5 -> CP1                             capped dead end (CAP in the other-nodes layer)
+#     M6 -> M7                              unexplained dead end
+#     M9, M10, M11 -> M1, M1, M2            abandoned, proposed and removed pipes
+#
+# Maintenance holes: M1 has a rim (LidElevation), M2 only a depth, M3 an implausible rim (12 m),
+# and M4 records 2 pipes out where the graph has 1.
+
+NODES_X0, NODES_Y0 = 480000.0, 4760000.0
+NODES_CRS = {"type": "name", "properties": {"name": "urn:ogc:def:crs:EPSG::32617"}}
+NODE_POS = {
+    "M1": (0, 100),
+    "M2": (50, 100),
+    "PS1": (100, 100),
+    "M3": (150, 100),
+    "M4": (200, 100),
+    "OF1": (250, 100),
+    "OF2": (120, 140),
+    "M8": (100, 200),
+    "DUP1": (150, 200),
+    "DUP2": (150.2, 200),
+    "X1": (180, 160),
+    "X2": (200, 150),
+    "Y1": (200.3, 150),
+    "M5": (50, 50),
+    "CP1": (0, 50),
+    "M6": (300, 50),
+    "M7": (350, 50),
+    "M9": (0, 150),
+    "M10": (-50, 100),
+    "M11": (50, 150),
+}
+
+# Inventory type of each node, as the pipes record it.
+INVENTORY = {"PS1": "PS", "OF1": "OF", "OF2": "OF", "CP1": "CAP", "DUP2": "DATE"}
+
+# (up, down, inv_up, inv_down, length, structure type, status)
+NODE_PIPES = [
+    ("M1", "M2", 249.00, 248.80, 50.0, "SL", "Built"),
+    ("M2", "PS1", 248.70, 248.50, 50.0, "SL", "Built"),
+    ("PS1", "M3", 248.40, 246.00, 50.0, "FM", "Built"),
+    ("M3", "M4", 245.50, 245.00, 50.0, "SL", "Built"),
+    ("M4", "OF1", 244.90, 240.50, 50.0, "SL", "Built"),
+    ("M3", "OF2", 246.50, 246.00, 50.0, "OVF", "Built"),
+    ("M8", "DUP1", 247.00, 246.00, 50.0, "SL", "Built"),
+    ("DUP2", "M3", 245.95, 245.80, 100.0, "SL", "Built"),
+    ("X1", "X2", 247.00, 246.50, 25.0, "SL", "Built"),
+    ("X2", "M4", 246.40, 246.00, 50.0, "SL", "Built"),
+    ("Y1", "M4", 248.50, 247.00, 50.0, "SL", "Built"),
+    ("M5", "CP1", 250.00, 249.50, 50.0, "SL", "Built"),
+    ("M6", "M7", 250.00, 249.00, 50.0, "SL", "Built"),
+    ("M9", "M1", 250.00, 249.20, 50.0, "SL", "Abandoned"),
+    ("M10", "M1", 250.00, 249.20, 50.0, "SL", "Proposed"),
+    ("M11", "M2", 250.00, 249.00, 50.0, "SL", "Removed"),
+]
+
+# Maintenance-hole layer: node -> (LidElevation, Depth, PipesIn, PipesOut, FlowMonitor)
+MAINTENANCE_HOLES = {
+    "M1": (252.0, None, None, None, 0),
+    "M2": (None, 3.0, None, None, 0),
+    "M3": (12.0, None, None, None, 0),
+    "M4": (251.0, None, 3, 2, 1),
+    "M5": (252.0, None, None, None, 0),
+    "M7": (252.0, None, None, None, 0),
+    "M8": (250.0, None, None, None, 0),
+    "DUP1": (250.0, None, None, None, 0),
+}
+
+
+def node_xy(node):
+    x, y = NODE_POS[node]
+    return [NODES_X0 + x, NODES_Y0 + y]
+
+
+def node_pipe(i, p):
+    up, down, inv_up, inv_down, length, structure, status = p
+    props = {
+        "OBJECTID": 5000 + i,
+        "GIS_ID": 6000 + i,
+        "FlowType": "SAN",
+        "UpstreamID": up,
+        "DownstreamID": down,
+        "UpstreamInventoryType": INVENTORY.get(up, "MH"),
+        "DownstreamInventoryType": INVENTORY.get(down, "MH"),
+        "Length": length,
+        "PipeShape": "R",
+        "Diameter": 300,
+        "Height": 300,
+        "Width": 300,
+        "Material": "PVC",
+        "UpstreamInvert": inv_up,
+        "DownstreamInvert": inv_down,
+        "DropStructureInvert": 0.0,
+        "ConstructedStatus": status,
+        "StructureType": structure,
+        "LocationArea": "TEST",
+    }
+    geometry = {"type": "LineString", "coordinates": [node_xy(up), node_xy(down)]}
+    return {"type": "Feature", "properties": props, "geometry": geometry}
+
+
+def node_point(node, props):
+    props = {"GIS_FeatureKey": node, **props}
+    geometry = {"type": "Point", "coordinates": node_xy(node)}
+    return {"type": "Feature", "properties": props, "geometry": geometry}
+
+
+def node_layers():
+    """{file name suffix: features} of the pipes and the four node layers."""
+    maintenance_holes = [
+        node_point(
+            node,
+            {
+                "LidElevation": lid,
+                "Depth": depth,
+                "DropStructures": 0,
+                "Overflow": "N",
+                "Weir": "N",
+                "PipesIn": pipes_in,
+                "PipesOut": pipes_out,
+                "Location": "Road",
+                "Verified": "Y",
+                "FlowMonitor": monitor,
+            },
+        )
+        for node, (lid, depth, pipes_in, pipes_out, monitor) in MAINTENANCE_HOLES.items()
+    ]
+    pump_stations = [node_point("PS1", {"Fullname": "Test Low Level P.S.", "StructureType": "PS"})]
+    outfalls = [
+        node_point("OF1", {"FlowType": "SAN", "PipeInvert": 240.0, "HeadwallElevation": 243.0}),
+        node_point("OF2", {"FlowType": "STM", "PipeInvert": 245.5, "HeadwallElevation": 248.0}),
+    ]
+    other_nodes = [
+        node_point("CP1", {"StructureType": "CAP"}),
+        node_point("DUP2", {"StructureType": "DATE"}),
+    ]
+    return {
+        "pipes": [node_pipe(i, p) for i, p in enumerate(NODE_PIPES)],
+        "maintenance_holes": maintenance_holes,
+        "pump_stations": pump_stations,
+        "outfalls": outfalls,
+        "other_nodes": other_nodes,
+    }
+
+
+if __name__ == "__main__":
+    for name, features in node_layers().items():
+        out = Path(__file__).with_name(f"fixture_nodes_{name}.geojson")
+        fc = {"type": "FeatureCollection", "crs": NODES_CRS, "features": features}
+        out.write_text(json.dumps(fc, indent=1))
+        print(f"wrote {out} ({len(features)} features)")

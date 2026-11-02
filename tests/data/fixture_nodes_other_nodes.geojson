@@ -1,0 +1,39 @@
+{
+ "type": "FeatureCollection",
+ "crs": {
+  "type": "name",
+  "properties": {
+   "name": "urn:ogc:def:crs:EPSG::32617"
+  }
+ },
+ "features": [
+  {
+   "type": "Feature",
+   "properties": {
+    "GIS_FeatureKey": "CP1",
+    "StructureType": "CAP"
+   },
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     480000.0,
+     4760050.0
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "GIS_FeatureKey": "DUP2",
+    "StructureType": "DATE"
+   },
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     480150.2,
+     4760200.0
+    ]
+   }
+  }
+ ]
+}

@@ -19,10 +19,41 @@ reads only the canonical columns:
 ``width``          maximum width, in m
 ``flow_type``      e.g. ``'sanitary'``, ``'storm'``, ``'combined'``; unmapped codes pass through
 ``material``       passed through unchanged (the key of ``manning_n_by_material``)
-``abandoned``      bool
+``status``         ``'built'``, ``'abandoned'``, ``'proposed'`` or ``'removed'``; unmapped codes
+                   pass through. Missing: ``'abandoned'`` if the ``abandoned`` flag is set, else
+                   ``'built'``
+``abandoned``      bool: ``status == 'abandoned'``
+``structure_type`` e.g. ``'gravity'``, ``'overflow'``, ``'force_main'``; unmapped codes pass
+                   through
+``us_node_type``   type of the upstream node (see ``node_type`` below), from the pipe's
+                   inventory type
+``ds_node_type``   type of the downstream node
 =================  ===========================================================================
 
 Columns that are not mapped keep their source names.
+
+Node layers (maintenance holes, pumping stations, outfalls and other nodes) are read with
+:meth:`Schema.normalize_nodes` into the canonical node columns; source columns that are not mapped
+are dropped:
+
+=================  ===========================================================================
+``node_id``        node ID, as in the pipes' ``from_node`` and ``to_node``
+``node_type``      ``'maintenance_hole'``, ``'pump_station'``, ``'outfall'``, ``'cap'``,
+                   ``'tee'``, ``'chamber'``, ...; unmapped codes pass through, missing ones are
+                   ``'other'``
+``name``           e.g. the pumping station's name
+``invert``         in m (NaN if missing)
+``rim_elevation``  lid or top elevation, in m; NaN if missing or outside ``rim_range``
+``depth``          rim to invert, in m
+``has_drop``       bool (NA if missing): the node has a drop structure
+``overflow``       bool: the node has an overflow
+``weir``           bool: the node has a weir
+``pipes_in``       number of pipes entering the node, as recorded in the node layer
+``pipes_out``      number of pipes leaving the node
+``flow_monitor``   bool: a flow monitor is installed
+``access``         passed through, e.g. London's ``Location`` (road or easement)
+``verified``       bool: the record has been verified
+=================  ===========================================================================
 
 Schemas can be written in TOML (see :meth:`Schema.from_toml`); the presets :data:`LONDON_ON` and
 :data:`TORONTO_ON` are loaded from ``sewernetworkx/schemas``.
@@ -53,8 +84,33 @@ CANONICAL_COLUMNS = (
     "width",
     "flow_type",
     "material",
+    "status",
     "abandoned",
+    "structure_type",
+    "us_node_type",
+    "ds_node_type",
 )
+
+# Canonical node columns, in the order they are written.
+NODE_COLUMNS = (
+    "node_id",
+    "node_type",
+    "name",
+    "invert",
+    "rim_elevation",
+    "depth",
+    "has_drop",
+    "overflow",
+    "weir",
+    "pipes_in",
+    "pipes_out",
+    "flow_monitor",
+    "access",
+    "verified",
+)
+NODE_BOOL_COLUMNS = ("has_drop", "overflow", "weir", "flow_monitor", "verified")
+TRUE_STRINGS = frozenset({"1", "Y", "YES", "T", "TRUE"})
+FALSE_STRINGS = frozenset({"0", "N", "NO", "F", "FALSE"})
 
 # Canonical columns a schema must map, and that must be present in the source data.
 REQUIRED_COLUMNS = ("pipe_id", "from_node", "to_node")
@@ -85,8 +141,24 @@ class Schema:
         the others ``height`` and ``width``).
     flow_types : dict
         Source flow-type code -> canonical flow type. Codes not in the mapping pass through.
+    statuses : dict
+        Source status code -> canonical status (``'built'``, ``'abandoned'``, ``'proposed'``,
+        ``'removed'``). Codes not in the mapping pass through.
+    structure_types : dict
+        Source pipe structure-type code -> canonical structure type (e.g. ``'gravity'``,
+        ``'overflow'``, ``'force_main'``). Codes not in the mapping pass through.
+    node_types : dict
+        Source node-type code -> canonical node type (e.g. ``'maintenance_hole'``,
+        ``'pump_station'``, ``'outfall'``, ``'cap'``), for the pipes' inventory types and the
+        ``node_type`` column of the other-nodes layer. Codes not in the mapping pass through.
+    node_columns : dict
+        Canonical node column -> source column of the node layers, or a list of source columns of
+        which the first one present is used (the layers have different columns). ``node_id`` is
+        required to read node layers.
+    rim_range : tuple of float or None
+        (lowest, highest) plausible rim elevation, in m; rims outside it are treated as missing.
     abandoned : str or None
-        Source column that flags abandoned pipes.
+        Source column that flags abandoned pipes (older exports; ``status`` takes precedence).
     abandoned_values : frozenset
         Values of ``abandoned`` that mean the pipe is abandoned.
     null_values : frozenset
@@ -106,6 +178,11 @@ class Schema:
     columns: dict
     shapes: dict = field(default_factory=dict)
     flow_types: dict = field(default_factory=dict)
+    statuses: dict = field(default_factory=dict)
+    structure_types: dict = field(default_factory=dict)
+    node_types: dict = field(default_factory=dict)
+    node_columns: dict = field(default_factory=dict)
+    rim_range: tuple | None = None
     abandoned: str | None = None
     abandoned_values: frozenset = frozenset()
     null_values: frozenset = frozenset()
@@ -127,6 +204,12 @@ class Schema:
         missing = [c for c in REQUIRED_COLUMNS if c not in self.columns]
         if missing:
             raise ValueError(f"Schema {self.name!r} does not map required columns: {missing}.")
+        unknown = set(self.node_columns) - set(NODE_COLUMNS)
+        if unknown:
+            raise ValueError(
+                f"Schema {self.name!r} maps node columns that cannot be mapped: "
+                f"{sorted(unknown)}. Canonical node columns: {list(NODE_COLUMNS)}."
+            )
         for unit in (self.length_unit, self.invert_unit, self.size_unit):
             if unit not in UNITS:
                 raise ValueError(f"Unknown unit {unit!r}; use one of {list(UNITS)}.")
@@ -152,6 +235,8 @@ class Schema:
         for key in ("abandoned_values", "null_values", "null_nodes"):
             if key in values:
                 values[key] = frozenset(values[key])
+        if "rim_range" in values:
+            values["rim_range"] = tuple(values["rim_range"])
         return cls(**values)
 
     def _lengths(self, data, lengths):
@@ -172,6 +257,10 @@ class Schema:
     def flow_type(self, code):
         """Canonical flow type of a source code (codes not in ``flow_types`` pass through)."""
         return self.flow_types.get(code, code)
+
+    def node_type(self, code):
+        """Canonical node type of a source code (codes not in ``node_types`` pass through)."""
+        return self.node_types.get(code, code)
 
     def normalize(self, data):
         """Return a copy of ``data`` with the canonical columns.
@@ -243,11 +332,18 @@ class Schema:
         if self.abandoned is not None and self.abandoned in data.columns:
             flag = data[self.abandoned]
             numeric = pd.to_numeric(flag, errors="coerce")
-            out["abandoned"] = flag.isin(self.abandoned_values) | numeric.isin(
-                self.abandoned_values
-            )
+            flagged = flag.isin(self.abandoned_values) | numeric.isin(self.abandoned_values)
+            fallback = flagged.map({True: "abandoned", False: "built"})
         else:
-            out["abandoned"] = pd.Series(False, index=data.index)
+            fallback = "built"
+        status = source("status").map(lambda code: self.statuses.get(code, code))
+        out["status"] = status.where(status.notna(), fallback)
+        out["abandoned"] = out["status"] == "abandoned"
+        out["structure_type"] = source("structure_type").map(
+            lambda code: self.structure_types.get(code, code)
+        )
+        for column in ("us_node_type", "ds_node_type"):
+            out[column] = source(column).map(self.node_type)
 
         unknown = codes[codes.notna() & (codes.astype(str).str.strip() != "")]
         unknown = unknown[~unknown.isin(self.shapes)]
@@ -264,6 +360,88 @@ class Schema:
         rest = [c for c in data.columns if c not in mapped]
         frame = pd.concat([pd.DataFrame(out, index=data.index), data[[*rest, geometry]]], axis=1)
         return gpd.GeoDataFrame(frame, geometry=geometry, crs=data.crs)
+
+    def normalize_nodes(self, data, node_type=None):
+        """Return the canonical node columns of a node layer.
+
+        Parameters
+        ----------
+        data : geopandas.GeoDataFrame
+            Node points as read from the GIS file.
+        node_type : str, optional
+            Canonical type of every node of the layer (e.g. ``'maintenance_hole'``); by default
+            it is read from the ``node_type`` source column through ``node_types``.
+
+        Returns
+        ----------
+        geopandas.GeoDataFrame
+            The columns of :data:`NODE_COLUMNS` and the geometry.
+
+        Raises
+        ----------
+        ValueError
+            If the schema maps no ``node_id`` column or it is not in the data.
+        """
+        candidates = {
+            c: [s] if isinstance(s, str) else list(s) for c, s in self.node_columns.items()
+        }
+        id_column = next((s for s in candidates.get("node_id", []) if s in data.columns), None)
+        if id_column is None:
+            raise ValueError(
+                f"Cannot load the node layer with schema {self.name!r}: its node_id column "
+                f"{candidates.get('node_id')} is not in the data."
+            )
+        if self.crs is not None:
+            data = data.to_crs(self.crs)
+
+        def source(canonical):
+            column = next((s for s in candidates.get(canonical, []) if s in data.columns), None)
+            if column is None:
+                return pd.Series(pd.NA, index=data.index, dtype=object)
+            values = data[column]
+            return values.where(~values.isin(self.null_values)) if self.null_values else values
+
+        def elevation(canonical):
+            values = pd.to_numeric(source(canonical), errors="coerce") / UNITS[self.invert_unit]
+            return values.where(values > 0) if self.nonpositive_inverts_missing else values
+
+        out = {}
+        out["node_id"] = source("node_id").where(~source("node_id").isin(self.null_nodes))
+        if node_type is None:
+            out["node_type"] = source("node_type").map(self.node_type).fillna("other")
+        else:
+            out["node_type"] = pd.Series(node_type, index=data.index)
+        out["name"] = source("name")
+        out["invert"] = elevation("invert")
+        rim = elevation("rim_elevation")
+        if self.rim_range is not None:
+            low, high = self.rim_range
+            rim = rim.where(rim.between(low, high))
+        out["rim_elevation"] = rim
+        out["depth"] = pd.to_numeric(source("depth"), errors="coerce") / UNITS[self.invert_unit]
+        for column in NODE_BOOL_COLUMNS:
+            out[column] = _booleans(source(column))
+        for column in ("pipes_in", "pipes_out"):
+            out[column] = pd.to_numeric(source(column), errors="coerce").astype("Int64")
+        out["access"] = source("access")
+        geometry = data.geometry.name
+        out = pd.DataFrame(out, index=data.index)[list(NODE_COLUMNS)]
+        frame = pd.concat([out, data[[geometry]]], axis=1)
+        return gpd.GeoDataFrame(frame, geometry=geometry, crs=data.crs)
+
+
+def _booleans(values):
+    """Nullable booleans from flags such as 1/0, 'Y'/'N' or True/False (NA if unrecognised)."""
+
+    def flag(value):
+        if pd.isna(value):
+            return pd.NA
+        if not isinstance(value, str):
+            return bool(value)
+        text = value.strip().upper()
+        return True if text in TRUE_STRINGS else False if text in FALSE_STRINGS else pd.NA
+
+    return values.map(flag).astype("boolean")
 
 
 def _preset(name):
