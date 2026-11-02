@@ -1,6 +1,34 @@
 # SewerNetworkx
  Python module used take GeoJSON data of a sewer network and create subnetworks and .inp files for pyswmm
 
+## GIS schema
+
+`Network(path, schema=...)` reads the GeoJSON and converts it to canonical columns (`pipe_id`,
+`from_node`, `to_node`, `length`, `us_invert`, `ds_invert`, `drop_invert`, `shape`, `diameter`,
+`height`, `width`, `flow_type`, `material`, `abandoned`, in m); everything after loading reads only
+those (see `sewernetworkx/schema.py`). The default schema, `LONDON_ON`, maps London, ON's GIS
+export. For another city, describe its columns, codes and units with a `Schema`:
+
+```python
+from sewernetworkx import Network, Schema
+
+city = Schema(
+    name="My city",
+    columns={"pipe_id": "PIPE", "from_node": "US_MH", "to_node": "DS_MH", "length": "LEN",
+             "us_invert": "US_INV", "ds_invert": "DS_INV", "shape": "SHAPE",
+             "diameter": "DIA", "height": "HT", "width": "WD", "flow_type": "SYSTEM"},
+    shapes={"CIRC": "CIRCULAR", "BOX": "RECT_CLOSED"},
+    flow_types={"Sanitary": "sanitary", "Storm": "storm"},
+    size_unit="mm",
+)
+network = Network("my_city.geojson", schema=city)
+```
+
+Only `pipe_id`, `from_node`, `to_node` and `length` are required; the pipes must name their
+upstream and downstream nodes. Shape codes that are not in `shapes` give a warning on loading, and
+those pipes are rejected if they are written to an .inp. `flow_types=` filters on canonical flow
+types (`{'sanitary'}` by default); source codes such as `'SAN'` are translated too.
+
 ## SWMM template
 
 `SubNetwork.write_pyswmm` fills the template shipped in the package,
@@ -14,14 +42,15 @@ geometry.
 
 ## Conduit geometry
 
-Cross-sections come from the GIS `PipeShape` (sizes in mm, written in m): `R`/`Round` →
-`CIRCULAR(Diameter)`, `REC` → `RECT_CLOSED(Height, Width)`, `EGG` → `EGG(Height)`, `ARC` →
-`ARCH`, `ELH`/`ELV` → `HORIZ_ELLIPSE`/`VERT_ELLIPSE` (`Height, Width`). An unknown or missing
-shape or size raises `ValueError` listing the pipe IDs, before anything is written.
+Cross-sections come from the schema's shape codes. For London (`PipeShape`, sizes in mm, written
+in m): `R`/`Round` → `CIRCULAR(Diameter)`, `REC` → `RECT_CLOSED(Height, Width)`, `EGG` →
+`EGG(Height)`, `ARC` → `ARCH`, `ELH`/`ELV` → `HORIZ_ELLIPSE`/`VERT_ELLIPSE` (`Height, Width`). An
+unknown or missing shape or size raises `ValueError` listing the pipe IDs, before anything is
+written.
 
 A node's invert is the lowest invert of the subnetwork pipes connected to it, including the
-`DropStructureInvert` of pipes entering it. Each conduit's inlet/outlet offset is its GIS pipe
-invert minus the node invert (`LINK_OFFSETS DEPTH`), so conduits keep their GIS inverts; any that
+drop-structure invert (`DropStructureInvert` in London) of pipes entering it. Each conduit's
+inlet/outlet offset is its GIS pipe invert minus the node invert (`LINK_OFFSETS DEPTH`), so conduits keep their GIS inverts; any that
 slope uphill are reported with a warning. `height_correction={node: invert}` overrides a node's
 invert, and the offsets are measured from it. The `inlet_offset`/`outlet_offset` arguments of
 `write_pyswmm` are deprecated and ignored.
