@@ -298,16 +298,36 @@ class Network:
         if not isinstance(upstream_id, str):
             raise TypeError("Input must be a string")
 
-        # row = self.full_data[self.full_data['UpstreamID'] == upstream_id]
-        row = self.full_data[self.full_data["UpstreamID"] == upstream_id]
-        if not row.empty:
-            return row.iloc[0]["UpstreamInvert"]
-        else:
-            row = self.full_data[self.full_data["DownstreamID"] == upstream_id]
-            if not row.empty:
-                return row.iloc[0]["DownstreamInvert"]
-            else:
-                raise TypeError("Cant find either upstreaminvert of downstreaminvert")
+        inverts = self._first_inverts()
+        if upstream_id not in inverts:
+            raise TypeError("Cant find either upstreaminvert of downstreaminvert")
+        return inverts[upstream_id]
+
+    def _first_inverts(self):
+        """{node: UpstreamInvert of the first pipe leaving it or, if no pipe leaves it,
+        DownstreamInvert of the first pipe entering it}, over ``full_data``.
+
+        Built on first use and rebuilt if ``full_data`` is replaced.
+        """
+        cached = getattr(self, "_inverts", None)
+        if cached is not None and cached[0] is self.full_data:
+            return cached[1]
+
+        data = self.full_data
+        upstream, downstream = {}, {}
+        for up, down, up_inv, down_inv in zip(
+            data["UpstreamID"],
+            data["DownstreamID"],
+            data["UpstreamInvert"],
+            data["DownstreamInvert"],
+            strict=True,
+        ):
+            upstream.setdefault(up, up_inv)
+            downstream.setdefault(down, down_inv)
+
+        inverts = {**downstream, **upstream}
+        self._inverts = (data, inverts)
+        return inverts
 
 
 class SubNetwork(Network):
@@ -700,12 +720,14 @@ class SubNetwork(Network):
         """
         nodes = set(nodes)
         upstream_ends, downstream_ends = {}, {}
-        for _, pipe in self.reduced_keys_data.iterrows():
-            upstream_id, downstream_id = pipe["UpstreamID"], pipe["DownstreamID"]
+        data = self.reduced_keys_data
+        for upstream_id, downstream_id, geometry in zip(
+            data["UpstreamID"], data["DownstreamID"], data["geometry"], strict=True
+        ):
             if upstream_id in nodes and upstream_id not in upstream_ends:
-                upstream_ends[upstream_id] = line_coords(pipe["geometry"])[0]
+                upstream_ends[upstream_id] = line_coords(geometry)[0]
             if downstream_id in nodes and downstream_id not in downstream_ends:
-                downstream_ends[downstream_id] = line_coords(pipe["geometry"])[-1]
+                downstream_ends[downstream_id] = line_coords(geometry)[-1]
         return {**downstream_ends, **upstream_ends}
 
     def explore_nodes(self, G, direction):
