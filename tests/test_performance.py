@@ -8,7 +8,7 @@ from conftest import quiet, read_sections, subnetwork_with_edges, write_inp
 from sewernetworkx import Network
 
 N_PIPES = 3000
-# Generous: the indexed writer takes ~0.1 s here; the old per-edge table scan took ~80 s.
+# Generous: the writer takes ~0.2 s here; the old per-edge table scan took ~80 s.
 TIME_LIMIT_S = 10.0
 
 
@@ -31,9 +31,10 @@ def binary_tree_geojson(path, n_pipes):
             "UpstreamID": _node(i),
             "DownstreamID": _node(parent),
             "Length": 50.0,
-            "PipeShape": "Round" if i % 2 else "R",
+            "PipeShape": "R" if i % 2 else "REC",
             "Height": 300,
-            "Width": 300,
+            "Width": 450,
+            "Diameter": 300,
             "Material": "PVC",
             "UpstreamInvert": 100.0 + 0.5 * _depth(i),
             "DownstreamInvert": 100.1 + 0.5 * _depth(parent),
