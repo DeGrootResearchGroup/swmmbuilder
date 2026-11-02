@@ -1,13 +1,15 @@
 """SWMM models of a subnetwork, and their .inp files.
 
 :func:`build_model` turns a subnetwork into a :class:`SwmmModel`: plain records of the junctions,
-outfalls, storage nodes, conduits, pumps, cross-sections, curves, coordinates and vertices, with all the hydraulic decisions
+outfalls, storage nodes, conduits, pumps, cross-sections, curves, dry-weather flows, time patterns,
+coordinates and vertices, with all the hydraulic decisions
 (node inverts, conduit offsets, cross-sections, Manning's n) already made.
 :meth:`SwmmModel.render` fills an .inp template with them, and :func:`write_inp` checks the
 template and the topology, builds the model and writes the file.
 """
 
 import logging
+import math
 import re
 import warnings
 from dataclasses import dataclass, field, replace
@@ -34,9 +36,25 @@ TEMPLATE_PLACEHOLDERS = (
     "pumps",
     "xsections",
     "curves",
+    "dwf",
+    "patterns",
     "coordinates",
     "vertices",
 )
+
+# SWMM time pattern types and their number of multipliers. A pattern given as a plain list of
+# multipliers takes its type from its length; WEEKEND (24 values) must be named explicitly.
+PATTERN_LENGTHS = {"MONTHLY": 12, "DAILY": 7, "HOURLY": 24, "WEEKEND": 24}
+PATTERN_TYPES_BY_LENGTH = {12: "MONTHLY", 7: "DAILY", 24: "HOURLY"}
+
+# SWMM's limit on the time patterns of a node's dry-weather flow (one of each type).
+MAX_DWF_PATTERNS = 4
+
+# Litres per unit of volume, and seconds per unit of time, for dwf_from_population.
+_VOLUME_LITRES = {"L": 1.0, "m3": 1000.0}
+_TIME_SECONDS = {"s": 1.0, "d": 86400.0}
+# Litres per second in each SI flow unit.
+_FLOW_UNIT_LPS = {"LPS": 1.0, "CMS": 1000.0, "MLD": 1e6 / 86400.0}
 
 # SWMM pump curve types, and what the x values of each are (y is flow, in the FLOW_UNITS).
 PUMP_CURVE_TYPES = {
@@ -76,13 +94,12 @@ def check_template(content):
         If FLOW_UNITS is missing or not an SI unit (the GIS data are metric), or if the template
         contains a placeholder the writer does not fill (see :data:`TEMPLATE_PLACEHOLDERS`).
     """
-    match = re.search(r"^\s*FLOW_UNITS\s+(\S+)", content, re.MULTILINE | re.IGNORECASE)
-    if match is None:
+    flow_units = template_flow_units(content)
+    if flow_units is None:
         raise ValueError(
             "The template has no FLOW_UNITS option (SWMM would default to CFS, US units). "
             f"Set FLOW_UNITS to one of {', '.join(SI_FLOW_UNITS)}."
         )
-    flow_units = match.group(1).upper()
     if flow_units not in SI_FLOW_UNITS:
         raise ValueError(
             f"The template sets FLOW_UNITS {flow_units}, a US unit, so SWMM would read the metric "
@@ -96,6 +113,12 @@ def check_template(content):
             f"The template contains placeholders that are not filled: {unknown}. "
             f"Supported placeholders: {list(TEMPLATE_PLACEHOLDERS)}."
         )
+
+
+def template_flow_units(template):
+    """FLOW_UNITS of the text of an .inp template, upper case; None if it is not set."""
+    match = re.search(r"^\s*FLOW_UNITS\s+(\S+)", template, re.MULTILINE | re.IGNORECASE)
+    return match.group(1).upper() if match else None
 
 
 def template_routing(template):
@@ -262,6 +285,167 @@ def resolve_wet_wells(subnetwork, wet_wells, outfalls=()):
     return {node: WetWell.coerce(node, v) for node, v in wet_wells.items()}
 
 
+def _is_finite_number(value):
+    try:
+        return math.isfinite(float(value))
+    except (TypeError, ValueError):
+        return False
+
+
+def resolve_patterns(patterns):
+    """{name: (type, multipliers)} from the ``patterns`` option of :func:`build_model`.
+
+    Each pattern is a list of multipliers, whose type is set by its length (24 HOURLY, 7 DAILY,
+    12 MONTHLY), or a (type, multipliers) pair. A warning is given for an HOURLY or WEEKEND
+    pattern whose mean is not 1, since the mean then scales the base flows.
+
+    Raises
+    ----------
+    ValueError
+        If a pattern has an unknown type, the wrong number of multipliers for its type, or a
+        multiplier that is not a positive finite number; the message lists every problem.
+    """
+    resolved, problems = {}, []
+    for name, value in (patterns or {}).items():
+        if isinstance(value, (tuple, list)) and len(value) == 2 and isinstance(value[0], str):
+            kind, values = value[0].upper(), list(value[1])
+            if kind not in PATTERN_LENGTHS:
+                problems.append(f"{name}: type {value[0]!r} is not one of {list(PATTERN_LENGTHS)}")
+                continue
+            if len(values) != PATTERN_LENGTHS[kind]:
+                problems.append(
+                    f"{name}: a {kind} pattern needs {PATTERN_LENGTHS[kind]} multipliers, "
+                    f"not {len(values)}"
+                )
+                continue
+        else:
+            values = list(value)
+            kind = PATTERN_TYPES_BY_LENGTH.get(len(values))
+            if kind is None:
+                problems.append(
+                    f"{name}: {len(values)} multipliers; give 24 (HOURLY), 7 (DAILY) or "
+                    "12 (MONTHLY), or a (type, multipliers) pair"
+                )
+                continue
+        if not all(_is_finite_number(v) and float(v) > 0 for v in values):
+            problems.append(f"{name}: multipliers must be positive finite numbers")
+            continue
+        values = tuple(float(v) for v in values)
+        mean = sum(values) / len(values)
+        if kind in ("HOURLY", "WEEKEND") and abs(mean - 1) > 0.01:
+            warnings.warn(
+                f"Pattern {name}: the mean of the {kind} multipliers is {mean:.3f}, not 1, so the "
+                "mean dry-weather flow is the base flow scaled by it.",
+                stacklevel=3,
+            )
+        resolved[name] = (kind, values)
+    if problems:
+        raise ValueError("Invalid patterns:\n  " + "\n  ".join(problems))
+    return resolved
+
+
+def resolve_dwf(subnetwork, dwf, outfalls=()):
+    """{node: base flow} from the ``dwf`` option of :func:`build_model`.
+
+    Raises
+    ----------
+    ValueError
+        If a node is not in the subnetwork or is an outfall, or a flow is negative or not finite.
+    """
+    if not dwf:
+        return {}
+    nodes = set(subnetwork.nodes)
+    missing = sorted(str(n) for n in dwf if n not in nodes)
+    if missing:
+        raise ValueError(f"Dry-weather flow nodes not in the subnetwork: {', '.join(missing)}")
+    at_outfalls = sorted(str(n) for n in dwf if n in set(outfalls))
+    if at_outfalls:
+        raise ValueError(f"Dry-weather flows cannot enter at outfalls: {', '.join(at_outfalls)}")
+    bad = sorted(
+        f"{n} ({q!r})" for n, q in dwf.items() if not (_is_finite_number(q) and float(q) >= 0)
+    )
+    if bad:
+        raise ValueError(f"Dry-weather flows must be non-negative and finite: {', '.join(bad)}")
+    return {node: float(flow) for node, flow in dwf.items()}
+
+
+def resolve_dwf_patterns(dwf_patterns, dwf, patterns):
+    """{node: [pattern names]} from the ``dwf_patterns`` option of :func:`build_model`.
+
+    ``dwf_patterns`` is a pattern name or list of names for every node of ``dwf``, or a mapping
+    {node: name or list of names}.
+
+    Raises
+    ----------
+    ValueError
+        If a node has no dry-weather flow, a pattern is not defined, or a node has more than
+        :data:`MAX_DWF_PATTERNS` patterns or two of the same type.
+    """
+    if not dwf_patterns:
+        return {}
+    if isinstance(dwf_patterns, str) or not hasattr(dwf_patterns, "items"):
+        dwf_patterns = dict.fromkeys(dwf, dwf_patterns)
+    unloaded = sorted(str(n) for n in dwf_patterns if n not in dwf)
+    if unloaded:
+        raise ValueError(f"dwf_patterns for nodes with no dry-weather flow: {', '.join(unloaded)}")
+    resolved, problems = {}, []
+    for node, names in dwf_patterns.items():
+        names = [names] if isinstance(names, str) else list(names)
+        undefined = [n for n in names if n not in patterns]
+        if undefined:
+            problems.append(f"{node}: patterns not defined in patterns: {', '.join(undefined)}")
+            continue
+        types = [patterns[n][0] for n in names]
+        if len(names) > MAX_DWF_PATTERNS or len(set(types)) != len(types):
+            problems.append(
+                f"{node}: at most one pattern of each type ({', '.join(PATTERN_LENGTHS)}), "
+                f"not {', '.join(f'{n} ({t})' for n, t in zip(names, types, strict=True))}"
+            )
+            continue
+        resolved[node] = names
+    if problems:
+        raise ValueError("Invalid dwf_patterns:\n  " + "\n  ".join(problems))
+    return resolved
+
+
+def dwf_from_population(population, per_capita, unit="L/d", flow_units="LPS"):
+    """{node: base flow} in ``flow_units`` from {node: population} and a per-capita flow.
+
+    How the population is allocated to nodes is left to the caller.
+
+    Parameters
+    ----------
+    population : dict
+        {node: number of people}.
+
+    per_capita : float
+        Flow per person, in ``unit``.
+
+    unit : {'L/d', 'm3/d', 'L/s', 'm3/s'}
+        Unit of ``per_capita`` (default L/d, e.g. 250 L/person/day).
+
+    flow_units : {'LPS', 'CMS', 'MLD'}
+        FLOW_UNITS of the template the flows are written with (default LPS, as in the shipped
+        template).
+
+    Returns
+    ----------
+    dict
+        {node: base flow}, to pass as ``dwf``.
+    """
+    volume, _, time = unit.partition("/")
+    if volume not in _VOLUME_LITRES or time not in _TIME_SECONDS:
+        raise ValueError(f"unit must be one of 'L/d', 'm3/d', 'L/s' or 'm3/s', not {unit!r}.")
+    flow_units = flow_units.upper()
+    if flow_units not in _FLOW_UNIT_LPS:
+        raise ValueError(
+            f"flow_units must be one of {', '.join(SI_FLOW_UNITS)}, not {flow_units!r}."
+        )
+    lps = per_capita * _VOLUME_LITRES[volume] / _TIME_SECONDS[time]
+    scale = lps / _FLOW_UNIT_LPS[flow_units]
+    return {node: people * scale for node, people in population.items()}
+
+
 def node_inverts(subnetwork, height_correction=None):
     """Invert elevation of every node of a subnetwork.
 
@@ -369,16 +553,32 @@ class XSection:
     barrels: float
 
 
+@dataclass(frozen=True)
+class DryWeatherFlow:
+    """A node's dry-weather flow: base flow (in the FLOW_UNITS) and time pattern names."""
+
+    node: str
+    base: float
+    patterns: tuple = ()
+
+
+@dataclass(frozen=True)
+class Pattern:
+    name: str
+    type: str
+    multipliers: tuple
+
+
 @dataclass
 class SwmmModel:
     """The SWMM objects of a subnetwork, ready to render into an .inp template.
 
     Attributes
     ----------
-    junctions, outfalls, storage, conduits, pumps, xsections, curves : list
+    junctions, outfalls, storage, conduits, pumps, xsections, curves, dwf, patterns : list
         :class:`Junction`, :class:`Outfall`, :class:`Storage`, :class:`Conduit`,
-        :class:`PumpLink`, :class:`XSection` and :class:`Curve` records, in the order they are
-        written.
+        :class:`PumpLink`, :class:`XSection`, :class:`Curve`, :class:`DryWeatherFlow` and
+        :class:`Pattern` records, in the order they are written.
     coordinates : dict
         {node: (x, y)}, in the units of the GIS geometry.
     vertices : dict
@@ -395,6 +595,8 @@ class SwmmModel:
     pumps: list = field(default_factory=list)
     xsections: list = field(default_factory=list)
     curves: list = field(default_factory=list)
+    dwf: list = field(default_factory=list)
+    patterns: list = field(default_factory=list)
     coordinates: dict = field(default_factory=dict)
     vertices: dict = field(default_factory=dict)
     data_gaps: pd.DataFrame | None = None
@@ -441,6 +643,23 @@ class SwmmModel:
                 + "\n"
                 for c in self.curves
             ),
+            "dwf": "".join(
+                f"{d.node:<16} {'FLOW':<16} {d.base:<11} "
+                + " ".join(f'"{p}"' for p in d.patterns)
+                + "\n"
+                for d in self.dwf
+            ),
+            # Six multipliers a line; the type is on the first line only.
+            "patterns": "".join(
+                "".join(
+                    f"{p.name:<16} {p.type if i == 0 else '':<10} "
+                    + " ".join(f"{m:<8}" for m in p.multipliers[i : i + 6])
+                    + "\n"
+                    for i in range(0, len(p.multipliers), 6)
+                )
+                + "\n"
+                for p in self.patterns
+            ),
             "coordinates": "".join(
                 f"{node:<16} {x:<18} {y:<18}\n" for node, (x, y) in self.coordinates.items()
             ),
@@ -485,6 +704,9 @@ def build_model(
     height_correction=None,
     pumps=None,
     wet_wells=None,
+    dwf=None,
+    patterns=None,
+    dwf_patterns=None,
     **fills,
 ):
     """The :class:`SwmmModel` of a subnetwork.
@@ -539,6 +761,23 @@ def build_model(
         area=4.0)}``: storage nodes of constant plan area instead of junctions. The inlet of a
         PUMP1 pump must be a wet well.
 
+    dwf : dict, optional
+        {node: base flow}: the dry-weather flow entering each node, in the template's FLOW_UNITS
+        (L/s with the shipped template), written to [DWF]. Nodes with no upstream pipes, e.g.
+        pumping stations fed by systems outside the data, take point loads this way. See
+        :func:`dwf_from_population` for per-capita flows.
+
+    patterns : dict, optional
+        {name: multipliers} time patterns, written to [PATTERNS]. The type is set by the number
+        of multipliers (24 HOURLY, 7 DAILY, 12 MONTHLY), or given as ``(type, multipliers)``,
+        e.g. ``('WEEKEND', [...24 values])``. The multipliers must be positive; an HOURLY
+        pattern's mean should be 1, or it scales the base flows (a warning is given).
+
+    dwf_patterns : str, list of str or dict, optional
+        The patterns applied to the base flows: a name or list of names for every node of
+        ``dwf``, or {node: name or list of names}. SWMM allows up to four per node, one of each
+        type.
+
     **fills
         Fill rules for gaps in the data, all off by default: ``size_overrides``, ``shape_codes``,
         ``size_fill``, ``invert_fill``, ``headwater_slope`` and ``force_main_discharge``; see
@@ -549,7 +788,8 @@ def build_model(
     ValueError
         If an outfall is not in the subnetwork, a gap that stops the model from being written
         remains after the fills (a conduit with no cross-section, a node with no invert; every
-        such gap is listed), or a pump, wet well or fill rule is invalid.
+        such gap is listed), or a pump, wet well, dry-weather flow, pattern or fill rule is
+        invalid.
     """
     outfalls = outfall_types(outfalls, subnetwork)
     unknown = sorted(set(outfalls) - set(subnetwork.nodes))
@@ -557,6 +797,9 @@ def build_model(
         raise ValueError(f"Outfalls not in the subnetwork: {', '.join(map(str, unknown))}")
     pumps = resolve_pumps(subnetwork, pumps)
     wet_wells = resolve_wet_wells(subnetwork, wet_wells, outfalls)
+    dwf = resolve_dwf(subnetwork, dwf, outfalls)
+    patterns = resolve_patterns(patterns)
+    dwf_patterns = resolve_dwf_patterns(dwf_patterns, dwf, patterns)
     pipes = subnetwork.pipes()
     inlets = dict(zip(pipes["pipe_id"], pipes["from_node"], strict=True))
     dry = sorted(
@@ -675,6 +918,11 @@ def build_model(
             f"{', '.join(adverse)}.",
             stacklevel=2,
         )
+
+    model.dwf = [
+        DryWeatherFlow(node, flow, tuple(dwf_patterns.get(node, ()))) for node, flow in dwf.items()
+    ]
+    model.patterns = [Pattern(name, kind, values) for name, (kind, values) in patterns.items()]
     return model
 
 
@@ -701,7 +949,8 @@ def write_inp(subnetwork, path, outfalls=None, template_path=None, dead_ends="ra
         The .inp template (default: :func:`default_template_path`, which uses FLOW_UNITS LPS).
         It must use an SI FLOW_UNITS (CMS, LPS or MLD) and only the placeholders in
         :data:`TEMPLATE_PLACEHOLDERS`; {storage}, {pumps} and {curves} are needed only with the
-        ``wet_wells`` and ``pumps`` options. The offsets are depths, so it should set
+        ``wet_wells`` and ``pumps`` options, and {dwf} and {patterns} only with ``dwf`` and
+        ``patterns``. The offsets are depths, so it should set
         LINK_OFFSETS DEPTH (the default).
 
     dead_ends : {'raise', 'outfall'}
@@ -734,13 +983,22 @@ def write_inp(subnetwork, path, outfalls=None, template_path=None, dead_ends="ra
             ("storage", model.storage),
             ("pumps", model.pumps),
             ("curves", model.curves),
+            ("dwf", model.dwf),
+            ("patterns", model.patterns),
         )
         if records and f"{{{name}}}" not in template
     ]
     if needed:
         raise ValueError(
             f"The template has no {', '.join(f'{{{n}}}' for n in needed)} placeholder, so the "
-            "pumps or wet wells would not be written."
+            "pumps, wet wells, dry-weather flows or patterns would not be written."
+        )
+    if model.dwf:
+        logger.info(
+            "Dry-weather flow: total base flow %.6g %s at %d nodes",
+            sum(d.base for d in model.dwf),
+            template_flow_units(template),
+            len(model.dwf),
         )
     logger.info("Writing %s", path)
     Path(path).write_text(model.render(template))

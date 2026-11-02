@@ -11,7 +11,7 @@ from .schema import (
     Schema,
 )
 from .subnetwork import Subnetwork, TopologyReport
-from .swmm import Pump, WetWell
+from .swmm import Pump, WetWell, dwf_from_population
 
 __all__ = [
     "BARRIE_ON",
@@ -28,5 +28,6 @@ __all__ = [
     "Subnetwork",
     "TopologyReport",
     "WetWell",
+    "dwf_from_population",
     "strip_leading_zeros",
 ]
