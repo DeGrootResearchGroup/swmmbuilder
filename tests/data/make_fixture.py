@@ -20,17 +20,37 @@ Layout (flow direction):
 The J2 -> OV1 overflow is listed *before* J2 -> OUT, so the "first pipe leaving the node" invert
 rule picks the overflow's higher invert for J2 (the OK0451 case in the London data).
 """
+
 import json
 from pathlib import Path
 
 X0, Y0 = -81.30, 42.98
 POS = {
-    "A1": (0, 4), "A2": (1, 4), "J1": (2, 3), "J2": (3, 2), "OUT": (4, 1),
-    "B1": (0, 2), "B2": (1, 2.5), "C1": (2, 5), "OV1": (4, 3), "OV2": (5, 3.5),
-    "D1": (2, 0), "D2": (2.5, 1), "E1": (3, 0.5), "X1": (0.5, 5), "Abandoned": (-1, 4.5),
-    "S1": (5, 5), "S2": (6, 5),
-    "F1": (-1, 6), "F2": (-1, 5.5), "F3": (-2, 6), "F4": (-2, 5),
-    "G1": (-1, 1), "G2": (-1, 2.5), "G3": (-2, 1), "G4": (-2, 3),
+    "A1": (0, 4),
+    "A2": (1, 4),
+    "J1": (2, 3),
+    "J2": (3, 2),
+    "OUT": (4, 1),
+    "B1": (0, 2),
+    "B2": (1, 2.5),
+    "C1": (2, 5),
+    "OV1": (4, 3),
+    "OV2": (5, 3.5),
+    "D1": (2, 0),
+    "D2": (2.5, 1),
+    "E1": (3, 0.5),
+    "X1": (0.5, 5),
+    "Abandoned": (-1, 4.5),
+    "S1": (5, 5),
+    "S2": (6, 5),
+    "F1": (-1, 6),
+    "F2": (-1, 5.5),
+    "F3": (-2, 6),
+    "F4": (-2, 5),
+    "G1": (-1, 1),
+    "G2": (-1, 2.5),
+    "G3": (-2, 1),
+    "G4": (-2, 3),
 }
 
 # (up, down, shape, height, width, diameter, inv_up, inv_down, drop, length, material, flow, abandoned)
@@ -70,16 +90,45 @@ def feature(i, p):
         coords.append([X0 + 1e-3 * (x1 + x2) / 2, Y0 + 1e-3 * (y1 + y2) / 2 + 2e-4])
     coords.append([X0 + 1e-3 * x2, Y0 + 1e-3 * y2])
     props = {
-        "OBJECTID": 1000 + i, "GIS_ID": 2000 + i, "GIS_FeatureKey": str(2000 + i), "FlowType": flow,
-        "StreetName": "Test St.", "Location": "Road", "UpstreamID": up, "DownstreamID": down,
-        "Length": length, "PipeShape": shape, "Height": h, "Width": w, "Material": mat,
-        "MaterialClass": "", "UpstreamInvert": iu, "DownstreamInvert": idn, "DropStructureInvert": drop,
-        "Slope": round(100 * (iu - idn) / length, 2), "AverageDepth": 2.5, "MaximumDepth": 3.0,
-        "PDC_Count": 0.0, "ConstructionDate": "2000-01-01T00:00:00Z", "Ownership": "CITY", "Assumed": 1,
-        "Combined": 0, "Relief": 0, "Trunk": int(d >= 450), "LastEditDate": "2022-01-01T00:00:00Z",
-        "Abandoned": aband, "Grouted": 0, "Diameter": d, "CCTVInspectionDate": None, "ShapeSTLength": length,
+        "OBJECTID": 1000 + i,
+        "GIS_ID": 2000 + i,
+        "GIS_FeatureKey": str(2000 + i),
+        "FlowType": flow,
+        "StreetName": "Test St.",
+        "Location": "Road",
+        "UpstreamID": up,
+        "DownstreamID": down,
+        "Length": length,
+        "PipeShape": shape,
+        "Height": h,
+        "Width": w,
+        "Material": mat,
+        "MaterialClass": "",
+        "UpstreamInvert": iu,
+        "DownstreamInvert": idn,
+        "DropStructureInvert": drop,
+        "Slope": round(100 * (iu - idn) / length, 2),
+        "AverageDepth": 2.5,
+        "MaximumDepth": 3.0,
+        "PDC_Count": 0.0,
+        "ConstructionDate": "2000-01-01T00:00:00Z",
+        "Ownership": "CITY",
+        "Assumed": 1,
+        "Combined": 0,
+        "Relief": 0,
+        "Trunk": int(d >= 450),
+        "LastEditDate": "2022-01-01T00:00:00Z",
+        "Abandoned": aband,
+        "Grouted": 0,
+        "Diameter": d,
+        "CCTVInspectionDate": None,
+        "ShapeSTLength": length,
     }
-    return {"type": "Feature", "properties": props, "geometry": {"type": "LineString", "coordinates": coords}}
+    return {
+        "type": "Feature",
+        "properties": props,
+        "geometry": {"type": "LineString", "coordinates": coords},
+    }
 
 
 if __name__ == "__main__":

@@ -1,0 +1,97 @@
+name: CI
+
+# Modelled on aquakin's CI (lint gate, test matrix, one stable aggregator check), without the
+# sharding: the whole suite runs in well under a minute, so each Python version is one job.
+# If the suite grows heavy, split it the way aquakin does (pytest-split shards + aggregator).
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+# Push to main: keyed on the commit SHA and never cancelled, so a second merge can't cancel the
+# first merge's run. Pull requests: keyed on the ref, so a new push cancels the superseded run.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'push' && github.sha || github.ref }}
+  cancel-in-progress: ${{ github.event_name != 'push' }}
+
+jobs:
+  # ---- Lint gate: ruff (static checks only; rule set and ignores live in pyproject.toml) -------
+  lint:
+    name: lint (ruff)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install ruff
+        run: |
+          python -m pip install --upgrade pip
+          pip install ".[lint]"
+
+      - name: Run ruff check
+        run: ruff check sewernetworkx tests
+
+      - name: Run ruff format --check
+        run: ruff format --check sewernetworkx tests
+
+  # ---- Tests: one unsharded job per Python version -----------------------------------------
+  tests:
+    name: tests (py${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+          cache-dependency-path: pyproject.toml
+
+      - name: Install package and test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[test]"
+
+      - name: Run tests
+        # -rsxX lists every skip, xfail and xpass with its reason, so the known-bug markers
+        # (strict xfails naming their issue) are visible in the log. --timeout names a test that
+        # hangs (e.g. a SWMM run) instead of letting the job time out silently.
+        run: >-
+          pytest -q -rsxX
+          --cov=sewernetworkx --cov-report=term-missing
+          --durations=10 --timeout=300 --timeout-method=thread
+
+  # ---- Aggregator: the single required status check -----------------------------------------
+  # A stable name for branch protection that survives matrix changes. Passes only if lint and
+  # every test job passed.
+  gate:
+    name: CI gate
+    needs: [lint, tests]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require lint and all test jobs to pass
+        run: |
+          status=0
+          for pair in "lint=${{ needs.lint.result }}" "tests=${{ needs.tests.result }}"; do
+            job="${pair%%=*}"; result="${pair#*=}"
+            echo "$job result: $result"
+            if [ "$result" != "success" ]; then
+              echo "::error::$job did not pass (result: $result)"
+              status=1
+            fi
+          done
+          exit $status

@@ -1,6 +1,6 @@
 import pytest
-
 from conftest import FIXTURE, REPO, quiet, subnetwork_with_edges
+
 from sewernetworkx import Network
 
 
@@ -23,7 +23,9 @@ def test_pipes_flagged_abandoned_removed(network):
     assert ("X1", "A2") not in pipe_pairs(sub)
 
 
-@pytest.mark.xfail(strict=True, reason="#2: Network.full_data is a class attribute shared by all instances")
+@pytest.mark.xfail(
+    strict=True, reason="#2: Network.full_data is a class attribute shared by all instances"
+)
 def test_networks_are_independent():
     first = quiet(Network, str(FIXTURE))
     n_first = len(first.full_data)
