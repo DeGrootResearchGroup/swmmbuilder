@@ -7,10 +7,10 @@ import pytest
 from conftest import FIXTURE, REPO, quiet, read_sections, subnetwork_with_edges, write_inp
 
 # Every node that drains to OUT (flow direction in tests/data/make_fixture.py). Not OV1/OV2 (the
-# overflow leaves J2), S1/S2 (storm) or 'Abandoned' (abandoned by ID).
+# overflow leaves J2), S1/S2 (storm), 'Abandoned' (abandoned by ID) or X1 (Abandoned flag).
 OUT_CATCHMENT = {
     "A1", "A2", "B1", "B2", "C1", "D1", "D2", "E1", "F1", "F2", "F3", "F4",
-    "G1", "G2", "G3", "G4", "J1", "J2", "OUT", "X1",
+    "G1", "G2", "G3", "G4", "J1", "J2", "OUT",
 }  # fmt: skip
 
 PROBE = """
@@ -97,13 +97,13 @@ def test_catchment_max_hops(sub):
         ("J2", "OUT"),
     }
     two = sub.catchment("J1", max_hops=2)
-    assert set(two.nodes) == set(one.nodes) | {"A1", "X1", "B1"}
+    assert set(two.nodes) == set(one.nodes) | {"A1", "B1"}
 
 
 def test_catchment_max_length(sub):
-    # Upstream path lengths to J1: A2 60, B2 50, C1 40, X1 90, A1 140, B1 120.
+    # Upstream path lengths to J1: A2 60, B2 50, C1 40, A1 140, B1 120.
     assert set(sub.catchment("J1", max_length=100).nodes) == {
-        "A2", "B2", "C1", "X1", "J1", "J2", "OUT",
+        "A2", "B2", "C1", "J1", "J2", "OUT",
     }  # fmt: skip
     both = sub.catchment("J1", max_hops=1, max_length=55)
     assert set(both.nodes) == {"B2", "C1", "J1", "J2", "OUT"}

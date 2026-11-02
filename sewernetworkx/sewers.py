@@ -21,6 +21,9 @@ import pandas as pd
 # matching the GIS data; with a US unit (CFS, GPM, MGD) SWMM would read them as feet.
 SI_FLOW_UNITS = ("CMS", "LPS", "MLD")
 
+# FlowType values that Network keeps by default: sanitary sewers only.
+DEFAULT_FLOW_TYPES = frozenset({"SAN"})
+
 # Placeholders that write_pyswmm fills in the template.
 TEMPLATE_PLACEHOLDERS = ("nodes", "outfalls", "conduits", "xsections", "coordinates", "vertices")
 
@@ -138,24 +141,60 @@ class Network:
         and ``length``. Nodes and edges are inserted in sorted order, so traversals do not depend
         on the order of the file.
 
-    Notes
-    -----
-    remove_store is used as a flag to automatically remove any sewer pipe
-    flagged as a storm drain.
+    remove_storm : bool, optional
+        Deprecated. ``False`` is the same as ``flow_types=None``; ``True`` keeps the default.
+
+    flow_types : iterable of str or None
+        FlowType values to keep (default ``{'SAN'}``). Every other pipe, including those with no
+        FlowType, is dropped and the counts are printed. ``None`` keeps every pipe.
+
+    keep_abandoned : bool
+        Keep pipes with ``Abandoned == 1`` (default False: they are dropped). Pipes with a node ID
+        of 'Abandoned' are dropped from the graph either way.
+
+    Attributes
+    ----------
+    removed : dict
+        What was dropped on loading: ``{'flow_type': {FlowType: count}, 'abandoned': count}``.
+        Pipes with no FlowType are counted under ``'None'``.
     """
 
-    def __init__(self, file_path, remove_storm=True):
+    def __init__(
+        self, file_path, remove_storm=None, flow_types=DEFAULT_FLOW_TYPES, keep_abandoned=False
+    ):
         """Class initialization"""
 
         self.file_path = file_path
         data = gpd.read_file(self.file_path)
         self.full_data = gpd.GeoDataFrame(data, geometry="geometry")
 
-        if remove_storm:
-            print("Removing storm sewers")
-            key = "FlowType"
-            condition = self.full_data[key] != "STM"
-            self.full_data = self.full_data[condition]
+        if remove_storm is not None:
+            warnings.warn(
+                "remove_storm is deprecated; use flow_types (flow_types=None keeps every pipe).",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+            if not remove_storm:
+                flow_types = None
+
+        self.removed = {"flow_type": {}, "abandoned": 0}
+
+        if flow_types is not None and "FlowType" in self.full_data.columns:
+            flow_types = set(flow_types)
+            keep = self.full_data["FlowType"].isin(flow_types)
+            dropped = self.full_data.loc[~keep, "FlowType"].fillna("None").astype(str)
+            self.removed["flow_type"] = dropped.value_counts().sort_index().to_dict()
+            self.full_data = self.full_data[keep]
+            for flow_type, count in self.removed["flow_type"].items():
+                print(
+                    f"Removed {count} pipes with FlowType {flow_type} (keeping {sorted(flow_types)})"
+                )
+
+        if not keep_abandoned and "Abandoned" in self.full_data.columns:
+            abandoned = pd.to_numeric(self.full_data["Abandoned"], errors="coerce") == 1
+            self.removed["abandoned"] = int(abandoned.sum())
+            self.full_data = self.full_data[~abandoned]
+            print(f"Removed {self.removed['abandoned']} pipes flagged Abandoned")
 
         self.graph = self._build_graph(self.full_data)
 
@@ -960,7 +999,15 @@ class SubNetwork(Network):
             file.write(modified_content)
 
     def write_conduits_pyswmm(
-        self, pyswmm_file, manning_n, inlet_offset, outlet_offset, init_flow, max_flow, barrels
+        self,
+        pyswmm_file,
+        manning_n,
+        inlet_offset,
+        outlet_offset,
+        init_flow,
+        max_flow,
+        barrels,
+        manning_n_by_material=None,
     ):
         """Add subnetwork data into the Conduits and XSection section of a .inp file.
 
@@ -988,6 +1035,9 @@ class SubNetwork(Network):
         barrels : float
             Barrel value for conduit (default is 0.0).
 
+        manning_n_by_material : dict, optional
+            Material -> Manning N. Pipes whose Material is not in the mapping use ``manning_n``.
+
         Notes
         -----
         Also fills the {vertices} placeholder with the interior vertices of multi-vertex pipes, in
@@ -1013,6 +1063,7 @@ class SubNetwork(Network):
                     inlet = row["UpstreamID"]
                     outlet = row["DownstreamID"]
                     length = row["Length"]
+                    roughness = (manning_n_by_material or {}).get(row.get("Material"), manning_n)
 
                     if row["PipeShape"] == "R":
                         shape = "RECT_CLOSED"
@@ -1025,7 +1076,7 @@ class SubNetwork(Network):
 
                     conduits_content += (
                         f"{name:<16} {inlet:<16} {outlet:<16}"
-                        f"{length:<11} {manning_n:<11} "
+                        f"{length:<11} {roughness:<11} "
                         f"{inlet_offset:<11} {outlet_offset:<11}"
                         f"{init_flow:<11} {max_flow:<11}\n"
                     )
@@ -1056,6 +1107,7 @@ class SubNetwork(Network):
         surcharge_depth=0.0,
         ponding_area=0.0,
         manning_n=0.01,
+        manning_n_by_material=None,
         inlet_offset=0.0,
         outlet_offset=0.0,
         init_flow=0.0,
@@ -1089,7 +1141,11 @@ class SubNetwork(Network):
             Ponding area for node (default is 0.0).
 
         manning_n : float
-            Manning N coefficient for conduit (default is 0.01).
+            Manning N coefficient for conduit (default is 0.01). With ``manning_n_by_material``,
+            the fallback for pipes whose Material is not in the mapping.
+
+        manning_n_by_material : dict, optional
+            Material -> Manning N, e.g. ``{'PVC': 0.011, 'CONC': 0.013, 'VIT': 0.013}``.
 
         inlet_offset : float
             Inlet offset height for conduit (default is 0.0).
@@ -1175,7 +1231,14 @@ class SubNetwork(Network):
 
         # Write conduits to pyswmm inp file
         self.write_conduits_pyswmm(
-            output_file_path, manning_n, inlet_offset, outlet_offset, init_flow, max_flow, barrels
+            output_file_path,
+            manning_n,
+            inlet_offset,
+            outlet_offset,
+            init_flow,
+            max_flow,
+            barrels,
+            manning_n_by_material,
         )
 
     @staticmethod

@@ -170,3 +170,13 @@ def test_dead_end_written_as_outfall(network, tmp_path):
     s = read_sections(write_inp(sub, tmp_path, dead_ends="outfall"))
     assert [(r[0], float(r[1]), r[2]) for r in s["OUTFALLS"]] == [("J1", 103.95, "FREE")]
     assert {r[0] for r in s["JUNCTIONS"]} == {"A1", "A2", "B2"}
+
+
+def test_manning_n_by_material(network, tmp_path):
+    sub = subnetwork_with_edges(network, [("A1", "A2"), ("B2", "J1"), ("E1", "J2")], outfalls=())
+    path = write_inp(
+        sub, tmp_path, dead_ends="outfall", manning_n=0.02, manning_n_by_material={"PVC": 0.011}
+    )
+    n = {r[0]: float(r[4]) for r in read_sections(path)["CONDUITS"]}
+    # A1-A2 is PVC; B2-J1 is CONC and E1-J2 has no material, so both fall back to manning_n.
+    assert n == {"1000": 0.011, "1003": 0.02, "1012": 0.02}
