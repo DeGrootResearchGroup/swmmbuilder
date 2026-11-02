@@ -4,13 +4,13 @@ The functions here only draw: they take per-pipe, per-node or per-group values c
 (concentrations, flows, the share of each upstream area in a pipe's load, ...), as pandas Series
 or DataFrames indexed by pipe ID, node ID or group name.
 
-Static plots take a :class:`~sewernetworkx.Network` or :class:`~sewernetworkx.Subnetwork`
+Static plots take a :class:`~swmmbuilder.Network` or :class:`~swmmbuilder.Subnetwork`
 (``net``) and draw in a metric CRS (see :func:`plot_crs`), so ribbon widths and polygon buffers
 are in metres. Functions drawing on the same axes must use the same ``crs``; the default is the
 same for a network and all its subnetworks.
 
 ``contextily`` (web-tile basemaps) and ``folium`` (:func:`to_leaflet`) are optional: install them
-with ``pip install 'SewerNetworkx[maps]'``.
+with ``pip install 'swmmbuilder[maps]'``.
 """
 
 import importlib
@@ -674,7 +674,7 @@ def _optional(module):
         return importlib.import_module(module)
     except ImportError as e:
         raise ImportError(
-            f"This needs {module}, an optional dependency: pip install 'SewerNetworkx[maps]'"
+            f"This needs {module}, an optional dependency: pip install 'swmmbuilder[maps]'"
         ) from e
 
 
@@ -916,7 +916,7 @@ def to_leaflet(net, path, layers=None, *, tiles="OpenStreetMap"):
 
 def to_geojson(net, path, kind="pipes", values=None):
     """Write the pipes or nodes of ``net`` (with ``values``; see
-    :meth:`~sewernetworkx.Network.to_geodataframe`) to a GeoJSON file in WGS 84."""
+    :meth:`~swmmbuilder.Network.to_geodataframe`) to a GeoJSON file in WGS 84."""
     data = _with_crs(net.to_geodataframe(kind, values)).to_crs(WGS84)
     data.to_file(path, driver="GeoJSON")
 
@@ -942,7 +942,7 @@ def generate_gmap(subnetwork, file_name, origin=None):
         (latitude, longitude) of the centre of the map. Defaults to the first node.
     """
     warnings.warn(
-        "generate_gmap is deprecated; use sewernetworkx.maps.to_leaflet instead.",
+        "generate_gmap is deprecated; use swmmbuilder.maps.to_leaflet instead.",
         DeprecationWarning,
         stacklevel=2,
     )

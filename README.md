@@ -23,7 +23,7 @@ pipe keyed by pipe ID, so parallel pipes are kept.
 
 ## Maps
 
-`sewernetworkx.maps` draws values computed elsewhere (concentrations, flows, each upstream
+`swmmbuilder.maps` draws values computed elsewhere (concentrations, flows, each upstream
 area's share of a pipe's load, ...) on the network: pandas Series or DataFrames indexed by pipe
 ID, node ID or group name. Static plots use matplotlib and draw in a metric CRS (the network's
 CRS if projected, else its UTM zone; see `maps.plot_crs`), so ribbon widths are in metres.
@@ -46,7 +46,7 @@ sub.to_geodataframe("pipes", values=concentration)  # or "nodes"; also on Networ
 ```
 
 Web-tile basemaps and `to_leaflet` need the optional `maps` extra
-(`pip install "SewerNetworkx[maps]"`: contextily, xyzservices, folium). `generate_gmap`
+(`pip install "swmmbuilder[maps]"`: contextily, xyzservices, folium). `generate_gmap`
 (Google Maps) is deprecated in favour of `to_leaflet`.
 
 ## Logging

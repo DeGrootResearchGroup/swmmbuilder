@@ -34,7 +34,7 @@ def node_positions(data, nodes):
 
 def to_geodataframe(pipes, positions, kind="pipes", values=None):
     """GeoDataFrame of ``pipes`` (kind 'pipes') or of the nodes at ``positions`` (kind 'nodes'),
-    optionally joined with ``values``; see :meth:`sewernetworkx.Network.to_geodataframe`."""
+    optionally joined with ``values``; see :meth:`swmmbuilder.Network.to_geodataframe`."""
     if kind == "pipes":
         data = pipes.set_index("pipe_id")
     elif kind == "nodes":

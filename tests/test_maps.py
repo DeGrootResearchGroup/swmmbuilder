@@ -15,7 +15,7 @@ from matplotlib.collections import LineCollection, PatchCollection
 from pyproj import CRS
 from shapely import LineString, Point
 
-from sewernetworkx import Network, maps
+from swmmbuilder import Network, maps
 
 matplotlib.use("Agg")
 
