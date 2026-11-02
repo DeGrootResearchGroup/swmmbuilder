@@ -109,10 +109,33 @@ The default template is the one shipped in the package,
 `sewernetworkx/templates/template.inp` (`examples/pyswmm_template/template.inp` is a copy kept in
 sync by a test). It uses SI units, `FLOW_UNITS LPS`, because the GIS lengths, inverts and sizes are
 in metres. A custom template (`template_path=`) must use `CMS`, `LPS` or `MLD`, and may only
-contain the `{nodes}`, `{outfalls}`, `{conduits}`, `{xsections}`, `{coordinates}` and `{vertices}`
-placeholders; anything else (including US units or `{pumps}`, since pumps are not supported yet)
+contain the `{nodes}`, `{outfalls}`, `{storage}`, `{conduits}`, `{pumps}`, `{xsections}`,
+`{curves}`, `{coordinates}` and `{vertices}` placeholders; anything else (including US units)
 raises `ValueError`. Node `[COORDINATES]` and pipe `[VERTICES]` are written in the units of the GIS
 geometry.
+
+## Pumps
+
+The GIS data do not identify pumping stations, so pumps are passed to `to_inp` by pipe ID.
+Each pumped pipe is written to `[PUMPS]` (from its upstream to its downstream node) instead of
+`[CONDUITS]`, with its curve in `[CURVES]`; it needs no cross-section and is not reported as
+adverse. Wet wells can be written as `[STORAGE]` nodes of constant plan area instead of junctions:
+
+```python
+sub.to_inp(
+    "model.inp",
+    outfalls=["OUT"],
+    pumps={1010: dict(curve=[(0, 6.0), (2, 4.0), (4, 0.0)], curve_type="PUMP3",
+                      startup=0.5, shutoff=0.1)},
+    wet_wells={"D1": dict(max_depth=3.0, area=4.0)},
+)
+```
+
+`curve` is a list of (x, y) points, with y the flow in the template's `FLOW_UNITS` (L/s with the
+shipped template) and x set by `curve_type`: `PUMP1` wet well volume (m³; the inlet must be a wet
+well), `PUMP2`/`PUMP4` inlet depth (m), `PUMP3`/`PUMP5` head (m). `curve="*"` is an ideal pump.
+`status` (`ON`/`OFF`), `startup` and `shutoff` (inlet depths, m) are optional. `Pump` and `WetWell`
+objects can be passed instead of dicts.
 
 ## Conduit geometry
 

@@ -1,7 +1,7 @@
 """SWMM models of a subnetwork, and their .inp files.
 
 :func:`build_model` turns a subnetwork into a :class:`SwmmModel`: plain records of the junctions,
-outfalls, conduits, cross-sections, coordinates and vertices, with all the hydraulic decisions
+outfalls, storage nodes, conduits, pumps, cross-sections, curves, coordinates and vertices, with all the hydraulic decisions
 (node inverts, conduit offsets, cross-sections, Manning's n) already made.
 :meth:`SwmmModel.render` fills an .inp template with them, and :func:`write_inp` checks the
 template and the topology, builds the model and writes the file.
@@ -10,7 +10,7 @@ template and the topology, builds the model and writes the file.
 import logging
 import re
 import warnings
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from importlib import resources
 from pathlib import Path
 
@@ -25,7 +25,26 @@ logger = logging.getLogger(__name__)
 SI_FLOW_UNITS = ("CMS", "LPS", "MLD")
 
 # Placeholders that SwmmModel.render fills in the template.
-TEMPLATE_PLACEHOLDERS = ("nodes", "outfalls", "conduits", "xsections", "coordinates", "vertices")
+TEMPLATE_PLACEHOLDERS = (
+    "nodes",
+    "outfalls",
+    "storage",
+    "conduits",
+    "pumps",
+    "xsections",
+    "curves",
+    "coordinates",
+    "vertices",
+)
+
+# SWMM pump curve types, and what the x values of each are (y is flow, in the FLOW_UNITS).
+PUMP_CURVE_TYPES = {
+    "PUMP1": "wet well volume",
+    "PUMP2": "inlet node depth",
+    "PUMP3": "head difference",
+    "PUMP4": "inlet node depth",
+    "PUMP5": "head difference",
+}
 
 
 def default_template_path():
@@ -54,7 +73,7 @@ def check_template(content):
     ----------
     ValueError
         If FLOW_UNITS is missing or not an SI unit (the GIS data are metric), or if the template
-        contains a placeholder the writer does not fill (e.g. ``{pumps}``: pumps are not supported).
+        contains a placeholder the writer does not fill (see :data:`TEMPLATE_PLACEHOLDERS`).
     """
     match = re.search(r"^\s*FLOW_UNITS\s+(\S+)", content, re.MULTILINE | re.IGNORECASE)
     if match is None:
@@ -169,6 +188,134 @@ def xsections(pipes, schema):
     return sections
 
 
+@dataclass
+class Pump:
+    """A pump that replaces a pipe in the .inp file (see the ``pumps`` option of
+    :func:`build_model`).
+
+    Attributes
+    ----------
+    curve : list of (float, float) or str
+        Pump curve points (x, y), y being the flow in the template's FLOW_UNITS (L/s with the
+        shipped template) and x as given by ``curve_type``; or ``'*'`` for an ideal pump, which
+        pumps whatever flows into its inlet node.
+
+    curve_type : str
+        PUMP1 (x: wet well volume, m3; the inlet must be a wet well), PUMP2 (x: inlet depth, m,
+        stepwise), PUMP3 (x: head difference, m), PUMP4 (x: inlet depth, m, continuous) or PUMP5
+        (variable-speed PUMP3). Ignored for an ideal pump.
+
+    status : str
+        Initial status, 'ON' or 'OFF'.
+
+    startup, shutoff : float
+        Inlet node depths (m) at which the pump turns on and off; 0 for none.
+    """
+
+    curve: object
+    curve_type: str = "PUMP3"
+    status: str = "ON"
+    startup: float = 0.0
+    shutoff: float = 0.0
+
+    @classmethod
+    def coerce(cls, pump_id, value):
+        """A Pump from a Pump or a dict of its fields, checked; raise ValueError if it is invalid."""
+        pump = replace(value) if isinstance(value, cls) else cls(**value)
+        problems = []
+        if isinstance(pump.curve, str):
+            if pump.curve != "*":
+                problems.append(f"curve must be a list of (x, y) points or '*', not {pump.curve!r}")
+        else:
+            points = [tuple(pt) for pt in pump.curve]
+            if not points or any(len(pt) != 2 for pt in points):
+                problems.append("curve must be a non-empty list of (x, y) points")
+            else:
+                pump.curve = [(float(x), float(y)) for x, y in points]
+            if pump.curve_type.upper() not in PUMP_CURVE_TYPES:
+                problems.append(
+                    f"curve_type {pump.curve_type!r} is not one of {list(PUMP_CURVE_TYPES)}"
+                )
+            pump.curve_type = pump.curve_type.upper()
+        pump.status = pump.status.upper()
+        if pump.status not in ("ON", "OFF"):
+            problems.append(f"status must be 'ON' or 'OFF', not {pump.status!r}")
+        if problems:
+            raise ValueError(f"Pump {pump_id}: {'; '.join(problems)}.")
+        return pump
+
+
+@dataclass
+class WetWell:
+    """A node written as a [STORAGE] node of constant plan area, e.g. a pumping station wet well
+    (see the ``wet_wells`` option of :func:`build_model`).
+
+    Attributes
+    ----------
+    max_depth : float
+        Depth (m) from the node invert to the top of the wet well.
+
+    area : float
+        Plan area (m2).
+
+    init_depth : float
+        Initial water depth (m).
+    """
+
+    max_depth: float
+    area: float
+    init_depth: float = 0.0
+
+    @classmethod
+    def coerce(cls, node, value):
+        """A WetWell from a WetWell or a dict of its fields; raise ValueError if it is invalid."""
+        well = replace(value) if isinstance(value, cls) else cls(**value)
+        if not (well.max_depth > 0 and well.area > 0 and well.init_depth >= 0):
+            raise ValueError(
+                f"Wet well {node}: max_depth and area must be positive and init_depth not negative."
+            )
+        return well
+
+
+def resolve_pumps(subnetwork, pumps):
+    """{pipe_id: Pump} from the ``pumps`` option of :func:`build_model`.
+
+    The keys are matched to the subnetwork pipe IDs as strings, so ``1010`` and ``'1010'`` are
+    the same pipe; the result is keyed by the pipe IDs of the data.
+
+    Raises
+    ----------
+    ValueError
+        If a pipe is not in the subnetwork or a pump is invalid.
+    """
+    if not pumps:
+        return {}
+    ids = {str(p): p for p in subnetwork.pipes()["pipe_id"]}
+    missing = sorted(str(k) for k in pumps if str(k) not in ids)
+    if missing:
+        raise ValueError(f"Pumped pipes not in the subnetwork: {', '.join(missing)}")
+    return {ids[str(k)]: Pump.coerce(k, v) for k, v in pumps.items()}
+
+
+def resolve_wet_wells(subnetwork, wet_wells, outfalls=()):
+    """{node: WetWell} from the ``wet_wells`` option of :func:`build_model`.
+
+    Raises
+    ----------
+    ValueError
+        If a node is not in the subnetwork or is an outfall, or a wet well is invalid.
+    """
+    if not wet_wells:
+        return {}
+    missing = sorted(str(n) for n in wet_wells if n not in set(subnetwork.nodes))
+    if missing:
+        raise ValueError(f"Wet wells not in the subnetwork: {', '.join(missing)}")
+    at_outfalls = sorted(str(n) for n in wet_wells if n in set(outfalls))
+    if at_outfalls:
+        raise ValueError(f"Wet wells cannot be outfalls: {', '.join(at_outfalls)}")
+    return {node: WetWell.coerce(node, v) for node, v in wet_wells.items()}
+
+
 def _invert(value):
     """An invert elevation, or None if it is missing."""
     return None if pd.isna(value) else float(value)
@@ -249,6 +396,17 @@ class Outfall:
 
 
 @dataclass(frozen=True)
+class Storage:
+    """A storage node of constant plan area."""
+
+    name: str
+    invert: float
+    max_depth: float
+    init_depth: float
+    area: float
+
+
+@dataclass(frozen=True)
 class Conduit:
     name: str
     inlet: str
@@ -259,6 +417,24 @@ class Conduit:
     outlet_offset: float
     init_flow: float
     max_flow: float
+
+
+@dataclass(frozen=True)
+class PumpLink:
+    name: str
+    inlet: str
+    outlet: str
+    curve: str
+    status: str
+    startup: float
+    shutoff: float
+
+
+@dataclass(frozen=True)
+class Curve:
+    name: str
+    type: str
+    points: tuple
 
 
 @dataclass(frozen=True)
@@ -276,19 +452,23 @@ class SwmmModel:
 
     Attributes
     ----------
-    junctions, outfalls, conduits, xsections : list
-        :class:`Junction`, :class:`Outfall`, :class:`Conduit` and :class:`XSection` records,
-        in the order they are written.
+    junctions, outfalls, storage, conduits, pumps, xsections, curves : list
+        :class:`Junction`, :class:`Outfall`, :class:`Storage`, :class:`Conduit`,
+        :class:`PumpLink`, :class:`XSection` and :class:`Curve` records, in the order they are
+        written.
     coordinates : dict
         {node: (x, y)}, in the units of the GIS geometry.
     vertices : dict
-        {conduit: [(x, y), ...]}: the interior vertices of each conduit.
+        {link: [(x, y), ...]}: the interior vertices of each conduit or pump.
     """
 
     junctions: list = field(default_factory=list)
     outfalls: list = field(default_factory=list)
+    storage: list = field(default_factory=list)
     conduits: list = field(default_factory=list)
+    pumps: list = field(default_factory=list)
     xsections: list = field(default_factory=list)
+    curves: list = field(default_factory=list)
     coordinates: dict = field(default_factory=dict)
     vertices: dict = field(default_factory=dict)
 
@@ -303,6 +483,12 @@ class SwmmModel:
             "outfalls": "".join(
                 f"{o.name:<16} {o.invert:<11}  {o.type:<28} {'NO':<10}\n" for o in self.outfalls
             ),
+            # FUNCTIONAL area = 0 * depth^0 + area: a constant plan area.
+            "storage": "".join(
+                f"{s.name:<16} {s.invert:<11} {s.max_depth:<11} {s.init_depth:<11} "
+                f"{'FUNCTIONAL':<12} {0:<11} {0:<11} {s.area:<11} {0:<11} {0:<11}\n"
+                for s in self.storage
+            ),
             "conduits": "".join(
                 f"{c.name:<16} {c.inlet:<16} {c.outlet:<16}"
                 f"{c.length:<11} {c.roughness:<11} "
@@ -310,10 +496,23 @@ class SwmmModel:
                 f"{c.init_flow:<11} {c.max_flow:<11}\n"
                 for c in self.conduits
             ),
+            "pumps": "".join(
+                f"{p.name:<16} {p.inlet:<16} {p.outlet:<16} {p.curve:<16} {p.status:<6} "
+                f"{p.startup:<11} {p.shutoff:<11}\n"
+                for p in self.pumps
+            ),
             "xsections": "".join(
                 f"{x.name:<16} {x.shape:<16} {x.geom1:<16}{x.geom2:<11} {0.0:<11} {0.0:<11} "
                 f"{x.barrels:<11}\n"
                 for x in self.xsections
+            ),
+            "curves": "".join(
+                "".join(
+                    f"{c.name:<16} {c.type if i == 0 else '':<9} {x:<11} {y:<11}\n"
+                    for i, (x, y) in enumerate(c.points)
+                )
+                + "\n"
+                for c in self.curves
             ),
             "coordinates": "".join(
                 f"{node:<16} {x:<18} {y:<18}\n" for node, (x, y) in self.coordinates.items()
@@ -354,6 +553,8 @@ def build_model(
     max_flow=0.0,
     barrels=1.0,
     height_correction=None,
+    pumps=None,
+    wet_wells=None,
 ):
     """The :class:`SwmmModel` of a subnetwork.
 
@@ -390,18 +591,42 @@ def build_model(
     height_correction : dict, optional
         {node: invert} overriding the computed node inverts.
 
+    pumps : dict, optional
+        {pipe_id: :class:`Pump` or dict of its fields}, e.g.
+        ``{1010: dict(curve=[(0, 6.0), (2, 4.0), (4, 0.0)], curve_type='PUMP3')}``. Each pipe is
+        written as a pump from its upstream to its downstream node instead of a conduit, with its
+        curve as ``<pipe_id>_curve``; it needs no cross-section and is not reported as adverse.
+        The GIS data do not identify pumps, so they must be given here.
+
+    wet_wells : dict, optional
+        {node: :class:`WetWell` or dict of its fields}, e.g. ``{'D1': dict(max_depth=3.0,
+        area=4.0)}``: storage nodes of constant plan area instead of junctions. The inlet of a
+        PUMP1 pump must be a wet well.
+
     Raises
     ----------
     ValueError
         If an outfall is not in the subnetwork, a pipe has an unknown or missing shape code or
-        size, or a node has no invert.
+        size, a node has no invert, or a pump or wet well is invalid.
     """
     outfalls = outfall_types(outfalls)
     unknown = sorted(set(outfalls) - set(subnetwork.nodes))
     if unknown:
         raise ValueError(f"Outfalls not in the subnetwork: {', '.join(map(str, unknown))}")
+    pumps = resolve_pumps(subnetwork, pumps)
+    wet_wells = resolve_wet_wells(subnetwork, wet_wells, outfalls)
     pipes = subnetwork.pipes()
-    sections = xsections(pipes, subnetwork.schema)
+    inlets = dict(zip(pipes["pipe_id"], pipes["from_node"], strict=True))
+    dry = sorted(
+        f"{name} (inlet {inlets[name]})"
+        for name, pump in pumps.items()
+        if pump.curve != "*" and pump.curve_type == "PUMP1" and inlets[name] not in wet_wells
+    )
+    if dry:
+        raise ValueError(
+            f"PUMP1 pumps need a wet well at their inlet node (pass wet_wells): {', '.join(dry)}"
+        )
+    sections = xsections(pipes[~pipes["pipe_id"].isin(list(pumps))], subnetwork.schema)
     inverts = node_inverts(subnetwork, height_correction)
     model = SwmmModel()
 
@@ -411,6 +636,9 @@ def build_model(
             logger.info("Node %s: invert set to %s by height_correction", node, invert)
         if node in outfalls:
             model.outfalls.append(Outfall(node, invert, outfalls[node]))
+        elif node in wet_wells:
+            well = wet_wells[node]
+            model.storage.append(Storage(node, invert, well.max_depth, well.init_depth, well.area))
         else:
             model.junctions.append(
                 Junction(node, invert, max_depth, init_depth, surcharge_depth, ponding_area)
@@ -426,6 +654,20 @@ def build_model(
     adverse = []
     for _, row in pipes.iterrows():
         name, inlet, outlet = row["pipe_id"], row["from_node"], row["to_node"]
+        interior = line_coords(row["geometry"])[1:-1]
+        if interior:
+            model.vertices[name] = interior
+
+        if name in pumps:
+            pump = pumps[name]
+            curve = "*" if pump.curve == "*" else f"{name}_curve"
+            model.pumps.append(
+                PumpLink(name, inlet, outlet, curve, pump.status, pump.startup, pump.shutoff)
+            )
+            if curve != "*":
+                model.curves.append(Curve(curve, pump.curve_type, tuple(pump.curve)))
+            continue
+
         roughness = (manning_n_by_material or {}).get(row["material"], manning_n)
 
         ends = []
@@ -458,9 +700,6 @@ def build_model(
             )
         )
         model.xsections.append(XSection(name, *sections[name], barrels))
-        interior = line_coords(row["geometry"])[1:-1]
-        if interior:
-            model.vertices[name] = interior
 
     if adverse:
         warnings.warn(
@@ -493,8 +732,9 @@ def write_inp(subnetwork, path, outfalls, template_path=None, dead_ends="raise",
     template_path : str, Path, optional
         The .inp template (default: :func:`default_template_path`, which uses FLOW_UNITS LPS).
         It must use an SI FLOW_UNITS (CMS, LPS or MLD) and only the placeholders in
-        :data:`TEMPLATE_PLACEHOLDERS`; pumps are not supported. The offsets are depths, so it
-        should set LINK_OFFSETS DEPTH (the default).
+        :data:`TEMPLATE_PLACEHOLDERS`; {storage}, {pumps} and {curves} are needed only with the
+        ``wet_wells`` and ``pumps`` options. The offsets are depths, so it should set
+        LINK_OFFSETS DEPTH (the default).
 
     dead_ends : {'raise', 'outfall'}
         What to do with nodes that have no outlet pipe and are not outfalls: raise a
@@ -520,6 +760,20 @@ def write_inp(subnetwork, path, outfalls, template_path=None, dead_ends="raise",
         outfalls = {**outfalls, **{node: "FREE" for node in report.dead_ends}}
 
     model = build_model(subnetwork, outfalls, **options)
+    needed = [
+        name
+        for name, records in (
+            ("storage", model.storage),
+            ("pumps", model.pumps),
+            ("curves", model.curves),
+        )
+        if records and f"{{{name}}}" not in template
+    ]
+    if needed:
+        raise ValueError(
+            f"The template has no {', '.join(f'{{{n}}}' for n in needed)} placeholder, so the "
+            "pumps or wet wells would not be written."
+        )
     logger.info("Writing %s", path)
     Path(path).write_text(model.render(template))
     return model
