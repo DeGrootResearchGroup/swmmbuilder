@@ -1,10 +1,10 @@
-# SewerNetworkx
+# swmmbuilder
 
 Python package that loads a city's GIS sewer network (GeoJSON or any format geopandas reads),
 selects subnetworks of it, and writes them as SWMM `.inp` files for pyswmm.
 
 ```python
-from sewernetworkx import Network, maps, swmm
+from swmmbuilder import Network, maps, swmm
 
 net = Network("london.geojson")                     # schema=LONDON_ON by default
 sub = net.catchment("OUT")                          # every node draining to OUT
@@ -24,7 +24,7 @@ pipe keyed by pipe ID, so parallel pipes are kept.
 ## Logging
 
 Progress and data problems (pipes dropped on loading, nodes with no position, height corrections)
-are reported through `logging`, on the `sewernetworkx` logger; nothing is printed. To see them:
+are reported through `logging`, on the `swmmbuilder` logger; nothing is printed. To see them:
 
 ```python
 import logging
@@ -36,8 +36,8 @@ logging.basicConfig(level=logging.INFO)
 `Network(path, schema=...)` reads the GeoJSON and converts it to canonical columns (`pipe_id`,
 `from_node`, `to_node`, `length`, `us_invert`, `ds_invert`, `drop_invert`, `shape`, `diameter`,
 `height`, `width`, `flow_type`, `material`, `abandoned`, in m); everything after loading reads only
-those (see `sewernetworkx/schema.py`). Two schemas ship with the package, as TOML files in
-`sewernetworkx/schemas/`:
+those (see `swmmbuilder/schema.py`). Two schemas ship with the package, as TOML files in
+`swmmbuilder/schemas/`:
 
 - `LONDON_ON` (the default): London, ON's GIS export.
 - `TORONTO_ON`: the [Sewer Gravity Mains](https://open.toronto.ca/dataset/sewer-gravity-mains/)
@@ -48,7 +48,7 @@ those (see `sewernetworkx/schema.py`). Two schemas ship with the package, as TOM
   `flow_types={"sanitary", "combined"}` keeps sanitary and combined sewers.
 
 ```python
-from sewernetworkx import TORONTO_ON, Network
+from swmmbuilder import TORONTO_ON, Network
 
 network = Network("sewer-gravity-main-4326.geojson", schema=TORONTO_ON)
 ```
@@ -98,7 +98,7 @@ give a warning on loading, and those pipes are rejected if they are written to a
 
 ## SWMM template
 
-`.inp` files are written by `sewernetworkx.swmm`. `build_model(subnetwork, ...)` returns a
+`.inp` files are written by `swmmbuilder.swmm`. `build_model(subnetwork, ...)` returns a
 `SwmmModel`: plain records of the junctions, outfalls, conduits, cross-sections, coordinates and
 vertices, with node inverts, conduit offsets and Manning's n already decided, so the model can be
 inspected or tested without a file. `write_inp(subnetwork, path, ...)` checks the template and
@@ -106,7 +106,7 @@ the topology, builds the model and renders it into the template in one write;
 `Subnetwork.to_inp` calls it.
 
 The default template is the one shipped in the package,
-`sewernetworkx/templates/template.inp` (`examples/pyswmm_template/template.inp` is a copy kept in
+`swmmbuilder/templates/template.inp` (`examples/pyswmm_template/template.inp` is a copy kept in
 sync by a test). It uses SI units, `FLOW_UNITS LPS`, because the GIS lengths, inverts and sizes are
 in metres. A custom template (`template_path=`) must use `CMS`, `LPS` or `MLD`, and may only
 contain the `{nodes}`, `{outfalls}`, `{storage}`, `{conduits}`, `{pumps}`, `{xsections}`,
