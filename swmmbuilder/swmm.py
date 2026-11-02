@@ -12,6 +12,8 @@ import logging
 import math
 import re
 import warnings
+from collections import Counter
+from collections.abc import Mapping
 from dataclasses import dataclass, field, replace
 from importlib import resources
 from pathlib import Path
@@ -63,6 +65,13 @@ PUMP_CURVE_TYPES = {
     "PUMP3": "head difference",
     "PUMP4": "inlet node depth",
     "PUMP5": "head difference",
+}
+
+# SWMM's FORCE_MAIN_EQUATION options, and what the roughness of a FORCE_MAIN cross-section is
+# with each (with SI units).
+FORCE_MAIN_EQUATIONS = {
+    "H-W": "Hazen-Williams C",
+    "D-W": "Darcy-Weisbach roughness height (mm)",
 }
 
 
@@ -125,6 +134,15 @@ def template_routing(template):
     """FLOW_ROUTING of the text of an .inp template; SWMM's default, KINWAVE, if it is not set."""
     match = re.search(r"^\s*FLOW_ROUTING\s+(\w+)", template, flags=re.MULTILINE | re.IGNORECASE)
     return match.group(1).upper() if match else "KINWAVE"
+
+
+def template_force_main_equation(template):
+    """FORCE_MAIN_EQUATION of the text of an .inp template; SWMM's default, H-W, if it is not
+    set."""
+    match = re.search(
+        r"^\s*FORCE_MAIN_EQUATION\s+(\S+)", template, flags=re.MULTILINE | re.IGNORECASE
+    )
+    return match.group(1).upper() if match else "H-W"
 
 
 def check_topology(report, routing, dead_ends):
@@ -283,6 +301,231 @@ def resolve_wet_wells(subnetwork, wet_wells, outfalls=()):
     if at_outfalls:
         raise ValueError(f"Wet wells cannot be outfalls: {', '.join(at_outfalls)}")
     return {node: WetWell.coerce(node, v) for node, v in wet_wells.items()}
+
+
+@dataclass
+class PumpStation:
+    """A pumping station that discharges into one or more force mains (see the
+    ``pump_stations`` option of :func:`build_model`).
+
+    Attributes
+    ----------
+    pump : Pump or dict
+        The pump. There is no default: an ideal pump (``curve='*'``) suits a variable-speed
+        station that delivers a near-uniform flow, a curve with startup and shutoff depths
+        (e.g. PUMP2 or PUMP4) a fixed-speed station that cycles on and off.
+
+    wet_well : WetWell or dict, optional
+        The station node's wet well; without one the station node is a junction.
+
+    force_mains : pipe ID or list of pipe IDs, optional
+        The first pipes of the force mains to pump into (default: every force main leaving the
+        station node).
+
+    discharge : {'shared', 'separate'}, optional
+        With more than one force main: one pump whose discharge node feeds them all
+        (``'shared'``), or one pump per force main (``'separate'``). Required then.
+    """
+
+    pump: object
+    wet_well: object = None
+    force_mains: object = None
+    discharge: str | None = None
+
+    @classmethod
+    def coerce(cls, node, value):
+        """A PumpStation from a PumpStation or a dict of its fields, with its pump and wet well
+        coerced; raise ValueError if it is invalid."""
+        station = replace(value) if isinstance(value, cls) else cls(**value)
+        station.pump = Pump.coerce(node, station.pump)
+        if station.wet_well is not None:
+            station.wet_well = WetWell.coerce(node, station.wet_well)
+        if station.force_mains is not None and (
+            isinstance(station.force_mains, str) or not hasattr(station.force_mains, "__iter__")
+        ):
+            station.force_mains = [station.force_mains]
+        if station.discharge not in (None, "shared", "separate"):
+            raise ValueError(
+                f"Pump station {node}: discharge must be 'shared' or 'separate', "
+                f"not {station.discharge!r}."
+            )
+        return station
+
+
+@dataclass(frozen=True)
+class StationPump:
+    """A pump of a :class:`PumpStation`, from the station node to its discharge node, and the
+    force mains it feeds: {first pipe ID: pipe IDs of the chain}."""
+
+    name: str
+    station: str
+    discharge: str
+    force_mains: dict
+
+
+def resolve_pump_stations(subnetwork, pump_stations, outfalls=()):
+    """({node: PumpStation}, [StationPump]) from the ``pump_stations`` option of
+    :func:`build_model`.
+
+    Raises
+    ----------
+    ValueError
+        If a station node is not in the subnetwork, is an outfall or has no force-main outlet, a
+        chosen force main does not leave it, it has several force mains and no ``discharge``,
+        a pump or wet well is invalid, a PUMP1 pump has no wet well, or a name the station needs
+        (``<node>_P``, ``<node>_D``) is already a node or pipe ID. Every problem is listed.
+    """
+    if not pump_stations:
+        return {}, []
+    nodes = set(subnetwork.nodes)
+    taken = {str(n) for n in subnetwork.network.graph.nodes} | {
+        str(p) for p in subnetwork.network.full_data["pipe_id"]
+    }
+    stations, links, problems = {}, [], []
+    for node, value in pump_stations.items():
+        if node not in nodes:
+            problems.append(f"{node} is not in the subnetwork")
+            continue
+        if node in set(outfalls):
+            problems.append(f"{node} is an outfall")
+            continue
+        station = stations[node] = PumpStation.coerce(node, value)
+        outlets = subnetwork.force_main_outlets(node)
+        if not outlets:
+            problems.append(f"{node} has no force-main outlet pipe")
+            continue
+        chosen = outlets
+        if station.force_mains is not None:
+            ids = {str(p): p for p in outlets}
+            wrong = [str(p) for p in station.force_mains if str(p) not in ids]
+            if wrong:
+                problems.append(
+                    f"{node}: force mains {', '.join(wrong)} do not leave it "
+                    f"(its force mains: {', '.join(map(str, outlets))})"
+                )
+                continue
+            chosen = [ids[str(p)] for p in station.force_mains]
+            unused = [str(p) for p in outlets if p not in chosen]
+            if unused:
+                warnings.warn(
+                    f"Pump station {node}: force mains {', '.join(unused)} are not pumped and "
+                    "are written as ordinary conduits from the station node.",
+                    stacklevel=3,
+                )
+        if len(chosen) > 1 and station.discharge is None:
+            problems.append(
+                f"{node} has {len(chosen)} force mains ({', '.join(map(str, chosen))}); pass "
+                "discharge='shared' (one pump feeding all of them) or 'separate' (one pump each)"
+            )
+            continue
+        pump = station.pump
+        if pump.curve != "*" and pump.curve_type == "PUMP1" and station.wet_well is None:
+            problems.append(f"{node} has a PUMP1 pump and no wet well")
+        if station.discharge == "separate":
+            groups = [(f"{node}_P{i}", f"{node}_D{i}", [p]) for i, p in enumerate(chosen, 1)]
+        else:
+            groups = [(f"{node}_P", f"{node}_D", chosen)]
+        clashes = sorted({n for name, d, _ in groups for n in (name, d) if n in taken})
+        if clashes:
+            problems.append(f"{node}: {', '.join(clashes)} already exist in the network")
+        for name, discharge, mains in groups:
+            chains = {p: subnetwork.force_main_chain(p, outfalls)[0] for p in mains}
+            links.append(StationPump(name, node, discharge, chains))
+    if problems:
+        raise ValueError("Invalid pump stations:\n  " + "\n  ".join(problems))
+    return stations, links
+
+
+def force_main_roughness_rule(rule):
+    """A function pipe -> roughness (None if the rule has no value for the pipe) from the
+    ``force_main_roughness`` option of :func:`build_model`.
+
+    Raises
+    ----------
+    ValueError
+        If the rule is not one of the accepted forms.
+    """
+    if callable(rule):
+        return rule
+    if isinstance(rule, Mapping):
+        by, table = rule.get("by"), rule.get("table")
+        unknown = sorted(set(rule) - {"by", "table", "equation"})
+        if unknown or by not in ("diameter", "material") or table is None:
+            raise ValueError(
+                "force_main_roughness must be a number, a callable, or a dict with 'by' "
+                "('diameter' or 'material'), 'table' and optionally 'equation'"
+                + (f"; unknown keys {unknown}" if unknown else "")
+                + "."
+            )
+        if by == "material":
+            table = dict(table)
+            return lambda pipe: table.get(pipe.get("material"))
+        table = sorted((float(upper), float(value)) for upper, value in table)
+
+        def by_diameter(pipe):
+            diameter = pipe.get("diameter")
+            if pd.isna(diameter):
+                return None
+            mm = round(1000 * diameter, 6)
+            return next((value for upper, value in table if mm <= upper), None)
+
+        return by_diameter
+    value = float(rule)
+    return lambda pipe: value
+
+
+def force_main_roughnesses(pipes, sections, rule, by_pipe=None):
+    """{pipe_id: roughness} of the force-main pipes ``pipes`` (see the ``force_main_roughness``
+    and ``force_main_roughness_by_pipe`` options of :func:`build_model`).
+
+    Raises
+    ----------
+    ValueError
+        If a force main is not circular or has no roughness; every such pipe is listed.
+    """
+    if pipes.empty:
+        return {}
+    overrides = {str(k): float(v) for k, v in (by_pipe or {}).items()}
+    rule = (lambda pipe: None) if rule is None else force_main_roughness_rule(rule)
+    found, not_round, missing = {}, [], []
+    for _, pipe in pipes.iterrows():
+        name = pipe["pipe_id"]
+        if sections[name][0] != "CIRCULAR":
+            not_round.append(f"{name} ({sections[name][0]})")
+        value = overrides.get(str(name))
+        if value is None:
+            value = rule(pipe)
+        if value is None or pd.isna(value):
+            missing.append(
+                f"{name} (diameter {pipe.get('diameter')} m, material {pipe.get('material')!r})"
+            )
+        else:
+            found[name] = float(value)
+    problems = []
+    if not_round:
+        problems.append(f"not circular: {', '.join(not_round)}")
+    if missing:
+        problems.append(
+            f"no roughness: {', '.join(missing)} (pass force_main_roughness, e.g. a "
+            "Hazen-Williams C, or force_main_roughness_by_pipe)"
+        )
+    if problems:
+        raise ValueError("Invalid force mains:\n  " + "\n  ".join(problems))
+    return found
+
+
+def check_force_main_equation(rule, equation):
+    """Raise ValueError if a ``force_main_roughness`` rule declares an ``equation`` that is not
+    the template's FORCE_MAIN_EQUATION."""
+    if not isinstance(rule, Mapping) or "equation" not in rule:
+        return
+    declared = str(rule["equation"]).upper()
+    if declared != equation:
+        raise ValueError(
+            f"force_main_roughness gives {FORCE_MAIN_EQUATIONS.get(declared, declared)} values "
+            f"(equation {declared}), but the template sets FORCE_MAIN_EQUATION {equation}, so "
+            f"SWMM would read them as {FORCE_MAIN_EQUATIONS.get(equation, equation)}."
+        )
 
 
 def _is_finite_number(value):
@@ -704,6 +947,10 @@ def build_model(
     height_correction=None,
     pumps=None,
     wet_wells=None,
+    pump_stations=None,
+    force_main_roughness=None,
+    force_main_roughness_by_pipe=None,
+    force_main_surcharge_depth=100.0,
     dwf=None,
     patterns=None,
     dwf_patterns=None,
@@ -761,6 +1008,39 @@ def build_model(
         area=4.0)}``: storage nodes of constant plan area instead of junctions. The inlet of a
         PUMP1 pump must be a wet well.
 
+    pump_stations : dict, optional
+        {station node: :class:`PumpStation` or dict of its fields}, e.g. ``{'PS1':
+        dict(pump=dict(curve='*'), wet_well=dict(max_depth=3.0, area=4.0))}``. For each station,
+        a discharge node ``<node>_D`` is written at the station's coordinates, with the invert of
+        the force main's upstream end, and a pump ``<node>_P`` from the station node to it (curve
+        ``<node>_curve``). The force mains leaving the station (see
+        :meth:`Subnetwork.force_main_chain`) start at ``<node>_D`` and are kept as conduits with
+        their GIS lengths and a FORCE_MAIN cross-section; their interior nodes and ``<node>_D``
+        get ``force_main_surcharge_depth``, so that the main can run pressurised under DYNWAVE.
+        Other outlets of the station, e.g. overflows, stay conduits. With ``discharge='separate'``
+        the pumps and discharge nodes are numbered: ``<node>_P1``, ``<node>_D1``, ...
+
+    force_main_roughness : float, dict or callable
+        Roughness of the FORCE_MAIN cross-sections, read by SWMM as a Hazen-Williams C or a
+        Darcy-Weisbach roughness height (mm) according to the template's FORCE_MAIN_EQUATION.
+        Required with ``pump_stations``; no rule is applied unless it is given here. One of:
+
+        - a constant;
+        - ``{'by': 'diameter', 'table': [(upper diameter in mm, value), ...]}``: the value of the
+          first row whose upper diameter is at or above the pipe's;
+        - ``{'by': 'material', 'table': {material: value}}``;
+        - a callable ``pipe -> value``, given the pipe's row of the canonical data.
+
+        A dict may also give ``'equation': 'H-W'`` or ``'D-W'``; :func:`write_inp` then refuses a
+        template with another FORCE_MAIN_EQUATION. Presets are in the schemas, e.g.
+        ``LONDON_ON.design['force_main_roughness']`` (C by diameter).
+
+    force_main_roughness_by_pipe : dict, optional
+        {pipe_id: roughness}, overriding ``force_main_roughness``.
+
+    force_main_surcharge_depth : float
+        Surcharge depth (m) of the force mains' interior and discharge nodes (default 100).
+
     dwf : dict, optional
         {node: base flow}: the dry-weather flow entering each node, in the template's FLOW_UNITS
         (L/s with the shipped template), written to [DWF]. Nodes with no upstream pipes, e.g.
@@ -788,8 +1068,10 @@ def build_model(
     ValueError
         If an outfall is not in the subnetwork, a gap that stops the model from being written
         remains after the fills (a conduit with no cross-section, a node with no invert; every
-        such gap is listed), or a pump, wet well, dry-weather flow, pattern or fill rule is
-        invalid.
+        such gap is listed), a pump, wet well, pump station, dry-weather flow, pattern or fill
+        rule is invalid, a pipe is both pumped and part of a station's force main, a force main
+        has no roughness or is not circular, or an ideal pump is not the only outlet link of its
+        inlet node (SWMM's ERROR 134).
     """
     outfalls = outfall_types(outfalls, subnetwork)
     unknown = sorted(set(outfalls) - set(subnetwork.nodes))
@@ -797,6 +1079,18 @@ def build_model(
         raise ValueError(f"Outfalls not in the subnetwork: {', '.join(map(str, unknown))}")
     pumps = resolve_pumps(subnetwork, pumps)
     wet_wells = resolve_wet_wells(subnetwork, wet_wells, outfalls)
+    stations, station_pumps = resolve_pump_stations(subnetwork, pump_stations, outfalls)
+    both = sorted(str(n) for n, s in stations.items() if s.wet_well is not None and n in wet_wells)
+    if both:
+        raise ValueError(f"Wet wells given both in wet_wells and pump_stations: {', '.join(both)}")
+    wet_wells.update({n: s.wet_well for n, s in stations.items() if s.wet_well is not None})
+    chains = {first: chain for link in station_pumps for first, chain in link.force_mains.items()}
+    force_mains = {pipe for chain in chains.values() for pipe in chain}
+    both = sorted(str(p) for p in pumps if p in force_mains)
+    if both:
+        raise ValueError(
+            "Pipes both in pumps and in a pump station's force main: " + ", ".join(both)
+        )
     dwf = resolve_dwf(subnetwork, dwf, outfalls)
     patterns = resolve_patterns(patterns)
     dwf_patterns = resolve_dwf_patterns(dwf_patterns, dwf, patterns)
@@ -827,6 +1121,14 @@ def build_model(
         name: xsection(row)
         for name, row in zip(pipes["pipe_id"], pipes.to_dict("records"), strict=True)
     }
+    roughness_of = force_main_roughnesses(
+        pipes[pipes["pipe_id"].isin(list(force_mains))],
+        sections,
+        force_main_roughness,
+        force_main_roughness_by_pipe,
+    )
+    outlets = dict(zip(pipes["pipe_id"], pipes["to_node"], strict=True))
+    pressurised = {outlets[p] for chain in chains.values() for p in chain[:-1]}
     model = SwmmModel(data_gaps=filled.report)
 
     for node in subnetwork.nodes:
@@ -851,8 +1153,11 @@ def build_model(
                     invert,
                     max_depth,
                 )
+            surcharge = surcharge_depth
+            if node in pressurised:
+                surcharge = max(surcharge_depth, force_main_surcharge_depth)
             model.junctions.append(
-                Junction(node, invert, depth, init_depth, surcharge_depth, ponding_area)
+                Junction(node, invert, depth, init_depth, surcharge, ponding_area)
             )
 
     positions = subnetwork.node_positions()
@@ -862,9 +1167,31 @@ def build_model(
         else:
             logger.warning("Node %s has no position; it is left out of [COORDINATES]", node)
 
+    us_inverts = dict(zip(pipes["pipe_id"], pipes["us_invert"], strict=True))
+    discharge_of = {}
+    for link in station_pumps:
+        ends = [_invert(us_inverts[p]) for p in link.force_mains]
+        ends = [e for e in ends if e is not None]
+        inverts[link.discharge] = min(ends) if ends else inverts[link.station]
+        surcharge = max(surcharge_depth, force_main_surcharge_depth)
+        model.junctions.append(
+            Junction(
+                link.discharge,
+                inverts[link.discharge],
+                max_depth,
+                init_depth,
+                surcharge,
+                ponding_area,
+            )
+        )
+        if link.station in positions:
+            model.coordinates[link.discharge] = positions[link.station]
+        discharge_of.update(dict.fromkeys(link.force_mains, link.discharge))
+
     adverse = []
     for _, row in pipes.iterrows():
         name, inlet, outlet = row["pipe_id"], row["from_node"], row["to_node"]
+        inlet = discharge_of.get(name, inlet)
         interior = line_coords(row["geometry"])[1:-1]
         if interior:
             model.vertices[name] = interior
@@ -894,7 +1221,7 @@ def build_model(
                 offset = 0.0
             ends.append((offset, inverts[node] + offset))
         (inlet_offset, inlet_elev), (outlet_offset, outlet_elev) = ends
-        if outlet_elev > inlet_elev:
+        if outlet_elev > inlet_elev and name not in force_mains:
             adverse.append(f"{name} ({inlet} {inlet_elev:.3f} -> {outlet} {outlet_elev:.3f})")
 
         model.conduits.append(
@@ -910,7 +1237,42 @@ def build_model(
                 max_flow,
             )
         )
-        model.xsections.append(XSection(name, *sections[name], barrels))
+        if name in force_mains:
+            diameter = sections[name][1]
+            model.xsections.append(
+                XSection(name, "FORCE_MAIN", diameter, roughness_of[name], barrels)
+            )
+        else:
+            model.xsections.append(XSection(name, *sections[name], barrels))
+
+    for link in station_pumps:
+        pump = stations[link.station].pump
+        curve = "*" if pump.curve == "*" else f"{link.station}_curve"
+        model.pumps.append(
+            PumpLink(
+                link.name,
+                link.station,
+                link.discharge,
+                curve,
+                pump.status,
+                pump.startup,
+                pump.shutoff,
+            )
+        )
+        if curve != "*" and curve not in {c.name for c in model.curves}:
+            model.curves.append(Curve(curve, pump.curve_type, tuple(pump.curve)))
+
+    outlet_links = Counter(link.inlet for link in model.conduits + model.pumps)
+    lone = sorted(
+        f"{p.name} (inlet {p.inlet}, {outlet_links[p.inlet]} outlet links)"
+        for p in model.pumps
+        if p.curve == "*" and outlet_links[p.inlet] > 1
+    )
+    if lone:
+        raise ValueError(
+            "An ideal pump (curve '*') must be the only outlet link of its inlet node (SWMM "
+            f"ERROR 134); use a pump curve or drop the other outlets: {', '.join(lone)}"
+        )
 
     if adverse:
         warnings.warn(
@@ -949,9 +1311,10 @@ def write_inp(subnetwork, path, outfalls=None, template_path=None, dead_ends="ra
         The .inp template (default: :func:`default_template_path`, which uses FLOW_UNITS LPS).
         It must use an SI FLOW_UNITS (CMS, LPS or MLD) and only the placeholders in
         :data:`TEMPLATE_PLACEHOLDERS`; {storage}, {pumps} and {curves} are needed only with the
-        ``wet_wells`` and ``pumps`` options, and {dwf} and {patterns} only with ``dwf`` and
-        ``patterns``. The offsets are depths, so it should set
-        LINK_OFFSETS DEPTH (the default).
+        ``wet_wells``, ``pumps`` and ``pump_stations`` options, and {dwf} and {patterns} only with
+        ``dwf`` and ``patterns``. The offsets are depths, so it should set LINK_OFFSETS DEPTH
+        (the default). A ``force_main_roughness`` rule that declares an ``equation`` must match
+        its FORCE_MAIN_EQUATION (SWMM's default: H-W).
 
     dead_ends : {'raise', 'outfall'}
         What to do with nodes that have no outlet pipe and are not outfalls: raise a
@@ -969,6 +1332,9 @@ def write_inp(subnetwork, path, outfalls=None, template_path=None, dead_ends="ra
         raise ValueError("dead_ends must be 'raise' or 'outfall'.")
     template = read_template(template_path)
     check_template(template)
+    check_force_main_equation(
+        options.get("force_main_roughness"), template_force_main_equation(template)
+    )
 
     outfalls = outfall_types(outfalls, subnetwork)
     report = subnetwork.validate(outfalls)
@@ -991,7 +1357,7 @@ def write_inp(subnetwork, path, outfalls=None, template_path=None, dead_ends="ra
     if needed:
         raise ValueError(
             f"The template has no {', '.join(f'{{{n}}}' for n in needed)} placeholder, so the "
-            "pumps, wet wells, dry-weather flows or patterns would not be written."
+            "pumps, pump stations, wet wells, dry-weather flows or patterns would not be written."
         )
     if model.dwf:
         logger.info(

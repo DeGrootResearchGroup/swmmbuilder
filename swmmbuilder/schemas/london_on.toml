@@ -92,3 +92,10 @@ verified = "Verified"
 # Ch. 4, s. 4.8: force mains enter the gravity system not more than 200 mm above the flow line of
 # the receiving maintenance hole.
 max_height_above_receiving_invert = 0.2
+
+[design.force_main_roughness]
+# Ch. 4, s. 4.8: force-main Hazen-Williams C by diameter, regardless of material: 100-150 mm 100,
+# 200-250 mm 110, 300-600 mm 120, over 600 mm 130. Rows are (upper diameter in mm, C).
+equation = "H-W"
+by = "diameter"
+table = [[150, 100], [250, 110], [600, 120], [inf, 130]]

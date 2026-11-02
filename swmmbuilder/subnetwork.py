@@ -36,6 +36,17 @@ class TopologyReport:
     force_mains : list
         Sorted pipe IDs of the force mains (pressurised pipes downstream of a pump).
 
+    stations_without_force_main : list
+        Pump-station nodes with no force-main outlet pipe.
+
+    orphan_force_mains : list
+        Sorted pipe IDs of the force mains that start a chain (see
+        :meth:`Subnetwork.force_main_chain`) at a node that is not a pump station.
+
+    force_main_ends : dict
+        First pipe ID of a force-main chain -> (node, ``'force_main'`` or ``'dead_end'``), for the
+        chains that join another force main or end at a dead end.
+
     pipe_count_mismatches : dict
         Node -> {'pipes_in': (node layer, graph), 'pipes_out': (node layer, graph)}, for every node
         whose pipe counts in its node layer differ from those of the network's graph (only the
@@ -52,6 +63,9 @@ class TopologyReport:
     dead_end_types: dict = field(default_factory=dict)
     parallel_pipes: dict = field(default_factory=dict)
     force_mains: list = field(default_factory=list)
+    stations_without_force_main: list = field(default_factory=list)
+    orphan_force_mains: list = field(default_factory=list)
+    force_main_ends: dict = field(default_factory=dict)
     pipe_count_mismatches: dict = field(default_factory=dict)
     data_gaps: dict = field(default_factory=dict)
 
@@ -103,6 +117,7 @@ class Subnetwork:
             for up, down, key, attrs in network.graph.edges(nodes, keys=True, data=True)
             if down in selected
         )
+        self._ends = {pipe: (up, down) for up, down, pipe in self.graph.edges(keys=True)}
 
     @classmethod
     def from_node_list(cls, network, path):
@@ -153,6 +168,62 @@ class Subnetwork:
         :meth:`Network.to_geodataframe`."""
         return to_geodataframe(self.pipes(), self.network.nodes.loc[self.nodes], kind, values)
 
+    def _is_force_main(self, pipe):
+        up, down = self._ends[pipe]
+        return self.graph.edges[up, down, pipe].get("structure_type") == "force_main"
+
+    def force_main_outlets(self, node):
+        """Sorted pipe IDs of the force mains leaving ``node``."""
+        return sorted(
+            pipe
+            for _, _, pipe, structure in self.graph.out_edges(
+                node, keys=True, data="structure_type"
+            )
+            if structure == "force_main"
+        )
+
+    def force_main_chain(self, pipe, outfalls=None):
+        """The force main that starts with ``pipe``, followed downstream.
+
+        A force main is often a chain of several GIS pipes. The chain continues through every node
+        whose only outlet pipe is a force main, and stops where it joins another force main.
+
+        Parameters
+        ----------
+        pipe : pipe ID
+            The first pipe of the chain.
+
+        outfalls : iterable of str, optional
+            The outfall nodes (default: :attr:`outfalls`).
+
+        Returns
+        ----------
+        pipes : list
+            The pipe IDs of the chain, in flow order.
+
+        end : str
+            The node where the chain ends.
+
+        problem : str or None
+            ``'force_main'`` if the chain joins another force main (a node with more than one
+            force main entering it), ``'dead_end'`` if it ends at a node with no outlet that is not
+            an outfall, else None.
+        """
+        outfalls = set(self.outfalls if outfalls is None else outfalls)
+        pipes = [pipe]
+        node = self._ends[pipe][1]
+        while True:
+            entering = [p for _, _, p in self.graph.in_edges(node, keys=True)]
+            if sum(self._is_force_main(p) for p in entering) > 1:
+                return pipes, node, "force_main"
+            outlets = [p for _, _, p in self.graph.out_edges(node, keys=True)]
+            if not outlets and node not in outfalls:
+                return pipes, node, "dead_end"
+            if len(outlets) != 1 or not self._is_force_main(outlets[0]) or outlets[0] in pipes:
+                return pipes, node, None
+            pipes.append(outlets[0])
+            node = self._ends[outlets[0]][1]
+
     def validate(self, outfalls=None):
         """Check the topology before the subnetwork is written to an .inp file.
 
@@ -165,9 +236,10 @@ class Subnetwork:
         ----------
         TopologyReport
             Flow splits, cycles, dead ends (classified by node type) and parallel pipes, plus the
-            force mains, the nodes whose recorded pipe counts differ from the graph and the counts
-            of gaps in the data. Splits and cycles are only allowed with dynamic-wave routing;
-            dead ends are never valid.
+            force mains (with the pump stations that have none, the force mains that start at no
+            pump station and the chains that end badly), the nodes whose recorded pipe counts
+            differ from the graph and the counts of gaps in the data. Splits and cycles are only
+            allowed with dynamic-wave routing; dead ends are never valid.
         """
         outfalls = set(self.outfalls if outfalls is None else outfalls)
         report = TopologyReport()
@@ -200,6 +272,20 @@ class Subnetwork:
             for _, _, pipe, structure in self.graph.edges(keys=True, data="structure_type")
             if structure == "force_main"
         )
+        stations = {n for n, t in self.graph.nodes(data="node_type") if t == "pump_station"}
+        report.stations_without_force_main = sorted(
+            n for n in stations if not self.force_main_outlets(n)
+        )
+        for pipe in report.force_mains:
+            up = self._ends[pipe][0]
+            entering = [p for _, _, p in self.graph.in_edges(up, keys=True)]
+            if up not in stations and any(self._is_force_main(p) for p in entering):
+                continue  # inside a chain, not its start
+            if up not in stations:
+                report.orphan_force_mains.append(pipe)
+            _, end, problem = self.force_main_chain(pipe, outfalls)
+            if problem is not None:
+                report.force_main_ends[pipe] = (end, problem)
 
         full = self.network.graph
         for node, attrs in self.graph.nodes(data=True):

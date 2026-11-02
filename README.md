@@ -71,7 +71,9 @@ sub.to_inp("model.inp")  # outfalls default to the outfall nodes of the subnetwo
   and those passed to `catchment`, `subnetwork` and `Subnetwork.from_node_list`.
 - **Validation.** `TopologyReport` also has `dead_end_types`, `force_mains`, and
   `pipe_count_mismatches`: maintenance holes whose recorded `pipes_in`/`pipes_out` differ from
-  the network's graph.
+  the network's graph. For pumping stations it lists `stations_without_force_main`,
+  `orphan_force_mains` (force mains that start at no pump station) and `force_main_ends`
+  (force-main chains that join another force main or end at a dead end).
 - **Maintenance-hole attributes.** `rim_elevation` is the layer's (London: `LidElevation`, or
   `HeadwallElevation` for outfalls), else `invert + depth`; rims outside the schema's
   `rim_range` (London: 150–350 m) are treated as missing. The `.inp` writer uses rim − invert
@@ -278,6 +280,55 @@ shipped template) and x set by `curve_type`: `PUMP1` wet well volume (m³; the i
 well), `PUMP2`/`PUMP4` inlet depth (m), `PUMP3`/`PUMP5` head (m). `curve="*"` is an ideal pump.
 `status` (`ON`/`OFF`), `startup` and `shutoff` (inlet depths, m) are optional. `Pump` and `WetWell`
 objects can be passed instead of dicts.
+
+An ideal pump must be the only outlet link of its inlet node (SWMM refuses it otherwise, with
+ERROR 134), so a station with an overflow needs a pump curve.
+
+### Pumping stations with force mains
+
+`pumps=` replaces a pipe with a pump, which suits a short lift. For a pumping station with a
+force main, use `pump_stations=`, keyed by the station node, so that the force main keeps its
+length and volume (and so its travel time):
+
+```python
+from swmmbuilder import LONDON_ON, PumpStation
+
+sub.to_inp(
+    "model.inp",
+    pump_stations={"SL6001": PumpStation(
+        pump=dict(curve=[(0.0, 120.0)], curve_type="PUMP2", startup=1.5, shutoff=0.5),
+        wet_well=dict(max_depth=4.0, area=12.0),
+    )},
+    force_main_roughness=LONDON_ON.design["force_main_roughness"],
+)
+```
+
+For each station the writer adds a discharge node `<node>_D` at the station, with the invert of
+the force main's upstream end, and a pump `<node>_P` from the station node (a wet well if one is
+given, else a junction) to it. The force-main pipes leaving the station (`StructureType` `FM` in
+London), followed downstream through every node whose only outlet is a force main
+(`Subnetwork.force_main_chain`), start at `<node>_D` and stay conduits with their GIS lengths and a
+`FORCE_MAIN` cross-section; their interior nodes and `<node>_D` get `force_main_surcharge_depth`
+(default 100 m) so that the main can run pressurised under `DYNWAVE`. Other outlets of the
+station, such as overflows, stay conduits (`include_overflows=False` drops them).
+
+- **Pump operation.** There is no default pump. An ideal pump (`curve="*"`) approximates a
+  variable-speed station that delivers a near-uniform flow; a curve with `startup`/`shutoff`
+  depths (e.g. `PUMP2`) a fixed-speed station whose on/off cycling pulses the force-main flow.
+- **Twin force mains.** `force_mains=` picks the force mains to pump into (the others are written
+  as ordinary conduits, with a warning). With more than one, `discharge="shared"` writes one pump
+  feeding them all and `discharge="separate"` one pump each (`<node>_P1`, `<node>_D1`, ...);
+  without it the writer refuses.
+- **Roughness.** `force_main_roughness` is required and is read by SWMM according to the
+  template's `FORCE_MAIN_EQUATION` (Hazen–Williams C for `H-W`, the shipped template; roughness
+  height in mm for `D-W`). It is a constant, `{"by": "diameter", "table": [(upper_mm, value),
+  ...]}`, `{"by": "material", "table": {material: value}}` or a callable `pipe -> value`; a dict
+  may declare `"equation"`, and a template with another equation is refused.
+  `force_main_roughness_by_pipe={pipe_id: value}` overrides the rule. Schemas carry design-rule
+  presets, never applied unless passed: `LONDON_ON.design["force_main_roughness"]` is London's
+  C by diameter (Design Specifications & Requirements Manual, s. 4.8).
+- A pipe in both `pumps` and a station's force main, a station with no force-main outlet, and a
+  wet well given both in `wet_wells` and a station are errors.
 
 ## Dry-weather flow
 

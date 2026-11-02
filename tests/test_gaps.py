@@ -222,7 +222,7 @@ def test_force_main_discharge_rule():
 
 
 def test_london_design_table():
-    assert LONDON_ON.design == {"force_main_discharge": {"max_height_above_receiving_invert": 0.2}}
+    assert LONDON_ON.design["force_main_discharge"] == {"max_height_above_receiving_invert": 0.2}
     with pytest.raises(ValueError, match="unknown design rules"):
         Schema(name="x", columns=LONDON_ON.columns, design={"min_slope": 0.01})
 
