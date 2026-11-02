@@ -12,7 +12,39 @@ dependencies = [
   "networkx",
   "matplotlib",
   "pyswmm",
+  "gmplot",
+  "setuptools<81",
+]
+
+[project.optional-dependencies]
+# `lint` pins the linter (same series as aquakin) so a new ruff release cannot turn the gate red
+# without a deliberate bump.
+lint = ["ruff>=0.15,<0.16"]
+test = [
+  "pytest>=7",
+  "pytest-timeout>=2",
+  "pytest-cov>=5",
 ]
 
 [tool.setuptools]
 packages = ["sewernetworkx"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = [".", "tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+#   E,W  pycodestyle   F  pyflakes   I  isort   B  flake8-bugbear   RUF  ruff-specific   UP  pyupgrade
+select = ["E", "F", "W", "I", "B", "RUF", "UP"]
+ignore = [
+    # `ruff format` owns line width; what it can't split (strings, URLs) is noise.
+    "E501",
+    # --- deferred to the open issues that rewrite this code (remove the ignore in that PR) ---
+    "B007",    # unused `index` from GeoDataFrame.iterrows loops           -> #2 / #7
+    "RUF015",  # list(self.coords.items())[0] in generate_gmap              -> #5
+    "RUF005",  # list concatenation in tests
+]
