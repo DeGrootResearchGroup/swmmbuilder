@@ -1,0 +1,1261 @@
+{
+ "type": "FeatureCollection",
+ "features": [
+  {
+   "type": "Feature",
+   "properties": {
+    "OBJECTID": 1000,
+    "GIS_ID": 2000,
+    "GIS_FeatureKey": "2000",
+    "FlowType": "SAN",
+    "StreetName": "Test St.",
+    "Location": "Road",
+    "UpstreamID": "A1",
+    "DownstreamID": "A2",
+    "Length": 80.0,
+    "PipeShape": "R",
+    "Height": 200,
+    "Width": 200,
+    "Material": "PVC",
+    "MaterialClass": "",
+    "UpstreamInvert": 105.0,
+    "DownstreamInvert": 104.5,
+    "DropStructureInvert": 0.0,
+    "Slope": 0.62,
+    "AverageDepth": 2.5,
+    "MaximumDepth": 3.0,
+    "PDC_Count": 0.0,
+    "ConstructionDate": "2000-01-01T00:00:00Z",
+    "Ownership": "CITY",
+    "Assumed": 1,
+    "Combined": 0,
+    "Relief": 0,
+    "Trunk": 0,
+    "LastEditDate": "2022-01-01T00:00:00Z",
+    "Abandoned": 0,
+    "Grouted": 0,
+    "Diameter": 200,
+    "CCTVInspectionDate": null,
+    "ShapeSTLength": 80.0
+   },
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -81.3,
+      42.983999999999995
+     ],
+     [
+      -81.2995,
+      42.984199999999994
+     ],
+     [
+      -81.29899999999999,
+      42.983999999999995
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "OBJECTID": 1001,
+    "GIS_ID": 2001,
+    "GIS_FeatureKey": "2001",
+    "FlowType": "SAN",
+    "StreetName": "Test St.",
+    "Location": "Road",
+    "UpstreamID": "A2",
+    "DownstreamID": "J1",
+    "Length": 60.0,
+    "PipeShape": "R",
+    "Height": 250,
+    "Width": 250,
+    "Material": "PVC",
+    "MaterialClass": "",
+    "UpstreamInvert": 104.4,
+    "DownstreamInvert": 104.0,
+    "DropStructureInvert": 0.0,
+    "Slope": 0.67,
+    "AverageDepth": 2.5,
+    "MaximumDepth": 3.0,
+    "PDC_Count": 0.0,
+    "ConstructionDate": "2000-01-01T00:00:00Z",
+    "Ownership": "CITY",
+    "Assumed": 1,
+    "Combined": 0,
+    "Relief": 0,
+    "Trunk": 0,
+    "LastEditDate": "2022-01-01T00:00:00Z",
+    "Abandoned": 0,
+    "Grouted": 0,
+    "Diameter": 250,
+    "CCTVInspectionDate": null,
+    "ShapeSTLength": 60.0
+   },
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -81.29899999999999,
+      42.983999999999995
+     ],
+     [
+      -81.298,
+      42.983
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "OBJECTID": 1002,
+    "GIS_ID": 2002,
+    "GIS_FeatureKey": "2002",
+    "FlowType": "SAN",
+    "StreetName": "Test St.",
+    "Location": "Road",
+    "UpstreamID": "B1",
+    "DownstreamID": "B2",
+    "Length": 70.0,
+    "PipeShape": "Round",
+    "Height": 200,
+    "Width": 200,
+    "Material": "PVC",
+    "MaterialClass": "",
+    "UpstreamInvert": 104.8,
+    "DownstreamInvert": 104.3,
+    "DropStructureInvert": 0.0,
+    "Slope": 0.71,
+    "AverageDepth": 2.5,
+    "MaximumDepth": 3.0,
+    "PDC_Count": 0.0,
+    "ConstructionDate": "2000-01-01T00:00:00Z",
+    "Ownership": "CITY",
+    "Assumed": 1,
+    "Combined": 0,
+    "Relief": 0,
+    "Trunk": 0,
+    "LastEditDate": "2022-01-01T00:00:00Z",
+    "Abandoned": 0,
+    "Grouted": 0,
+    "Diameter": 200,
+    "CCTVInspectionDate": null,
+    "ShapeSTLength": 70.0
+   },
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -81.3,
+      42.982
+     ],
+     [
+      -81.29899999999999,
+      42.982499999999995
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "OBJECTID": 1003,
+    "GIS_ID": 2003,
+    "GIS_FeatureKey": "2003",
+    "FlowType": "SAN",
+    "StreetName": "Test St.",
+    "Location": "Road",
+    "UpstreamID": "B2",
+    "DownstreamID": "J1",
+    "Length": 50.0,
+    "PipeShape": "REC",
+    "Height": 300,
+    "Width": 450,
+    "Material": "CONC",
+    "MaterialClass": "",
+    "UpstreamInvert": 104.2,
+    "DownstreamInvert": 103.95,
+    "DropStructureInvert": 0.0,
+    "Slope": 0.5,
+    "AverageDepth": 2.5,
+    "MaximumDepth": 3.0,
+    "PDC_Count": 0.0,
+    "ConstructionDate": "2000-01-01T00:00:00Z",
+    "Ownership": "CITY",
+    "Assumed": 1,
+    "Combined": 0,
+    "Relief": 0,
+    "Trunk": 1,
+    "LastEditDate": "2022-01-01T00:00:00Z",
+    "Abandoned": 0,
+    "Grouted": 0,
+    "Diameter": 450,
+    "CCTVInspectionDate": null,
+    "ShapeSTLength": 50.0
+   },
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -81.29899999999999,
+      42.982499999999995
+     ],
+     [
+      -81.2985,
+      42.982949999999995
+     ],
+     [
+      -81.298,
+      42.983
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "OBJECTID": 1004,
+    "GIS_ID": 2004,
+    "GIS_FeatureKey": "2004",
+    "FlowType": "SAN",
+    "StreetName": "Test St.",
+    "Location": "Road",
+    "UpstreamID": "C1",
+    "DownstreamID": "J1",
+    "Length": 40.0,
+    "PipeShape": "R",
+    "Height": 200,
+    "Width": 200,
+    "Material": "PVC",
+    "MaterialClass": "",
+    "UpstreamInvert": 106.0,
+    "DownstreamInvert": 105.5,
+    "DropStructureInvert": 103.98,
+    "Slope": 1.25,
+    "AverageDepth": 2.5,
+    "MaximumDepth": 3.0,
+    "PDC_Count": 0.0,
+    "ConstructionDate": "2000-01-01T00:00:00Z",
+    "Ownership": "CITY",
+    "Assumed": 1,
+    "Combined": 0,
+    "Relief": 0,
+    "Trunk": 0,
+    "LastEditDate": "2022-01-01T00:00:00Z",
+    "Abandoned": 0,
+    "Grouted": 0,
+    "Diameter": 200,
+    "CCTVInspectionDate": null,
+    "ShapeSTLength": 40.0
+   },
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -81.298,
+      42.985
+     ],
+     [
+      -81.298,
+      42.983
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "OBJECTID": 1005,
+    "GIS_ID": 2005,
+    "GIS_FeatureKey": "2005",
+    "FlowType": "SAN",
+    "StreetName": "Test St.",
+    "Location": "Road",
+    "UpstreamID": "J2",
+    "DownstreamID": "OV1",
+    "Length": 15.0,
+    "PipeShape": "R",
+    "Height": 300,
+    "Width": 300,
+    "Material": "CONC",
+    "MaterialClass": "",
+    "UpstreamInvert": 104.6,
+    "DownstreamInvert": 104.55,
+    "DropStructureInvert": 0.0,
+    "Slope": 0.33,
+    "AverageDepth": 2.5,
+    "MaximumDepth": 3.0,
+    "PDC_Count": 0.0,
+    "ConstructionDate": "2000-01-01T00:00:00Z",
+    "Ownership": "CITY",
+    "Assumed": 1,
+    "Combined": 0,
+    "Relief": 0,
+    "Trunk": 0,
+    "LastEditDate": "2022-01-01T00:00:00Z",
+    "Abandoned": 0,
+    "Grouted": 0,
+    "Diameter": 300,
+    "CCTVInspectionDate": null,
+    "ShapeSTLength": 15.0
+   },
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -81.297,
+      42.982
+     ],
+     [
+      -81.29599999999999,
+      42.983
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "OBJECTID": 1006,
+    "GIS_ID": 2006,
+    "GIS_FeatureKey": "2006",
+    "FlowType": "SAN",
+    "StreetName": "Test St.",
+    "Location": "Road",
+    "UpstreamID": "J1",
+    "DownstreamID": "J2",
+    "Length": 90.0,
+    "PipeShape": "EGG",
+    "Height": 600,
+    "Width": 400,
+    "Material": "BRCK",
+    "MaterialClass": "",
+    "UpstreamInvert": 103.9,
+    "DownstreamInvert": 103.6,
+    "DropStructureInvert": 0.0,
+    "Slope": 0.33,
+    "AverageDepth": 2.5,
+    "MaximumDepth": 3.0,
+    "PDC_Count": 0.0,
+    "ConstructionDate": "2000-01-01T00:00:00Z",
+    "Ownership": "CITY",
+    "Assumed": 1,
+    "Combined": 0,
+    "Relief": 0,
+    "Trunk": 1,
+    "LastEditDate": "2022-01-01T00:00:00Z",
+    "Abandoned": 0,
+    "Grouted": 0,
+    "Diameter": 490,
+    "CCTVInspectionDate": null,
+    "ShapeSTLength": 90.0
+   },
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -81.298,
+      42.983
+     ],
+     [
+      -81.2975,
+      42.982699999999994
+     ],
+     [
+      -81.297,
+      42.982
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "OBJECTID": 1007,
+    "GIS_ID": 2007,
+    "GIS_FeatureKey": "2007",
+    "FlowType": "SAN",
+    "StreetName": "Test St.",
+    "Location": "Road",
+    "UpstreamID": "J1",
+    "DownstreamID": "J2",
+    "Length": 90.0,
+    "PipeShape": "R",
+    "Height": 300,
+    "Width": 300,
+    "Material": "CONC",
+    "MaterialClass": "",
+    "UpstreamInvert": 103.9,
+    "DownstreamInvert": 103.6,
+    "DropStructureInvert": 0.0,
+    "Slope": 0.33,
+    "AverageDepth": 2.5,
+    "MaximumDepth": 3.0,
+    "PDC_Count": 0.0,
+    "ConstructionDate": "2000-01-01T00:00:00Z",
+    "Ownership": "CITY",
+    "Assumed": 1,
+    "Combined": 0,
+    "Relief": 0,
+    "Trunk": 0,
+    "LastEditDate": "2022-01-01T00:00:00Z",
+    "Abandoned": 0,
+    "Grouted": 0,
+    "Diameter": 300,
+    "CCTVInspectionDate": null,
+    "ShapeSTLength": 90.0
+   },
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -81.298,
+      42.983
+     ],
+     [
+      -81.297,
+      42.982
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "OBJECTID": 1008,
+    "GIS_ID": 2008,
+    "GIS_FeatureKey": "2008",
+    "FlowType": "SAN",
+    "StreetName": "Test St.",
+    "Location": "Road",
+    "UpstreamID": "J2",
+    "DownstreamID": "OUT",
+    "Length": 40.0,
+    "PipeShape": "R",
+    "Height": 600,
+    "Width": 600,
+    "Material": "CONC",
+    "MaterialClass": "",
+    "UpstreamInvert": 103.5,
+    "DownstreamInvert": 103.3,
+    "DropStructureInvert": 0.0,
+    "Slope": 0.5,
+    "AverageDepth": 2.5,
+    "MaximumDepth": 3.0,
+    "PDC_Count": 0.0,
+    "ConstructionDate": "2000-01-01T00:00:00Z",
+    "Ownership": "CITY",
+    "Assumed": 1,
+    "Combined": 0,
+    "Relief": 0,
+    "Trunk": 1,
+    "LastEditDate": "2022-01-01T00:00:00Z",
+    "Abandoned": 0,
+    "Grouted": 0,
+    "Diameter": 600,
+    "CCTVInspectionDate": null,
+    "ShapeSTLength": 40.0
+   },
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -81.297,
+      42.982
+     ],
+     [
+      -81.29599999999999,
+      42.980999999999995
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "OBJECTID": 1009,
+    "GIS_ID": 2009,
+    "GIS_FeatureKey": "2009",
+    "FlowType": "SAN",
+    "StreetName": "Test St.",
+    "Location": "Road",
+    "UpstreamID": "OV1",
+    "DownstreamID": "OV2",
+    "Length": 10.0,
+    "PipeShape": "R",
+    "Height": 300,
+    "Width": 300,
+    "Material": "CONC",
+    "MaterialClass": "",
+    "UpstreamInvert": 104.5,
+    "DownstreamInvert": 104.4,
+    "DropStructureInvert": 0.0,
+    "Slope": 1.0,
+    "AverageDepth": 2.5,
+    "MaximumDepth": 3.0,
+    "PDC_Count": 0.0,
+    "ConstructionDate": "2000-01-01T00:00:00Z",
+    "Ownership": "CITY",
+    "Assumed": 1,
+    "Combined": 0,
+    "Relief": 0,
+    "Trunk": 0,
+    "LastEditDate": "2022-01-01T00:00:00Z",
+    "Abandoned": 0,
+    "Grouted": 0,
+    "Diameter": 300,
+    "CCTVInspectionDate": null,
+    "ShapeSTLength": 10.0
+   },
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -81.29599999999999,
+      42.983
+     ],
+     [
+      -81.2955,
+      42.98345
+     ],
+     [
+      -81.295,
+      42.9835
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "OBJECTID": 1010,
+    "GIS_ID": 2010,
+    "GIS_FeatureKey": "2010",
+    "FlowType": "SAN",
+    "StreetName": "Test St.",
+    "Location": "Road",
+    "UpstreamID": "D1",
+    "DownstreamID": "D2",
+    "Length": 30.0,
+    "PipeShape": "R",
+    "Height": 200,
+    "Width": 200,
+    "Material": "PVC",
+    "MaterialClass": "",
+    "UpstreamInvert": 103.8,
+    "DownstreamInvert": 104.1,
+    "DropStructureInvert": 0.0,
+    "Slope": -1.0,
+    "AverageDepth": 2.5,
+    "MaximumDepth": 3.0,
+    "PDC_Count": 0.0,
+    "ConstructionDate": "2000-01-01T00:00:00Z",
+    "Ownership": "CITY",
+    "Assumed": 1,
+    "Combined": 0,
+    "Relief": 0,
+    "Trunk": 0,
+    "LastEditDate": "2022-01-01T00:00:00Z",
+    "Abandoned": 0,
+    "Grouted": 0,
+    "Diameter": 200,
+    "CCTVInspectionDate": null,
+    "ShapeSTLength": 30.0
+   },
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -81.298,
+      42.98
+     ],
+     [
+      -81.2975,
+      42.980999999999995
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "OBJECTID": 1011,
+    "GIS_ID": 2011,
+    "GIS_FeatureKey": "2011",
+    "FlowType": "SAN",
+    "StreetName": "Test St.",
+    "Location": "Road",
+    "UpstreamID": "D2",
+    "DownstreamID": "J2",
+    "Length": 30.0,
+    "PipeShape": "R",
+    "Height": 200,
+    "Width": 200,
+    "Material": "PVC",
+    "MaterialClass": "",
+    "UpstreamInvert": 104.0,
+    "DownstreamInvert": 103.7,
+    "DropStructureInvert": 0.0,
+    "Slope": 1.0,
+    "AverageDepth": 2.5,
+    "MaximumDepth": 3.0,
+    "PDC_Count": 0.0,
+    "ConstructionDate": "2000-01-01T00:00:00Z",
+    "Ownership": "CITY",
+    "Assumed": 1,
+    "Combined": 0,
+    "Relief": 0,
+    "Trunk": 0,
+    "LastEditDate": "2022-01-01T00:00:00Z",
+    "Abandoned": 0,
+    "Grouted": 0,
+    "Diameter": 200,
+    "CCTVInspectionDate": null,
+    "ShapeSTLength": 30.0
+   },
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -81.2975,
+      42.980999999999995
+     ],
+     [
+      -81.297,
+      42.982
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "OBJECTID": 1012,
+    "GIS_ID": 2012,
+    "GIS_FeatureKey": "2012",
+    "FlowType": "SAN",
+    "StreetName": "Test St.",
+    "Location": "Road",
+    "UpstreamID": "E1",
+    "DownstreamID": "J2",
+    "Length": 25.0,
+    "PipeShape": "",
+    "Height": null,
+    "Width": 0,
+    "Material": "",
+    "MaterialClass": "",
+    "UpstreamInvert": 104.3,
+    "DownstreamInvert": 103.8,
+    "DropStructureInvert": 0.0,
+    "Slope": 2.0,
+    "AverageDepth": 2.5,
+    "MaximumDepth": 3.0,
+    "PDC_Count": 0.0,
+    "ConstructionDate": "2000-01-01T00:00:00Z",
+    "Ownership": "CITY",
+    "Assumed": 1,
+    "Combined": 0,
+    "Relief": 0,
+    "Trunk": 0,
+    "LastEditDate": "2022-01-01T00:00:00Z",
+    "Abandoned": 0,
+    "Grouted": 0,
+    "Diameter": 200,
+    "CCTVInspectionDate": null,
+    "ShapeSTLength": 25.0
+   },
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -81.297,
+      42.9805
+     ],
+     [
+      -81.297,
+      42.981449999999995
+     ],
+     [
+      -81.297,
+      42.982
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "OBJECTID": 1013,
+    "GIS_ID": 2013,
+    "GIS_FeatureKey": "2013",
+    "FlowType": "SAN",
+    "StreetName": "Test St.",
+    "Location": "Road",
+    "UpstreamID": "X1",
+    "DownstreamID": "A2",
+    "Length": 30.0,
+    "PipeShape": "R",
+    "Height": 200,
+    "Width": 200,
+    "Material": "AC",
+    "MaterialClass": "",
+    "UpstreamInvert": 105.2,
+    "DownstreamInvert": 104.6,
+    "DropStructureInvert": 0.0,
+    "Slope": 2.0,
+    "AverageDepth": 2.5,
+    "MaximumDepth": 3.0,
+    "PDC_Count": 0.0,
+    "ConstructionDate": "2000-01-01T00:00:00Z",
+    "Ownership": "CITY",
+    "Assumed": 1,
+    "Combined": 0,
+    "Relief": 0,
+    "Trunk": 0,
+    "LastEditDate": "2022-01-01T00:00:00Z",
+    "Abandoned": 1,
+    "Grouted": 0,
+    "Diameter": 200,
+    "CCTVInspectionDate": null,
+    "ShapeSTLength": 30.0
+   },
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -81.2995,
+      42.985
+     ],
+     [
+      -81.29899999999999,
+      42.983999999999995
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "OBJECTID": 1014,
+    "GIS_ID": 2014,
+    "GIS_FeatureKey": "2014",
+    "FlowType": "SAN",
+    "StreetName": "Test St.",
+    "Location": "Road",
+    "UpstreamID": "Abandoned",
+    "DownstreamID": "A1",
+    "Length": 30.0,
+    "PipeShape": "R",
+    "Height": 200,
+    "Width": 200,
+    "Material": "AC",
+    "MaterialClass": "",
+    "UpstreamInvert": 105.5,
+    "DownstreamInvert": 105.1,
+    "DropStructureInvert": 0.0,
+    "Slope": 1.33,
+    "AverageDepth": 2.5,
+    "MaximumDepth": 3.0,
+    "PDC_Count": 0.0,
+    "ConstructionDate": "2000-01-01T00:00:00Z",
+    "Ownership": "CITY",
+    "Assumed": 1,
+    "Combined": 0,
+    "Relief": 0,
+    "Trunk": 0,
+    "LastEditDate": "2022-01-01T00:00:00Z",
+    "Abandoned": 0,
+    "Grouted": 0,
+    "Diameter": 200,
+    "CCTVInspectionDate": null,
+    "ShapeSTLength": 30.0
+   },
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -81.301,
+      42.9845
+     ],
+     [
+      -81.3,
+      42.983999999999995
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "OBJECTID": 1015,
+    "GIS_ID": 2015,
+    "GIS_FeatureKey": "2015",
+    "FlowType": "STM",
+    "StreetName": "Test St.",
+    "Location": "Road",
+    "UpstreamID": "S1",
+    "DownstreamID": "S2",
+    "Length": 50.0,
+    "PipeShape": "R",
+    "Height": 300,
+    "Width": 300,
+    "Material": "CONC",
+    "MaterialClass": "",
+    "UpstreamInvert": 104.0,
+    "DownstreamInvert": 103.5,
+    "DropStructureInvert": 0.0,
+    "Slope": 1.0,
+    "AverageDepth": 2.5,
+    "MaximumDepth": 3.0,
+    "PDC_Count": 0.0,
+    "ConstructionDate": "2000-01-01T00:00:00Z",
+    "Ownership": "CITY",
+    "Assumed": 1,
+    "Combined": 0,
+    "Relief": 0,
+    "Trunk": 0,
+    "LastEditDate": "2022-01-01T00:00:00Z",
+    "Abandoned": 0,
+    "Grouted": 0,
+    "Diameter": 300,
+    "CCTVInspectionDate": null,
+    "ShapeSTLength": 50.0
+   },
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -81.295,
+      42.985
+     ],
+     [
+      -81.2945,
+      42.9852
+     ],
+     [
+      -81.294,
+      42.985
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "OBJECTID": 1016,
+    "GIS_ID": 2016,
+    "GIS_FeatureKey": "2016",
+    "FlowType": "SAN",
+    "StreetName": "Test St.",
+    "Location": "Road",
+    "UpstreamID": "F1",
+    "DownstreamID": "A1",
+    "Length": 40.0,
+    "PipeShape": "R",
+    "Height": 200,
+    "Width": 200,
+    "Material": "PVC",
+    "MaterialClass": "",
+    "UpstreamInvert": 105.6,
+    "DownstreamInvert": 105.1,
+    "DropStructureInvert": 0.0,
+    "Slope": 1.25,
+    "AverageDepth": 2.5,
+    "MaximumDepth": 3.0,
+    "PDC_Count": 0.0,
+    "ConstructionDate": "2000-01-01T00:00:00Z",
+    "Ownership": "CITY",
+    "Assumed": 1,
+    "Combined": 0,
+    "Relief": 0,
+    "Trunk": 0,
+    "LastEditDate": "2022-01-01T00:00:00Z",
+    "Abandoned": 0,
+    "Grouted": 0,
+    "Diameter": 200,
+    "CCTVInspectionDate": null,
+    "ShapeSTLength": 40.0
+   },
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -81.301,
+      42.986
+     ],
+     [
+      -81.3,
+      42.983999999999995
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "OBJECTID": 1017,
+    "GIS_ID": 2017,
+    "GIS_FeatureKey": "2017",
+    "FlowType": "SAN",
+    "StreetName": "Test St.",
+    "Location": "Road",
+    "UpstreamID": "F2",
+    "DownstreamID": "A1",
+    "Length": 40.0,
+    "PipeShape": "R",
+    "Height": 200,
+    "Width": 200,
+    "Material": "PVC",
+    "MaterialClass": "",
+    "UpstreamInvert": 105.5,
+    "DownstreamInvert": 105.1,
+    "DropStructureInvert": 0.0,
+    "Slope": 1.0,
+    "AverageDepth": 2.5,
+    "MaximumDepth": 3.0,
+    "PDC_Count": 0.0,
+    "ConstructionDate": "2000-01-01T00:00:00Z",
+    "Ownership": "CITY",
+    "Assumed": 1,
+    "Combined": 0,
+    "Relief": 0,
+    "Trunk": 0,
+    "LastEditDate": "2022-01-01T00:00:00Z",
+    "Abandoned": 0,
+    "Grouted": 0,
+    "Diameter": 200,
+    "CCTVInspectionDate": null,
+    "ShapeSTLength": 40.0
+   },
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -81.301,
+      42.985499999999995
+     ],
+     [
+      -81.3,
+      42.983999999999995
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "OBJECTID": 1018,
+    "GIS_ID": 2018,
+    "GIS_FeatureKey": "2018",
+    "FlowType": "SAN",
+    "StreetName": "Test St.",
+    "Location": "Road",
+    "UpstreamID": "F3",
+    "DownstreamID": "F1",
+    "Length": 40.0,
+    "PipeShape": "R",
+    "Height": 200,
+    "Width": 200,
+    "Material": "PVC",
+    "MaterialClass": "",
+    "UpstreamInvert": 106.0,
+    "DownstreamInvert": 105.7,
+    "DropStructureInvert": 0.0,
+    "Slope": 0.75,
+    "AverageDepth": 2.5,
+    "MaximumDepth": 3.0,
+    "PDC_Count": 0.0,
+    "ConstructionDate": "2000-01-01T00:00:00Z",
+    "Ownership": "CITY",
+    "Assumed": 1,
+    "Combined": 0,
+    "Relief": 0,
+    "Trunk": 0,
+    "LastEditDate": "2022-01-01T00:00:00Z",
+    "Abandoned": 0,
+    "Grouted": 0,
+    "Diameter": 200,
+    "CCTVInspectionDate": null,
+    "ShapeSTLength": 40.0
+   },
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -81.30199999999999,
+      42.986
+     ],
+     [
+      -81.30149999999999,
+      42.9862
+     ],
+     [
+      -81.301,
+      42.986
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "OBJECTID": 1019,
+    "GIS_ID": 2019,
+    "GIS_FeatureKey": "2019",
+    "FlowType": "SAN",
+    "StreetName": "Test St.",
+    "Location": "Road",
+    "UpstreamID": "F4",
+    "DownstreamID": "F2",
+    "Length": 40.0,
+    "PipeShape": "R",
+    "Height": 200,
+    "Width": 200,
+    "Material": "PVC",
+    "MaterialClass": "",
+    "UpstreamInvert": 106.0,
+    "DownstreamInvert": 105.6,
+    "DropStructureInvert": 0.0,
+    "Slope": 1.0,
+    "AverageDepth": 2.5,
+    "MaximumDepth": 3.0,
+    "PDC_Count": 0.0,
+    "ConstructionDate": "2000-01-01T00:00:00Z",
+    "Ownership": "CITY",
+    "Assumed": 1,
+    "Combined": 0,
+    "Relief": 0,
+    "Trunk": 0,
+    "LastEditDate": "2022-01-01T00:00:00Z",
+    "Abandoned": 0,
+    "Grouted": 0,
+    "Diameter": 200,
+    "CCTVInspectionDate": null,
+    "ShapeSTLength": 40.0
+   },
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -81.30199999999999,
+      42.985
+     ],
+     [
+      -81.301,
+      42.985499999999995
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "OBJECTID": 1020,
+    "GIS_ID": 2020,
+    "GIS_FeatureKey": "2020",
+    "FlowType": "SAN",
+    "StreetName": "Test St.",
+    "Location": "Road",
+    "UpstreamID": "G1",
+    "DownstreamID": "B1",
+    "Length": 40.0,
+    "PipeShape": "R",
+    "Height": 200,
+    "Width": 200,
+    "Material": "PVC",
+    "MaterialClass": "",
+    "UpstreamInvert": 105.3,
+    "DownstreamInvert": 104.9,
+    "DropStructureInvert": 0.0,
+    "Slope": 1.0,
+    "AverageDepth": 2.5,
+    "MaximumDepth": 3.0,
+    "PDC_Count": 0.0,
+    "ConstructionDate": "2000-01-01T00:00:00Z",
+    "Ownership": "CITY",
+    "Assumed": 1,
+    "Combined": 0,
+    "Relief": 0,
+    "Trunk": 0,
+    "LastEditDate": "2022-01-01T00:00:00Z",
+    "Abandoned": 0,
+    "Grouted": 0,
+    "Diameter": 200,
+    "CCTVInspectionDate": null,
+    "ShapeSTLength": 40.0
+   },
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -81.301,
+      42.980999999999995
+     ],
+     [
+      -81.3,
+      42.982
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "OBJECTID": 1021,
+    "GIS_ID": 2021,
+    "GIS_FeatureKey": "2021",
+    "FlowType": "SAN",
+    "StreetName": "Test St.",
+    "Location": "Road",
+    "UpstreamID": "G2",
+    "DownstreamID": "B1",
+    "Length": 40.0,
+    "PipeShape": "R",
+    "Height": 200,
+    "Width": 200,
+    "Material": "PVC",
+    "MaterialClass": "",
+    "UpstreamInvert": 105.2,
+    "DownstreamInvert": 104.9,
+    "DropStructureInvert": 0.0,
+    "Slope": 0.75,
+    "AverageDepth": 2.5,
+    "MaximumDepth": 3.0,
+    "PDC_Count": 0.0,
+    "ConstructionDate": "2000-01-01T00:00:00Z",
+    "Ownership": "CITY",
+    "Assumed": 1,
+    "Combined": 0,
+    "Relief": 0,
+    "Trunk": 0,
+    "LastEditDate": "2022-01-01T00:00:00Z",
+    "Abandoned": 0,
+    "Grouted": 0,
+    "Diameter": 200,
+    "CCTVInspectionDate": null,
+    "ShapeSTLength": 40.0
+   },
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -81.301,
+      42.982499999999995
+     ],
+     [
+      -81.3005,
+      42.98244999999999
+     ],
+     [
+      -81.3,
+      42.982
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "OBJECTID": 1022,
+    "GIS_ID": 2022,
+    "GIS_FeatureKey": "2022",
+    "FlowType": "SAN",
+    "StreetName": "Test St.",
+    "Location": "Road",
+    "UpstreamID": "G3",
+    "DownstreamID": "G1",
+    "Length": 40.0,
+    "PipeShape": "R",
+    "Height": 200,
+    "Width": 200,
+    "Material": "PVC",
+    "MaterialClass": "",
+    "UpstreamInvert": 105.8,
+    "DownstreamInvert": 105.4,
+    "DropStructureInvert": 0.0,
+    "Slope": 1.0,
+    "AverageDepth": 2.5,
+    "MaximumDepth": 3.0,
+    "PDC_Count": 0.0,
+    "ConstructionDate": "2000-01-01T00:00:00Z",
+    "Ownership": "CITY",
+    "Assumed": 1,
+    "Combined": 0,
+    "Relief": 0,
+    "Trunk": 0,
+    "LastEditDate": "2022-01-01T00:00:00Z",
+    "Abandoned": 0,
+    "Grouted": 0,
+    "Diameter": 200,
+    "CCTVInspectionDate": null,
+    "ShapeSTLength": 40.0
+   },
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -81.30199999999999,
+      42.980999999999995
+     ],
+     [
+      -81.301,
+      42.980999999999995
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "OBJECTID": 1023,
+    "GIS_ID": 2023,
+    "GIS_FeatureKey": "2023",
+    "FlowType": "SAN",
+    "StreetName": "Test St.",
+    "Location": "Road",
+    "UpstreamID": "G4",
+    "DownstreamID": "G2",
+    "Length": 40.0,
+    "PipeShape": "R",
+    "Height": 200,
+    "Width": 200,
+    "Material": "PVC",
+    "MaterialClass": "",
+    "UpstreamInvert": 105.7,
+    "DownstreamInvert": 105.3,
+    "DropStructureInvert": 0.0,
+    "Slope": 1.0,
+    "AverageDepth": 2.5,
+    "MaximumDepth": 3.0,
+    "PDC_Count": 0.0,
+    "ConstructionDate": "2000-01-01T00:00:00Z",
+    "Ownership": "CITY",
+    "Assumed": 1,
+    "Combined": 0,
+    "Relief": 0,
+    "Trunk": 0,
+    "LastEditDate": "2022-01-01T00:00:00Z",
+    "Abandoned": 0,
+    "Grouted": 0,
+    "Diameter": 200,
+    "CCTVInspectionDate": null,
+    "ShapeSTLength": 40.0
+   },
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -81.30199999999999,
+      42.983
+     ],
+     [
+      -81.301,
+      42.982499999999995
+     ]
+    ]
+   }
+  }
+ ]
+}

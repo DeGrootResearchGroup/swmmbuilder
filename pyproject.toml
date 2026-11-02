@@ -12,7 +12,16 @@ dependencies = [
   "networkx",
   "matplotlib",
   "pyswmm",
+  "gmplot",
+  "setuptools<81",
 ]
+
+[project.optional-dependencies]
+test = ["pytest"]
 
 [tool.setuptools]
 packages = ["sewernetworkx"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = [".", "tests"]
