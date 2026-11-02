@@ -1,0 +1,7 @@
+LICENCE PLACEHOLDER -- NOT YET CHOSEN
+
+The licence for SewerNetworkx has not been decided yet. This file exists because pyproject.toml
+references it; it will be replaced with the full text of the chosen licence.
+
+Until then, no licence is granted: Copyright (c) the SewerNetworkx authors (Anthony Sherratt,
+Christopher DeGroot). All rights reserved.
