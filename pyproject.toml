@@ -4,18 +4,18 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "SewerNetworkx"
-version = "0.1.0"
+version = "0.2.0"
 description = "A tool manipulating GIS data files to product sewer subnetworks and .inp files for pyswmm."
 license = "MIT"
 license-files = ["LICENCE"]
 authors = [{name = "Anthony Sherratt", email="asherra@uwo.ca"}, {name = "Christopher DeGroot", email="christopher.degroot@uwo.ca"},]
 maintainers = [{name = "Anthony Sherratt", email="asherra@uwo.ca"}, {name = "Christopher DeGroot", email="christopher.degroot@uwo.ca"},]
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 dependencies = [
   "geopandas",
   "networkx",
-  "matplotlib",
+  "pyproj",
   "pyswmm",
   "gmplot",
 ]

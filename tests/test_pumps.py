@@ -1,7 +1,7 @@
 """Pumps and wet wells in the .inp writer (#13)."""
 
 import pytest
-from conftest import DENDRITIC, TEMPLATE, read_sections, run_swmm, subnetwork_with_edges, write_inp
+from conftest import DENDRITIC, TEMPLATE, read_sections, run_swmm, subnetwork, write_inp
 
 from sewernetworkx import Pump, WetWell
 
@@ -12,7 +12,7 @@ CURVE = [(0.0, 6.0), (2.0, 4.0), (4.0, 0.0)]  # head (m) -> flow (L/s)
 
 @pytest.fixture
 def sub(network):
-    return subnetwork_with_edges(network, PUMPED)
+    return subnetwork(network, PUMPED)
 
 
 def write(sub, tmp_path, **kwargs):
@@ -45,7 +45,7 @@ def test_pump_keys_match_as_strings(sub, tmp_path):
 
 def test_pump_without_shape_is_accepted(network, tmp_path):
     """E1 -> J2 has no PipeShape: as a conduit it is rejected, as a pump it needs none."""
-    sub = subnetwork_with_edges(network, DENDRITIC + [("E1", "J2")])
+    sub = subnetwork(network, DENDRITIC + [("E1", "J2")])
     s = read_sections(write(sub, tmp_path, pumps={1012: dict(curve="*")}))
     assert [r[0] for r in s["PUMPS"]] == ["1012"]
 
@@ -108,12 +108,10 @@ def test_template_without_pumps_placeholder_rejected(sub, tmp_path):
     template = tmp_path / "nopumps.inp"
     template.write_text(TEMPLATE.read_text().replace("{pumps}", "").replace("KINWAVE", "DYNWAVE"))
     with pytest.raises(ValueError, match=r"no \{pumps\} placeholder"):
-        sub.write_pyswmm(
-            output_file="m.inp",
-            template_path=str(template),
-            output_folder=str(tmp_path),
-            pumps={1010: dict(curve="*")},
+        sub.to_inp(
+            tmp_path / "m.inp", ["OUT"], template_path=template, pumps={1010: dict(curve="*")}
         )
+    assert not (tmp_path / "m.inp").exists()
 
 
 def test_pumped_network_runs_in_swmm(sub, tmp_path):
@@ -124,14 +122,14 @@ def test_pumped_network_runs_in_swmm(sub, tmp_path):
     text = TEMPLATE.read_text().replace("KINWAVE", "DYNWAVE")
     inflow = 'D1  FLOW  ""  FLOW  1.0  1.0  2.0\n'
     template.write_text(text.replace("[INFLOWS]\n", "[INFLOWS]\n" + inflow))
-    sub.write_pyswmm(
-        output_file="model.inp",
-        template_path=str(template),
-        output_folder=str(tmp_path),
+    path = tmp_path / "model.inp"
+    sub.to_inp(
+        path,
+        ["OUT"],
+        template_path=template,
         pumps={1010: dict(curve=CURVE, startup=0.3, shutoff=0.05)},
         wet_wells={"D1": dict(max_depth=3.0, area=2.0)},
     )
-    path = tmp_path / "model.inp"
     assert run_swmm(path, tmp_path) == []
 
     pumped = 0.0

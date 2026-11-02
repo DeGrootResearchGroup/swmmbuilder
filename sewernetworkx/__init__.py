@@ -1,5 +1,7 @@
+from .network import Network
 from .schema import LONDON_ON, TORONTO_ON, Schema
-from .sewers import Network, Pump, SubNetwork, TopologyReport, WetWell
+from .subnetwork import Subnetwork, TopologyReport
+from .swmm import Pump, WetWell
 
 __all__ = [
     "LONDON_ON",
@@ -7,7 +9,7 @@ __all__ = [
     "Network",
     "Pump",
     "Schema",
-    "SubNetwork",
+    "Subnetwork",
     "TopologyReport",
     "WetWell",
 ]

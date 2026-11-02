@@ -2,16 +2,16 @@
 the writer cannot fill."""
 
 import pytest
-from conftest import TEMPLATE, quiet, read_sections, subnetwork_with_edges
+from conftest import TEMPLATE, read_sections, subnetwork
 
-from sewernetworkx.sewers import SI_FLOW_UNITS, check_template, default_template_path
+from sewernetworkx.swmm import SI_FLOW_UNITS, check_template, default_template_path
 
 
 @pytest.fixture
 def sub(network):
     # Without the parallel J1 -> J2 pipes, which the template's KINWAVE routing rejects (#3).
     edges = [("A1", "A2"), ("A2", "J1"), ("B1", "B2"), ("B2", "J1"), ("C1", "J1")]
-    return subnetwork_with_edges(network, edges, outfalls=("J1",))
+    return subnetwork(network, edges)
 
 
 def test_packaged_template_is_si_and_fillable():
@@ -26,7 +26,7 @@ def test_example_template_matches_packaged():
 
 
 def test_default_template_used_without_template_path(sub, tmp_path):
-    quiet(sub.write_pyswmm, output_file="model.inp", output_folder=str(tmp_path))
+    sub.to_inp(tmp_path / "model.inp", ["J1"])
     text = (tmp_path / "model.inp").read_text()
     assert "{" not in text
     sections = read_sections(tmp_path / "model.inp")
@@ -45,41 +45,24 @@ def custom_template(tmp_path, old, new):
 def test_us_units_template_rejected(sub, tmp_path, units):
     path = custom_template(tmp_path, "FLOW_UNITS           LPS", f"FLOW_UNITS           {units}")
     with pytest.raises(ValueError, match=units):
-        quiet(
-            sub.write_pyswmm,
-            output_file="m.inp",
-            template_path=str(path),
-            output_folder=str(tmp_path),
-        )
+        sub.to_inp(tmp_path / "m.inp", ["J1"], template_path=path)
 
 
 def test_missing_flow_units_rejected(sub, tmp_path):
     path = custom_template(tmp_path, "FLOW_UNITS           LPS", "")
     with pytest.raises(ValueError, match="FLOW_UNITS"):
-        quiet(
-            sub.write_pyswmm,
-            output_file="m.inp",
-            template_path=str(path),
-            output_folder=str(tmp_path),
-        )
+        sub.to_inp(tmp_path / "m.inp", ["J1"], template_path=path)
 
 
 def test_unknown_placeholder_rejected(sub, tmp_path):
     path = custom_template(tmp_path, "[LOSSES]", "[WEIRS]\n{weirs}\n\n[LOSSES]")
     with pytest.raises(ValueError, match="weirs"):
-        quiet(
-            sub.write_pyswmm,
-            output_file="m.inp",
-            template_path=str(path),
-            output_folder=str(tmp_path),
-        )
+        sub.to_inp(tmp_path / "m.inp", ["J1"], template_path=path)
     assert not (tmp_path / "m.inp").exists()
 
 
 @pytest.mark.parametrize("units", SI_FLOW_UNITS)
 def test_si_units_template_accepted(sub, tmp_path, units):
     path = custom_template(tmp_path, "FLOW_UNITS           LPS", f"FLOW_UNITS           {units}")
-    quiet(
-        sub.write_pyswmm, output_file="m.inp", template_path=str(path), output_folder=str(tmp_path)
-    )
+    sub.to_inp(tmp_path / "m.inp", ["J1"], template_path=path)
     assert (tmp_path / "m.inp").exists()
