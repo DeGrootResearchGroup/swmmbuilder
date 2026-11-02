@@ -1,4 +1,4 @@
-from .network import Network
+from .network import Network, strip_leading_zeros
 from .schema import (
     BARRIE_ON,
     KITCHENER_ON,
@@ -28,4 +28,5 @@ __all__ = [
     "Subnetwork",
     "TopologyReport",
     "WetWell",
+    "strip_leading_zeros",
 ]

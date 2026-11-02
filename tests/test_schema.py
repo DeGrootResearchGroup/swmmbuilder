@@ -4,7 +4,7 @@ import warnings
 import geopandas as gpd
 import pandas as pd
 import pytest
-from conftest import DENDRITIC, FIXTURE, read_sections, subnetwork, write_inp
+from conftest import DENDRITIC, FIXTURE, REPO, read_sections, subnetwork, write_inp
 from shapely.geometry import LineString
 
 from swmmbuilder import LONDON_ON, Network, Schema
@@ -223,43 +223,12 @@ def test_reproject():
     assert schema.normalize(data).crs == "EPSG:32617"
 
 
-LONDON_TOML = """
-name = "London from TOML"
-abandoned = "Abandoned"
-abandoned_values = [1]
-null_nodes = ["Abandoned"]
-nonpositive_inverts_missing = true
-size_unit = "mm"
-
-[columns]
-pipe_id = "OBJECTID"
-from_node = "UpstreamID"
-to_node = "DownstreamID"
-length = "Length"
-us_invert = "UpstreamInvert"
-ds_invert = "DownstreamInvert"
-drop_invert = "DropStructureInvert"
-shape = "PipeShape"
-diameter = "Diameter"
-height = "Height"
-width = "Width"
-flow_type = "FlowType"
-material = "Material"
-
-[shapes]
-R = "CIRCULAR"
-Round = "CIRCULAR"
-REC = "RECT_CLOSED"
-EGG = "EGG"
-ARC = "ARCH"
-ELH = "HORIZ_ELLIPSE"
-ELV = "VERT_ELLIPSE"
-
-[flow_types]
-SAN = "sanitary"
-STM = "storm"
-COM = "combined"
-"""
+# The shipped London preset, renamed.
+LONDON_TOML = (
+    (REPO / "swmmbuilder" / "schemas" / "london_on.toml")
+    .read_text()
+    .replace('name = "London, ON"', 'name = "London from TOML"')
+)
 
 
 def test_from_toml(tmp_path):

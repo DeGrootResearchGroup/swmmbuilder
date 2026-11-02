@@ -69,6 +69,8 @@ def test_load(city, network):
     assert data["diameter"].between(0.15, 0.6).all()
     assert data[["from_node", "to_node", "us_invert", "ds_invert"]].notna().all().all()
     assert data["flow_type"].isin({"sanitary"}).all() or data["flow_type"].isna().all()
+    assert data["structure_type"].isin({"gravity"}).all() or data["structure_type"].isna().all()
+    assert set(data["status"]) == {"built"}
 
 
 def test_lengths_match_geometry(network):
@@ -136,17 +138,20 @@ def test_waterloo_placeholder_invert(tmp_path):
 
 def test_kitchener_missing_node_and_force_main(tmp_path):
     kitchener = by_name("kitchener")
-    path = edited(kitchener, tmp_path, [0], UP_SANMANHOLEID=-1, CATEGORY="FORCEMAIN")
-    network = Network(path, schema=kitchener.schema, flow_types=None)
-    assert network.full_data["from_node"].isna().sum() == 1
-    network = Network(path, schema=kitchener.schema)
-    assert network.removed["flow_type"] == {"FORCEMAIN": 1}
+    path = edited(kitchener, tmp_path, [0], UP_SANMANHOLEID=-1, CATEGORY="SLUDGE FORCEMAIN")
+    data = Network(path, schema=kitchener.schema).full_data
+    assert data["from_node"].isna().sum() == 1
+    assert data["structure_type"].value_counts().to_dict() == {
+        "gravity": kitchener.pipes - 1,
+        "force_main": 1,
+    }
 
 
-def test_barrie_force_main_dropped(tmp_path):
+def test_barrie_force_main(tmp_path):
     barrie = by_name("barrie")
     path = edited(barrie, tmp_path, [0, 1], TYPE="FORCE")
-    assert Network(path, schema=barrie.schema).removed["flow_type"] == {"FORCE": 2}
+    data = Network(path, schema=barrie.schema).full_data
+    assert (data["structure_type"] == "force_main").sum() == 2
 
 
 def test_sarnia_non_circular_size(tmp_path):
