@@ -1,0 +1,2105 @@
+{
+ "type": "FeatureCollection",
+ "features": [
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -80.5245324775996,
+      43.4628899839314
+     ],
+     [
+      -80.524115200419,
+      43.4630750206625
+     ]
+    ]
+   },
+   "properties": {
+    "OBJECTID": 28,
+    "LIFECYCLESTATUS": "Active",
+    "INSTALLDATE": 915148800000,
+    "TYPE": "Local Main",
+    "ASSET_ID": 10084105,
+    "ENTID": 112697,
+    "ENTNAME": "W2-20toW2-25",
+    "ROAD_ID": 28153,
+    "OWNER": "City of Waterloo",
+    "ASBUILTNUMBER": "5-1874; 41-615",
+    "POSITION": "Eng Dwg/As Built +/- 2m",
+    "DIAMETER": 200,
+    "MATERIAL": "Polyvinyl chloride",
+    "LINED": null,
+    "LINING_TYPE": null,
+    "LINING_YEAR": null,
+    "LINING_NOTES": null,
+    "UPSTREAMINVERT": 321.001,
+    "DOWNSTREAMINVERT": 320.569,
+    "SLOPE": null,
+    "FROMMH": "W2-20",
+    "TOMH": "W2-25",
+    "LENGTH_M": 39.51901940908811,
+    "Shape__Length": 0.0004564634019196116
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -80.5246975986988,
+      43.4637879539132
+     ],
+     [
+      -80.5244105721425,
+      43.4634326359686
+     ]
+    ]
+   },
+   "properties": {
+    "OBJECTID": 50,
+    "LIFECYCLESTATUS": "Active",
+    "INSTALLDATE": 1477958400000,
+    "TYPE": "Local Main",
+    "ASSET_ID": 10187348,
+    "ENTID": 124214,
+    "ENTNAME": "W2-27toW2-26",
+    "ROAD_ID": 1611,
+    "OWNER": "City of Waterloo",
+    "ASBUILTNUMBER": "41-609",
+    "POSITION": "Eng Dwg/As Built +/- 2m",
+    "DIAMETER": 300,
+    "MATERIAL": "Polyvinyl chloride",
+    "LINED": null,
+    "LINING_TYPE": null,
+    "LINING_YEAR": null,
+    "LINING_NOTES": null,
+    "UPSTREAMINVERT": 320.614,
+    "DOWNSTREAMINVERT": 320.482,
+    "SLOPE": 0.28,
+    "FROMMH": "W2-27",
+    "TOMH": "W2-26",
+    "LENGTH_M": 45.78552593200025,
+    "Shape__Length": 0.00045676589821541923
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -80.525309451065,
+      43.4627628381328
+     ],
+     [
+      -80.5245324775996,
+      43.4628899839314
+     ]
+    ]
+   },
+   "properties": {
+    "OBJECTID": 75,
+    "LIFECYCLESTATUS": "Active",
+    "INSTALLDATE": 915148800000,
+    "TYPE": "Local Main",
+    "ASSET_ID": 10084102,
+    "ENTID": 112696,
+    "ENTNAME": "W2-21toW2-20",
+    "ROAD_ID": 28153,
+    "OWNER": "City of Waterloo",
+    "ASBUILTNUMBER": "5-1874",
+    "POSITION": "Estimated/Unknown",
+    "DIAMETER": 200,
+    "MATERIAL": "Polyvinyl chloride",
+    "LINED": null,
+    "LINING_TYPE": null,
+    "LINING_YEAR": null,
+    "LINING_NOTES": null,
+    "UPSTREAMINVERT": 321.359,
+    "DOWNSTREAMINVERT": 321.031,
+    "SLOPE": 0.51,
+    "FROMMH": "W2-21",
+    "TOMH": "W2-20",
+    "LENGTH_M": 64.42022527896991,
+    "Shape__Length": 0.0007873079575696639
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -80.5265146878033,
+      43.4574417451549
+     ],
+     [
+      -80.5261693831872,
+      43.4576444785758
+     ],
+     [
+      -80.5255478334264,
+      43.458012000857
+     ]
+    ]
+   },
+   "properties": {
+    "OBJECTID": 795,
+    "LIFECYCLESTATUS": "Active",
+    "INSTALLDATE": -63158400000,
+    "TYPE": "Local Main",
+    "ASSET_ID": 10084338,
+    "ENTID": 110232,
+    "ENTNAME": "W5-14toW5-12",
+    "ROAD_ID": 1431,
+    "OWNER": "City of Waterloo",
+    "ASBUILTNUMBER": "5-465",
+    "POSITION": "GPS +/- 0.5m",
+    "DIAMETER": 225,
+    "MATERIAL": "Vitrified Clay",
+    "LINED": null,
+    "LINING_TYPE": null,
+    "LINING_YEAR": null,
+    "LINING_NOTES": null,
+    "UPSTREAMINVERT": 336.01,
+    "DOWNSTREAMINVERT": 332.49,
+    "SLOPE": 3.449,
+    "FROMMH": "W5-14",
+    "TOMH": "W5-12",
+    "LENGTH_M": 100.64519724615903,
+    "Shape__Length": 0.0011224979921366234
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -80.5245818919839,
+      43.4557023076721
+     ],
+     [
+      -80.5249622797342,
+      43.4560510666751
+     ],
+     [
+      -80.5250422380964,
+      43.456124376393
+     ],
+     [
+      -80.5250502593432,
+      43.4561317311487
+     ],
+     [
+      -80.5251427002269,
+      43.4562164849477
+     ],
+     [
+      -80.5251987939751,
+      43.4562679130204
+     ]
+    ]
+   },
+   "properties": {
+    "OBJECTID": 991,
+    "LIFECYCLESTATUS": "Active",
+    "INSTALLDATE": -1470182400000,
+    "TYPE": "Local Main",
+    "ASSET_ID": 10088016,
+    "ENTID": 110263,
+    "ENTNAME": "W7-44toW5-30",
+    "ROAD_ID": 8586,
+    "OWNER": "City of Waterloo",
+    "ASBUILTNUMBER": "5-88, 15-397",
+    "POSITION": "GPS +/- 0.5m",
+    "DIAMETER": 250,
+    "MATERIAL": "Vitrified Clay",
+    "LINED": null,
+    "LINING_TYPE": null,
+    "LINING_YEAR": null,
+    "LINING_NOTES": null,
+    "UPSTREAMINVERT": 341.08,
+    "DOWNSTREAMINVERT": 340.18,
+    "SLOPE": 1.506,
+    "FROMMH": "W7-44",
+    "TOMH": "W5-30",
+    "LENGTH_M": 80.22987292657348,
+    "Shape__Length": 0.0008369453248605956
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -80.5267592600185,
+      43.4562214973702
+     ],
+     [
+      -80.5257862111863,
+      43.4567909804216
+     ]
+    ]
+   },
+   "properties": {
+    "OBJECTID": 1020,
+    "LIFECYCLESTATUS": "Active",
+    "INSTALLDATE": -3786825600000,
+    "TYPE": "Local Main",
+    "ASSET_ID": 10085021,
+    "ENTID": 110264,
+    "ENTNAME": "W5-31toW5-29",
+    "ROAD_ID": 8605,
+    "OWNER": "City of Waterloo",
+    "ASBUILTNUMBER": "5-729",
+    "POSITION": "GPS +/- 0.5m",
+    "DIAMETER": 250,
+    "MATERIAL": "Vitrified Clay",
+    "LINED": null,
+    "LINING_TYPE": null,
+    "LINING_YEAR": null,
+    "LINING_NOTES": null,
+    "UPSTREAMINVERT": 340.1,
+    "DOWNSTREAMINVERT": 338.86,
+    "SLOPE": 1.236,
+    "FROMMH": "W5-31",
+    "TOMH": "W5-29",
+    "LENGTH_M": 100.98249344690214,
+    "Shape__Length": 0.001127446218576603
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -80.5227539746742,
+      43.4555069858843
+     ],
+     [
+      -80.5231447901451,
+      43.4558496318808
+     ]
+    ]
+   },
+   "properties": {
+    "OBJECTID": 1151,
+    "LIFECYCLESTATUS": "Active",
+    "INSTALLDATE": 788918400000,
+    "TYPE": "Local Main",
+    "ASSET_ID": 10083851,
+    "ENTID": 110270,
+    "ENTNAME": "W7-42toW7-41",
+    "ROAD_ID": 1669,
+    "OWNER": "City of Waterloo",
+    "ASBUILTNUMBER": null,
+    "POSITION": "Estimated/Unknown",
+    "DIAMETER": 225,
+    "MATERIAL": "Vitrified Clay",
+    "LINED": null,
+    "LINING_TYPE": null,
+    "LINING_YEAR": null,
+    "LINING_NOTES": null,
+    "UPSTREAMINVERT": 336.43,
+    "DOWNSTREAMINVERT": 336.18,
+    "SLOPE": 0.51,
+    "FROMMH": "W7-42",
+    "TOMH": "W7-41",
+    "LENGTH_M": 49.47586386248418,
+    "Shape__Length": 0.0005197528367132129
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -80.5231447901451,
+      43.4558496318808
+     ],
+     [
+      -80.5232031756807,
+      43.4559009381279
+     ],
+     [
+      -80.5236228406862,
+      43.4562697208346
+     ]
+    ]
+   },
+   "properties": {
+    "OBJECTID": 1160,
+    "LIFECYCLESTATUS": "Active",
+    "INSTALLDATE": 788918400000,
+    "TYPE": "Local Main",
+    "ASSET_ID": 10086117,
+    "ENTID": 110269,
+    "ENTNAME": "W7-41toW7-40",
+    "ROAD_ID": 1669,
+    "OWNER": "City of Waterloo",
+    "ASBUILTNUMBER": null,
+    "POSITION": "Estimated/Unknown",
+    "DIAMETER": 225,
+    "MATERIAL": "Polyvinyl chloride",
+    "LINED": null,
+    "LINING_TYPE": null,
+    "LINING_YEAR": null,
+    "LINING_NOTES": null,
+    "UPSTREAMINVERT": 336.15,
+    "DOWNSTREAMINVERT": 335.87,
+    "SLOPE": 0.459,
+    "FROMMH": "W7-41",
+    "TOMH": "W7-40",
+    "LENGTH_M": 60.60139860295123,
+    "Shape__Length": 0.0006364016411813893
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -80.5255478334264,
+      43.458012000857
+     ],
+     [
+      -80.5262494846573,
+      43.4586374868855
+     ]
+    ]
+   },
+   "properties": {
+    "OBJECTID": 1189,
+    "LIFECYCLESTATUS": "Active",
+    "INSTALLDATE": 536457600000,
+    "TYPE": "Local Main",
+    "ASSET_ID": 10083400,
+    "ENTID": 110208,
+    "ENTNAME": "W5-12toW5-19",
+    "ROAD_ID": 135,
+    "OWNER": "City of Waterloo",
+    "ASBUILTNUMBER": null,
+    "POSITION": "GPS +/- 0.5m",
+    "DIAMETER": 225,
+    "MATERIAL": "Vitrified Clay",
+    "LINED": null,
+    "LINING_TYPE": "CIPP",
+    "LINING_YEAR": 2010,
+    "LINING_NOTES": "CIPP lined 12/2010",
+    "UPSTREAMINVERT": 332.46,
+    "DOWNSTREAMINVERT": 332.25,
+    "SLOPE": 0.231,
+    "FROMMH": "W5-12",
+    "TOMH": "W5-19",
+    "LENGTH_M": 89.70919567221334,
+    "Shape__Length": 0.0009399719260409635
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -80.523846797,
+      43.4550414650001
+     ],
+     [
+      -80.524581892,
+      43.4557023080001
+     ]
+    ]
+   },
+   "properties": {
+    "OBJECTID": 1223,
+    "LIFECYCLESTATUS": "Active",
+    "INSTALLDATE": -3786825600000,
+    "TYPE": "Local Main",
+    "ASSET_ID": 10082330,
+    "ENTID": 102246,
+    "ENTNAME": "W7-44AtoW7-44",
+    "ROAD_ID": 8584,
+    "OWNER": "City of Waterloo",
+    "ASBUILTNUMBER": "15-398",
+    "POSITION": "GPS +/- 0.5m",
+    "DIAMETER": 250,
+    "MATERIAL": "Vitrified Clay",
+    "LINED": null,
+    "LINING_TYPE": null,
+    "LINING_YEAR": null,
+    "LINING_NOTES": null,
+    "UPSTREAMINVERT": 342.24,
+    "DOWNSTREAMINVERT": 341.21,
+    "SLOPE": null,
+    "FROMMH": "W7-44A",
+    "TOMH": "W7-44",
+    "LENGTH_M": 94.4644552149369,
+    "Shape__Length": 0.000988472624626494
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -80.5271942488721,
+      43.4542754766599
+     ],
+     [
+      -80.5267880334454,
+      43.4543728784757
+     ],
+     [
+      -80.5263101730284,
+      43.4544874568343
+     ]
+    ]
+   },
+   "properties": {
+    "OBJECTID": 1391,
+    "LIFECYCLESTATUS": "Active",
+    "INSTALLDATE": 220924800000,
+    "TYPE": "Local Main",
+    "ASSET_ID": 10085752,
+    "ENTID": 110299,
+    "ENTNAME": "W7-48toW7-47",
+    "ROAD_ID": 1405,
+    "OWNER": "City of Waterloo",
+    "ASBUILTNUMBER": "15-131",
+    "POSITION": "GPS +/- 0.5m",
+    "DIAMETER": 200,
+    "MATERIAL": "Vitrified Clay",
+    "LINED": null,
+    "LINING_TYPE": null,
+    "LINING_YEAR": null,
+    "LINING_NOTES": null,
+    "UPSTREAMINVERT": 344.41,
+    "DOWNSTREAMINVERT": 344.34,
+    "SLOPE": 0.092,
+    "FROMMH": "W7-48",
+    "TOMH": "W7-47",
+    "LENGTH_M": 75.30231527752484,
+    "Shape__Length": 0.0009091345839953859
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -80.5263101730284,
+      43.4544874568343
+     ],
+     [
+      -80.5251286924905,
+      43.4547506107379
+     ]
+    ]
+   },
+   "properties": {
+    "OBJECTID": 1440,
+    "LIFECYCLESTATUS": "Active",
+    "INSTALLDATE": 220924800000,
+    "TYPE": "Local Main",
+    "ASSET_ID": 10085481,
+    "ENTID": 110298,
+    "ENTNAME": "W7-47toW7-46",
+    "ROAD_ID": 1405,
+    "OWNER": "City of Waterloo",
+    "ASBUILTNUMBER": "15-131",
+    "POSITION": "GPS +/- 0.5m",
+    "DIAMETER": 200,
+    "MATERIAL": "Vitrified Clay",
+    "LINED": null,
+    "LINING_TYPE": null,
+    "LINING_YEAR": null,
+    "LINING_NOTES": null,
+    "UPSTREAMINVERT": 344.31,
+    "DOWNSTREAMINVERT": 343.28,
+    "SLOPE": 1.026,
+    "FROMMH": "W7-47",
+    "TOMH": "W7-46",
+    "LENGTH_M": 99.95719919047288,
+    "Shape__Length": 0.0012104322527289675
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -80.5251286924905,
+      43.4547506107379
+     ],
+     [
+      -80.52512932826,
+      43.4549906469628
+     ],
+     [
+      -80.5250982127157,
+      43.4551871125115
+     ],
+     [
+      -80.5250084129067,
+      43.4553581130987
+     ],
+     [
+      -80.5248573646929,
+      43.4555246730046
+     ],
+     [
+      -80.5247332562309,
+      43.4556192819367
+     ],
+     [
+      -80.5245818919839,
+      43.4557023076721
+     ]
+    ]
+   },
+   "properties": {
+    "OBJECTID": 1698,
+    "LIFECYCLESTATUS": "Active",
+    "INSTALLDATE": -3786825600000,
+    "TYPE": "Local Main",
+    "ASSET_ID": 10085299,
+    "ENTID": 110268,
+    "ENTNAME": "W7-46toW7-44",
+    "ROAD_ID": 8587,
+    "OWNER": "City of Waterloo",
+    "ASBUILTNUMBER": "15-339, 5-56",
+    "POSITION": "GPS +/- 0.5m",
+    "DIAMETER": 225,
+    "MATERIAL": "Vitrified Clay",
+    "LINED": null,
+    "LINING_TYPE": null,
+    "LINING_YEAR": null,
+    "LINING_NOTES": null,
+    "UPSTREAMINVERT": 343.25,
+    "DOWNSTREAMINVERT": 341.11,
+    "SLOPE": 1.827,
+    "FROMMH": "W7-46",
+    "TOMH": "W7-44",
+    "LENGTH_M": 120.98890556392794,
+    "Shape__Length": 0.0011856438855432855
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -80.5245818919839,
+      43.4557023076721
+     ],
+     [
+      -80.5243793845483,
+      43.4558221211823
+     ],
+     [
+      -80.5243698748365,
+      43.455827748067
+     ],
+     [
+      -80.5242466731756,
+      43.4559006390365
+     ],
+     [
+      -80.5242394396716,
+      43.4559049184244
+     ],
+     [
+      -80.5241217823587,
+      43.4559745295291
+     ],
+     [
+      -80.5241149524169,
+      43.4559785710728
+     ],
+     [
+      -80.5239927361384,
+      43.4560508787835
+     ],
+     [
+      -80.5239729094009,
+      43.4560626090585
+     ],
+     [
+      -80.5238665581807,
+      43.456125530808
+     ],
+     [
+      -80.5238429488302,
+      43.4561394990995
+     ],
+     [
+      -80.5237385333458,
+      43.456201273531
+     ],
+     [
+      -80.5237275246487,
+      43.4562077864499
+     ],
+     [
+      -80.5236228406862,
+      43.4562697208346
+     ]
+    ]
+   },
+   "properties": {
+    "OBJECTID": 1733,
+    "LIFECYCLESTATUS": "Active",
+    "INSTALLDATE": -3786825600000,
+    "TYPE": "Local Main",
+    "ASSET_ID": 10085348,
+    "ENTID": 110267,
+    "ENTNAME": "W7-44toW7-40",
+    "ROAD_ID": 8583,
+    "OWNER": "City of Waterloo",
+    "ASBUILTNUMBER": null,
+    "POSITION": "Estimated/Unknown",
+    "DIAMETER": 200,
+    "MATERIAL": "Vitrified Clay",
+    "LINED": null,
+    "LINING_TYPE": null,
+    "LINING_YEAR": null,
+    "LINING_NOTES": null,
+    "UPSTREAMINVERT": 341.08,
+    "DOWNSTREAMINVERT": 335.87,
+    "SLOPE": 5.265,
+    "FROMMH": "W7-44",
+    "TOMH": "W7-40",
+    "LENGTH_M": 99.95762024287043,
+    "Shape__Length": 0.0011143325753674776
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -80.5248694179391,
+      43.4619139369306
+     ],
+     [
+      -80.523939571319,
+      43.4610742403771
+     ]
+    ]
+   },
+   "properties": {
+    "OBJECTID": 1808,
+    "LIFECYCLESTATUS": "Active",
+    "INSTALLDATE": 126230400000,
+    "TYPE": "Local Main",
+    "ASSET_ID": 10084141,
+    "ENTID": 110194,
+    "ENTNAME": "W2-19toW2-18",
+    "ROAD_ID": 1602,
+    "OWNER": "City of Waterloo",
+    "ASBUILTNUMBER": "5-839",
+    "POSITION": "GPS +/- 0.5m",
+    "DIAMETER": 225,
+    "MATERIAL": "Vitrified Clay",
+    "LINED": null,
+    "LINING_TYPE": null,
+    "LINING_YEAR": null,
+    "LINING_NOTES": null,
+    "UPSTREAMINVERT": 326.213,
+    "DOWNSTREAMINVERT": 325.782,
+    "SLOPE": 0.409,
+    "FROMMH": "W2-19",
+    "TOMH": "W2-18",
+    "LENGTH_M": 119.8125473414574,
+    "Shape__Length": 0.0012528787007207158
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -80.523939571319,
+      43.4610742403771
+     ],
+     [
+      -80.5228712787483,
+      43.4615378336461
+     ]
+    ]
+   },
+   "properties": {
+    "OBJECTID": 2531,
+    "LIFECYCLESTATUS": "Active",
+    "INSTALLDATE": -31536000000,
+    "TYPE": "Local Main",
+    "ASSET_ID": 10082672,
+    "ENTID": 110196,
+    "ENTNAME": "W2-18toW2-16",
+    "ROAD_ID": 1610,
+    "OWNER": "City of Waterloo",
+    "ASBUILTNUMBER": "5-589",
+    "POSITION": "GPS +/- 0.5m",
+    "DIAMETER": 225,
+    "MATERIAL": "Vitrified Clay",
+    "LINED": null,
+    "LINING_TYPE": "CIPP",
+    "LINING_YEAR": 2017,
+    "LINING_NOTES": "Full length",
+    "UPSTREAMINVERT": 325.75,
+    "DOWNSTREAMINVERT": 323.604,
+    "SLOPE": 2.043,
+    "FROMMH": "W2-18",
+    "TOMH": "W2-16",
+    "LENGTH_M": 100.59634934357929,
+    "Shape__Length": 0.0011645461501077399
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -80.5280810816051,
+      43.455440203877
+     ],
+     [
+      -80.5279722964517,
+      43.4555022477883
+     ],
+     [
+      -80.5279167833002,
+      43.4555339084398
+     ]
+    ]
+   },
+   "properties": {
+    "OBJECTID": 3811,
+    "LIFECYCLESTATUS": "Active",
+    "INSTALLDATE": 1448928000000,
+    "TYPE": "Local Main",
+    "ASSET_ID": 10141288,
+    "ENTID": 117241,
+    "ENTNAME": "W5-34toW5-33",
+    "ROAD_ID": 5976,
+    "OWNER": "City of Waterloo",
+    "ASBUILTNUMBER": "Site Plan 106 Westmount Rd",
+    "POSITION": "Site Plan +/- 2m",
+    "DIAMETER": 200,
+    "MATERIAL": "Unknown",
+    "LINED": null,
+    "LINING_TYPE": null,
+    "LINING_YEAR": null,
+    "LINING_NOTES": null,
+    "UPSTREAMINVERT": 341.32,
+    "DOWNSTREAMINVERT": 341.01,
+    "SLOPE": 1.84,
+    "FROMMH": "W5-34",
+    "TOMH": "W5-33",
+    "LENGTH_M": 16.881738747370715,
+    "Shape__Length": 0.00018914142343589172
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -80.5257898621607,
+      43.4625457774001
+     ],
+     [
+      -80.525309451065,
+      43.4627628381328
+     ]
+    ]
+   },
+   "properties": {
+    "OBJECTID": 3823,
+    "LIFECYCLESTATUS": "Active",
+    "INSTALLDATE": 915148800000,
+    "TYPE": "Local Main",
+    "ASSET_ID": 10084100,
+    "ENTID": 112695,
+    "ENTNAME": "W2-22toW2-21",
+    "ROAD_ID": 28153,
+    "OWNER": "City of Waterloo",
+    "ASBUILTNUMBER": "5-1874",
+    "POSITION": "Estimated/Unknown",
+    "DIAMETER": 200,
+    "MATERIAL": "Polyvinyl chloride",
+    "LINED": null,
+    "LINING_TYPE": null,
+    "LINING_YEAR": null,
+    "LINING_NOTES": null,
+    "UPSTREAMINVERT": 321.61,
+    "DOWNSTREAMINVERT": 321.37,
+    "SLOPE": 0.537,
+    "FROMMH": "W2-22",
+    "TOMH": "W2-21",
+    "LENGTH_M": 45.732627705366994,
+    "Shape__Length": 0.0005271718719055058
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -80.5251987939751,
+      43.4562679130204
+     ],
+     [
+      -80.525238535498,
+      43.4563033012541
+     ],
+     [
+      -80.5252613105491,
+      43.4563235808672
+     ],
+     [
+      -80.5253320895536,
+      43.4563866071174
+     ],
+     [
+      -80.5253456767863,
+      43.4563987068388
+     ],
+     [
+      -80.5254361464075,
+      43.4564792660912
+     ],
+     [
+      -80.5257862111863,
+      43.4567909804216
+     ]
+    ]
+   },
+   "properties": {
+    "OBJECTID": 3831,
+    "LIFECYCLESTATUS": "Active",
+    "INSTALLDATE": -1470182400000,
+    "TYPE": "Local Main",
+    "ASSET_ID": 10088017,
+    "ENTID": 110262,
+    "ENTNAME": "W5-30toW5-29",
+    "ROAD_ID": 8586,
+    "OWNER": "City of Waterloo",
+    "ASBUILTNUMBER": "5-88, 15-397",
+    "POSITION": "Estimated/Unknown",
+    "DIAMETER": 250,
+    "MATERIAL": "Vitrified Clay",
+    "LINED": null,
+    "LINING_TYPE": null,
+    "LINING_YEAR": null,
+    "LINING_NOTES": null,
+    "UPSTREAMINVERT": 340.15,
+    "DOWNSTREAMINVERT": 338.86,
+    "SLOPE": 2.514,
+    "FROMMH": "W5-30",
+    "TOMH": "W5-29",
+    "LENGTH_M": 75.05446603468482,
+    "Shape__Length": 0.000786548463968805
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -80.525783713,
+      43.4553439000001
+     ],
+     [
+      -80.5267592599999,
+      43.4562214970001
+     ]
+    ]
+   },
+   "properties": {
+    "OBJECTID": 3870,
+    "LIFECYCLESTATUS": "Active",
+    "INSTALLDATE": -631152000000,
+    "TYPE": "Local Main",
+    "ASSET_ID": 10082924,
+    "ENTID": 110265,
+    "ENTNAME": "W5-32toW5-31",
+    "ROAD_ID": 8602,
+    "OWNER": "City of Waterloo",
+    "ASBUILTNUMBER": null,
+    "POSITION": "GPS +/- 0.5m",
+    "DIAMETER": 200,
+    "MATERIAL": "Vitrified Clay",
+    "LINED": null,
+    "LINING_TYPE": null,
+    "LINING_YEAR": null,
+    "LINING_NOTES": null,
+    "UPSTREAMINVERT": 340.13,
+    "DOWNSTREAMINVERT": 340.1,
+    "SLOPE": null,
+    "FROMMH": "W5-32",
+    "TOMH": "W5-31",
+    "LENGTH_M": 125.41469787734852,
+    "Shape__Length": 0.001312199848958952
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -80.5248154824222,
+      43.4573620774474
+     ],
+     [
+      -80.5255478334264,
+      43.458012000857
+     ]
+    ]
+   },
+   "properties": {
+    "OBJECTID": 4050,
+    "LIFECYCLESTATUS": "Active",
+    "INSTALLDATE": 536457600000,
+    "TYPE": "Local Main",
+    "ASSET_ID": 10088021,
+    "ENTID": 110233,
+    "ENTNAME": "W5-28toW5-12",
+    "ROAD_ID": 1433,
+    "OWNER": "City of Waterloo",
+    "ASBUILTNUMBER": null,
+    "POSITION": "Estimated/Unknown",
+    "DIAMETER": 225,
+    "MATERIAL": "Polyvinyl chloride",
+    "LINED": null,
+    "LINING_TYPE": null,
+    "LINING_YEAR": null,
+    "LINING_NOTES": null,
+    "UPSTREAMINVERT": 334.5,
+    "DOWNSTREAMINVERT": 332.49,
+    "SLOPE": 2.081,
+    "FROMMH": "W5-28",
+    "TOMH": "W5-12",
+    "LENGTH_M": 93.38295200739344,
+    "Shape__Length": 0.0009791518941153134
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -80.5259991080096,
+      43.4625881414796
+     ],
+     [
+      -80.5257898621607,
+      43.4625457774001
+     ]
+    ]
+   },
+   "properties": {
+    "OBJECTID": 4183,
+    "LIFECYCLESTATUS": "Active",
+    "INSTALLDATE": 915148800000,
+    "TYPE": "Local Main",
+    "ASSET_ID": 10084099,
+    "ENTID": 112694,
+    "ENTNAME": "W2-23toW2-22",
+    "ROAD_ID": 28153,
+    "OWNER": "City of Waterloo",
+    "ASBUILTNUMBER": "5-1873",
+    "POSITION": "Estimated/Unknown",
+    "DIAMETER": 200,
+    "MATERIAL": "Polyvinyl chloride",
+    "LINED": null,
+    "LINING_TYPE": null,
+    "LINING_YEAR": null,
+    "LINING_NOTES": null,
+    "UPSTREAMINVERT": 321.725,
+    "DOWNSTREAMINVERT": 321.61,
+    "SLOPE": 0.716,
+    "FROMMH": "W2-23",
+    "TOMH": "W2-22",
+    "LENGTH_M": 17.568802612324845,
+    "Shape__Length": 0.00021349131246260533
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -80.526362831029,
+      43.4630409309497
+     ],
+     [
+      -80.5259991080096,
+      43.4625881414796
+     ]
+    ]
+   },
+   "properties": {
+    "OBJECTID": 4523,
+    "LIFECYCLESTATUS": "Active",
+    "INSTALLDATE": 915148800000,
+    "TYPE": "Local Main",
+    "ASSET_ID": 10084098,
+    "ENTID": 112693,
+    "ENTNAME": "W2-24toW2-23",
+    "ROAD_ID": 28153,
+    "OWNER": "City of Waterloo",
+    "ASBUILTNUMBER": "5-1873",
+    "POSITION": "Eng Dwg/As Built +/- 2m",
+    "DIAMETER": 200,
+    "MATERIAL": "Polyvinyl chloride",
+    "LINED": null,
+    "LINING_TYPE": null,
+    "LINING_YEAR": null,
+    "LINING_NOTES": null,
+    "UPSTREAMINVERT": 322.282,
+    "DOWNSTREAMINVERT": 321.755,
+    "SLOPE": 0.905,
+    "FROMMH": "W2-24",
+    "TOMH": "W2-23",
+    "LENGTH_M": 58.262119921082224,
+    "Shape__Length": 0.0005807863110318566
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -80.5262494846573,
+      43.4586374868855
+     ],
+     [
+      -80.5269058805949,
+      43.4592316866073
+     ],
+     [
+      -80.5269567374873,
+      43.459277723734
+     ]
+    ]
+   },
+   "properties": {
+    "OBJECTID": 4528,
+    "LIFECYCLESTATUS": "Active",
+    "INSTALLDATE": 536457600000,
+    "TYPE": "Local Main",
+    "ASSET_ID": 10085527,
+    "ENTID": 110207,
+    "ENTNAME": "W5-19toW5-18",
+    "ROAD_ID": 135,
+    "OWNER": "City of Waterloo",
+    "ASBUILTNUMBER": "15-349",
+    "POSITION": "GPS +/- 0.5m",
+    "DIAMETER": 225,
+    "MATERIAL": "Vitrified Clay",
+    "LINED": null,
+    "LINING_TYPE": "CIPP",
+    "LINING_YEAR": 2010,
+    "LINING_NOTES": "CIPP lined 12/2010",
+    "UPSTREAMINVERT": 332.22,
+    "DOWNSTREAMINVERT": 330.71,
+    "SLOPE": 1.692,
+    "FROMMH": "W5-19",
+    "TOMH": "W5-18",
+    "LENGTH_M": 91.26669765424293,
+    "Shape__Length": 0.0009539967440115428
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -80.5257862111863,
+      43.4567909804216
+     ],
+     [
+      -80.5265146878033,
+      43.4574417451549
+     ]
+    ]
+   },
+   "properties": {
+    "OBJECTID": 4578,
+    "LIFECYCLESTATUS": "Active",
+    "INSTALLDATE": -1470182400000,
+    "TYPE": "Local Main",
+    "ASSET_ID": 10088020,
+    "ENTID": 110231,
+    "ENTNAME": "W5-29toW5-14",
+    "ROAD_ID": 8585,
+    "OWNER": "City of Waterloo",
+    "ASBUILTNUMBER": "5-88, 15-396",
+    "POSITION": "GPS +/- 0.5m",
+    "DIAMETER": 250,
+    "MATERIAL": "Vitrified Clay",
+    "LINED": null,
+    "LINING_TYPE": null,
+    "LINING_YEAR": null,
+    "LINING_NOTES": null,
+    "UPSTREAMINVERT": 338.83,
+    "DOWNSTREAMINVERT": 336.04,
+    "SLOPE": 4.261,
+    "FROMMH": "W5-29",
+    "TOMH": "W5-14",
+    "LENGTH_M": 93.25712602280083,
+    "Shape__Length": 0.000976817751556647
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -80.5283355586047,
+      43.4605802758621
+     ],
+     [
+      -80.5276648490298,
+      43.4599186512244
+     ]
+    ]
+   },
+   "properties": {
+    "OBJECTID": 4582,
+    "LIFECYCLESTATUS": "Active",
+    "INSTALLDATE": -599616000000,
+    "TYPE": "Local Main",
+    "ASSET_ID": 10088550,
+    "ENTID": 110176,
+    "ENTNAME": "W5-21toW5-20",
+    "ROAD_ID": 5941,
+    "OWNER": "City of Waterloo",
+    "ASBUILTNUMBER": null,
+    "POSITION": "GPS +/- 0.5m",
+    "DIAMETER": 300,
+    "MATERIAL": "Vitrified Clay",
+    "LINED": null,
+    "LINING_TYPE": null,
+    "LINING_YEAR": null,
+    "LINING_NOTES": null,
+    "UPSTREAMINVERT": 328.852,
+    "DOWNSTREAMINVERT": 328.397,
+    "SLOPE": null,
+    "FROMMH": "W5-21",
+    "TOMH": "W5-20",
+    "LENGTH_M": 91.34192447568006,
+    "Shape__Length": 0.0009421244582815139
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -80.5242131551305,
+      43.456830480786
+     ],
+     [
+      -80.5244886985327,
+      43.4570736675069
+     ],
+     [
+      -80.5244960198,
+      43.4570801297595
+     ],
+     [
+      -80.5245645518495,
+      43.4571406142089
+     ],
+     [
+      -80.5245756381217,
+      43.4571503994084
+     ],
+     [
+      -80.524616727727,
+      43.457186663278
+     ],
+     [
+      -80.5248154824222,
+      43.4573620774474
+     ]
+    ]
+   },
+   "properties": {
+    "OBJECTID": 4618,
+    "LIFECYCLESTATUS": "Active",
+    "INSTALLDATE": 788918400000,
+    "TYPE": "Local Main",
+    "ASSET_ID": 10088019,
+    "ENTID": 110259,
+    "ENTNAME": "W7-39toW5-28",
+    "ROAD_ID": 1444,
+    "OWNER": "City of Waterloo",
+    "ASBUILTNUMBER": null,
+    "POSITION": "Estimated/Unknown",
+    "DIAMETER": 225,
+    "MATERIAL": "Polyvinyl chloride",
+    "LINED": null,
+    "LINING_TYPE": null,
+    "LINING_YEAR": null,
+    "LINING_NOTES": null,
+    "UPSTREAMINVERT": 335.32,
+    "DOWNSTREAMINVERT": 334.54,
+    "SLOPE": 1.026,
+    "FROMMH": "W7-39",
+    "TOMH": "W5-28",
+    "LENGTH_M": 76.55189343402515,
+    "Shape__Length": 0.0008033636640686772
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -80.527664849,
+      43.4599186510001
+     ],
+     [
+      -80.526956737,
+      43.4592777240001
+     ]
+    ]
+   },
+   "properties": {
+    "OBJECTID": 4713,
+    "LIFECYCLESTATUS": "Active",
+    "INSTALLDATE": -599616000000,
+    "TYPE": "Local Main",
+    "ASSET_ID": 10088551,
+    "ENTID": 110177,
+    "ENTNAME": "W5-20toW5-18",
+    "ROAD_ID": 5941,
+    "OWNER": "City of Waterloo",
+    "ASBUILTNUMBER": null,
+    "POSITION": "GPS +/- 0.5m",
+    "DIAMETER": 300,
+    "MATERIAL": "Vitrified Clay",
+    "LINED": null,
+    "LINING_TYPE": null,
+    "LINING_YEAR": null,
+    "LINING_NOTES": null,
+    "UPSTREAMINVERT": 328.397,
+    "DOWNSTREAMINVERT": 327.96,
+    "SLOPE": null,
+    "FROMMH": "W5-20",
+    "TOMH": "W5-18",
+    "LENGTH_M": 91.36962970748282,
+    "Shape__Length": 0.000955096866217367
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -80.5236846751969,
+      43.4628489047573
+     ],
+     [
+      -80.5227401742727,
+      43.4632689314748
+     ]
+    ]
+   },
+   "properties": {
+    "OBJECTID": 4725,
+    "LIFECYCLESTATUS": "Active",
+    "INSTALLDATE": 1104537600000,
+    "TYPE": "Local Main",
+    "ASSET_ID": 10083752,
+    "ENTID": 112609,
+    "ENTNAME": "W2-11DtoW2-11C",
+    "ROAD_ID": 30205,
+    "OWNER": "City of Waterloo",
+    "ASBUILTNUMBER": "5-2192; 41-610",
+    "POSITION": "Eng Dwg/As Built +/- 2m",
+    "DIAMETER": 375,
+    "MATERIAL": "Concrete",
+    "LINED": null,
+    "LINING_TYPE": null,
+    "LINING_YEAR": null,
+    "LINING_NOTES": null,
+    "UPSTREAMINVERT": 321.08,
+    "DOWNSTREAMINVERT": 320.132,
+    "SLOPE": 0.131,
+    "FROMMH": "W2-11D",
+    "TOMH": "W2-11C",
+    "LENGTH_M": 89.51996070175032,
+    "Shape__Length": 0.0010336848839185965
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -80.5257862111863,
+      43.4567909804216
+     ],
+     [
+      -80.5252438810385,
+      43.4571100449359
+     ],
+     [
+      -80.5252368897951,
+      43.4571141579109
+     ],
+     [
+      -80.5251274201981,
+      43.4571785607956
+     ],
+     [
+      -80.5248154824222,
+      43.4573620774474
+     ]
+    ]
+   },
+   "properties": {
+    "OBJECTID": 4727,
+    "LIFECYCLESTATUS": "Active",
+    "INSTALLDATE": -3786825600000,
+    "TYPE": "Local Main",
+    "ASSET_ID": 10082332,
+    "ENTID": 110261,
+    "ENTNAME": "W5-29toW5-28",
+    "ROAD_ID": 1435,
+    "OWNER": "City of Waterloo",
+    "ASBUILTNUMBER": "Logbook_GIS Edits_2026-07-27, 5-729",
+    "POSITION": "Field Notes",
+    "DIAMETER": 250,
+    "MATERIAL": "Vitrified Clay",
+    "LINED": null,
+    "LINING_TYPE": null,
+    "LINING_YEAR": null,
+    "LINING_NOTES": null,
+    "UPSTREAMINVERT": 338.83,
+    "DOWNSTREAMINVERT": 334.54,
+    "SLOPE": 4.249,
+    "FROMMH": "W5-29",
+    "TOMH": "W5-28",
+    "LENGTH_M": 100.94819468998023,
+    "Shape__Length": 0.0011262620237842663
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -80.5259970891239,
+      43.4598396000887
+     ],
+     [
+      -80.5250483990125,
+      43.4603955799777
+     ]
+    ]
+   },
+   "properties": {
+    "OBJECTID": 4737,
+    "LIFECYCLESTATUS": "Active",
+    "INSTALLDATE": -31536000000,
+    "TYPE": "Local Main",
+    "ASSET_ID": 10084138,
+    "ENTID": 110204,
+    "ENTNAME": "W5-17toW5-16",
+    "ROAD_ID": 1604,
+    "OWNER": "City of Waterloo",
+    "ASBUILTNUMBER": "5-589",
+    "POSITION": "GPS +/- 0.5m",
+    "DIAMETER": 225,
+    "MATERIAL": "Vitrified Clay",
+    "LINED": null,
+    "LINING_TYPE": "CIPP",
+    "LINING_YEAR": 2017,
+    "LINING_NOTES": "Full Length",
+    "UPSTREAMINVERT": 327.47,
+    "DOWNSTREAMINVERT": 327.09,
+    "SLOPE": 0.372,
+    "FROMMH": "W5-17",
+    "TOMH": "W5-16",
+    "LENGTH_M": 98.5034230693074,
+    "Shape__Length": 0.001099602912216035
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -80.5267340297248,
+      43.4604669238526
+     ],
+     [
+      -80.5259970891239,
+      43.4598396000887
+     ]
+    ]
+   },
+   "properties": {
+    "OBJECTID": 4784,
+    "LIFECYCLESTATUS": "Active",
+    "INSTALLDATE": -599616000000,
+    "TYPE": "Local Main",
+    "ASSET_ID": 10084137,
+    "ENTID": 110188,
+    "ENTNAME": "L44-19toW5-17",
+    "ROAD_ID": 1393,
+    "OWNER": "City of Waterloo",
+    "ASBUILTNUMBER": "15-110B",
+    "POSITION": "GPS +/- 0.5m",
+    "DIAMETER": 225,
+    "MATERIAL": "Vitrified Clay",
+    "LINED": null,
+    "LINING_TYPE": null,
+    "LINING_YEAR": null,
+    "LINING_NOTES": null,
+    "UPSTREAMINVERT": 328.4,
+    "DOWNSTREAMINVERT": 327.5,
+    "SLOPE": 1.001,
+    "FROMMH": "L44-19",
+    "TOMH": "W5-17",
+    "LENGTH_M": 91.6962216586535,
+    "Shape__Length": 0.0009677895194998237
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -80.5274485216029,
+      43.456884278609
+     ],
+     [
+      -80.5265146878033,
+      43.4574417451549
+     ]
+    ]
+   },
+   "properties": {
+    "OBJECTID": 4836,
+    "LIFECYCLESTATUS": "Active",
+    "INSTALLDATE": -63158400000,
+    "TYPE": "Local Main",
+    "ASSET_ID": 10084382,
+    "ENTID": 110230,
+    "ENTNAME": "W5-15toW5-14",
+    "ROAD_ID": 8867,
+    "OWNER": "City of Waterloo",
+    "ASBUILTNUMBER": "5-466",
+    "POSITION": "GPS +/- 0.5m",
+    "DIAMETER": 225,
+    "MATERIAL": "Vitrified Clay",
+    "LINED": null,
+    "LINING_TYPE": null,
+    "LINING_YEAR": null,
+    "LINING_NOTES": null,
+    "UPSTREAMINVERT": 339.28,
+    "DOWNSTREAMINVERT": 336.04,
+    "SLOPE": 3.327,
+    "FROMMH": "W5-15",
+    "TOMH": "W5-14",
+    "LENGTH_M": 97.6772978359985,
+    "Shape__Length": 0.0010875727631331994
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -80.5250483990125,
+      43.4603955799777
+     ],
+     [
+      -80.523939571319,
+      43.4610742403771
+     ]
+    ]
+   },
+   "properties": {
+    "OBJECTID": 4978,
+    "LIFECYCLESTATUS": "Active",
+    "INSTALLDATE": -31536000000,
+    "TYPE": "Local Main",
+    "ASSET_ID": 10084140,
+    "ENTID": 110199,
+    "ENTNAME": "W5-16toW2-18",
+    "ROAD_ID": 1600,
+    "OWNER": "City of Waterloo",
+    "ASBUILTNUMBER": "5-589",
+    "POSITION": "GPS +/- 0.5m",
+    "DIAMETER": 225,
+    "MATERIAL": "Vitrified Clay",
+    "LINED": null,
+    "LINING_TYPE": null,
+    "LINING_YEAR": null,
+    "LINING_NOTES": null,
+    "UPSTREAMINVERT": 328.28,
+    "DOWNSTREAMINVERT": 325.78,
+    "SLOPE": 2.132,
+    "FROMMH": "W5-16",
+    "TOMH": "W2-18",
+    "LENGTH_M": 117.1637441610661,
+    "Shape__Length": 0.0013000303041027551
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -80.5269567374873,
+      43.459277723734
+     ],
+     [
+      -80.5259970891239,
+      43.4598396000887
+     ]
+    ]
+   },
+   "properties": {
+    "OBJECTID": 5113,
+    "LIFECYCLESTATUS": "Active",
+    "INSTALLDATE": -31536000000,
+    "TYPE": "Local Main",
+    "ASSET_ID": 10084363,
+    "ENTID": 110206,
+    "ENTNAME": "W5-18toW5-17",
+    "ROAD_ID": 1398,
+    "OWNER": "City of Waterloo",
+    "ASBUILTNUMBER": "5-589",
+    "POSITION": "GPS +/- 0.5m",
+    "DIAMETER": 225,
+    "MATERIAL": "Vitrified Clay",
+    "LINED": null,
+    "LINING_TYPE": null,
+    "LINING_YEAR": null,
+    "LINING_NOTES": null,
+    "UPSTREAMINVERT": 327.96,
+    "DOWNSTREAMINVERT": 327.5,
+    "SLOPE": 0.488,
+    "FROMMH": "W5-18",
+    "TOMH": "W5-17",
+    "LENGTH_M": 99.60519366089287,
+    "Shape__Length": 0.0011120386770517533
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -80.5279167833002,
+      43.4555339084398
+     ],
+     [
+      -80.5267592600185,
+      43.4562214973702
+     ]
+    ]
+   },
+   "properties": {
+    "OBJECTID": 5324,
+    "LIFECYCLESTATUS": "Active",
+    "INSTALLDATE": -631152000000,
+    "TYPE": "Local Main",
+    "ASSET_ID": 10082871,
+    "ENTID": 110266,
+    "ENTNAME": "W5-33toW5-31",
+    "ROAD_ID": 5976,
+    "OWNER": "City of Waterloo",
+    "ASBUILTNUMBER": "5-729",
+    "POSITION": "GPS +/- 0.5m",
+    "DIAMETER": 250,
+    "MATERIAL": "Concrete",
+    "LINED": null,
+    "LINING_TYPE": null,
+    "LINING_YEAR": null,
+    "LINING_NOTES": null,
+    "UPSTREAMINVERT": 340.96,
+    "DOWNSTREAMINVERT": 340.15,
+    "SLOPE": 0.674,
+    "FROMMH": "W5-33",
+    "TOMH": "W5-31",
+    "LENGTH_M": 120.83646505938093,
+    "Shape__Length": 0.0013463427070736372
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -80.5278163311063,
+      43.458759437603
+     ],
+     [
+      -80.5269567374873,
+      43.459277723734
+     ]
+    ]
+   },
+   "properties": {
+    "OBJECTID": 5427,
+    "LIFECYCLESTATUS": "Active",
+    "INSTALLDATE": 536457600000,
+    "TYPE": "Local Main",
+    "ASSET_ID": 10086025,
+    "ENTID": 110210,
+    "ENTNAME": "W5-22toW5-18",
+    "ROAD_ID": 131,
+    "OWNER": "City of Waterloo",
+    "ASBUILTNUMBER": "15-349",
+    "POSITION": "GPS +/- 0.5m",
+    "DIAMETER": 250,
+    "MATERIAL": "Vitrified Clay",
+    "LINED": null,
+    "LINING_TYPE": null,
+    "LINING_YEAR": null,
+    "LINING_NOTES": null,
+    "UPSTREAMINVERT": 330.87,
+    "DOWNSTREAMINVERT": 327.99,
+    "SLOPE": 3.159,
+    "FROMMH": "W5-22",
+    "TOMH": "W5-18",
+    "LENGTH_M": 90.27307360018081,
+    "Shape__Length": 0.0010037538061237342
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -80.5236228406862,
+      43.4562697208346
+     ],
+     [
+      -80.5239334851024,
+      43.4565648139555
+     ],
+     [
+      -80.5242131551305,
+      43.456830480786
+     ]
+    ]
+   },
+   "properties": {
+    "OBJECTID": 5611,
+    "LIFECYCLESTATUS": "Active",
+    "INSTALLDATE": 788918400000,
+    "TYPE": "Local Main",
+    "ASSET_ID": 10088018,
+    "ENTID": 110260,
+    "ENTNAME": "W7-40toW7-39",
+    "ROAD_ID": 1444,
+    "OWNER": "City of Waterloo",
+    "ASBUILTNUMBER": null,
+    "POSITION": "Estimated/Unknown",
+    "DIAMETER": 225,
+    "MATERIAL": "Polyvinyl chloride",
+    "LINED": null,
+    "LINING_TYPE": null,
+    "LINING_YEAR": null,
+    "LINING_NOTES": null,
+    "UPSTREAMINVERT": 335.84,
+    "DOWNSTREAMINVERT": 335.35,
+    "SLOPE": 0.624,
+    "FROMMH": "W7-40",
+    "TOMH": "W7-39",
+    "LENGTH_M": 78.48174414075645,
+    "Shape__Length": 0.0008142007530622132
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -80.5236267307734,
+      43.4625295593899
+     ],
+     [
+      -80.5238683783331,
+      43.4627684335484
+     ]
+    ]
+   },
+   "properties": {
+    "OBJECTID": 6510,
+    "LIFECYCLESTATUS": "Active",
+    "INSTALLDATE": 1477958400000,
+    "TYPE": "Local Main",
+    "ASSET_ID": 10204790,
+    "ENTID": 132190,
+    "ENTNAME": "W2-13toW2-12",
+    "ROAD_ID": 28344,
+    "OWNER": "City of Waterloo",
+    "ASBUILTNUMBER": "41-610",
+    "POSITION": "Eng Dwg/As Built +/- 2m",
+    "DIAMETER": 300,
+    "MATERIAL": "Polyvinyl chloride",
+    "LINED": null,
+    "LINING_TYPE": null,
+    "LINING_YEAR": null,
+    "LINING_NOTES": null,
+    "UPSTREAMINVERT": 321.397,
+    "DOWNSTREAMINVERT": 320.846,
+    "SLOPE": 1.67,
+    "FROMMH": "W2-13",
+    "TOMH": "W2-12",
+    "LENGTH_M": 32.953484326030086,
+    "Shape__Length": 0.0003397858247768309
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -80.5244105721425,
+      43.4634326359686
+     ],
+     [
+      -80.524115200419,
+      43.4630750206625
+     ]
+    ]
+   },
+   "properties": {
+    "OBJECTID": 6536,
+    "LIFECYCLESTATUS": "Active",
+    "INSTALLDATE": 1477958400000,
+    "TYPE": "Local Main",
+    "ASSET_ID": 10204788,
+    "ENTID": 132191,
+    "ENTNAME": "W2-26toW2-25",
+    "ROAD_ID": 1611,
+    "OWNER": "City of Waterloo",
+    "ASBUILTNUMBER": "41-610",
+    "POSITION": "Eng Dwg/As Built +/- 2m",
+    "DIAMETER": 300,
+    "MATERIAL": "Polyvinyl chloride",
+    "LINED": null,
+    "LINING_TYPE": null,
+    "LINING_YEAR": null,
+    "LINING_NOTES": null,
+    "UPSTREAMINVERT": 320.472,
+    "DOWNSTREAMINVERT": 320.395,
+    "SLOPE": 0.34,
+    "FROMMH": "W2-26",
+    "TOMH": "W2-25",
+    "LENGTH_M": 46.35005312516831,
+    "Shape__Length": 0.00046382449499194023
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -80.524115200419,
+      43.4630750206625
+     ],
+     [
+      -80.5238683783331,
+      43.4627684335484
+     ]
+    ]
+   },
+   "properties": {
+    "OBJECTID": 6547,
+    "LIFECYCLESTATUS": "Active",
+    "INSTALLDATE": 1477958400000,
+    "TYPE": "Local Main",
+    "ASSET_ID": 10204780,
+    "ENTID": 132188,
+    "ENTNAME": "W2-25toW2-12",
+    "ROAD_ID": 30206,
+    "OWNER": "City of Waterloo",
+    "ASBUILTNUMBER": "41-610",
+    "POSITION": "Eng Dwg/As Built +/- 2m",
+    "DIAMETER": 375,
+    "MATERIAL": "Polyvinyl chloride",
+    "LINED": null,
+    "LINING_TYPE": null,
+    "LINING_YEAR": null,
+    "LINING_NOTES": null,
+    "UPSTREAMINVERT": 320.32,
+    "DOWNSTREAMINVERT": 320.246,
+    "SLOPE": 0.15,
+    "FROMMH": "W2-25",
+    "TOMH": "W2-12",
+    "LENGTH_M": 39.471886008223436,
+    "Shape__Length": 0.000393594716181526
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -80.5233772771898,
+      43.4622148716248
+     ],
+     [
+      -80.5236267307734,
+      43.4625295593899
+     ]
+    ]
+   },
+   "properties": {
+    "OBJECTID": 6549,
+    "LIFECYCLESTATUS": "Active",
+    "INSTALLDATE": 1477958400000,
+    "TYPE": "Local Main",
+    "ASSET_ID": 10204781,
+    "ENTID": 132189,
+    "ENTNAME": "W2-14toW2-13",
+    "ROAD_ID": 28344,
+    "OWNER": "City of Waterloo",
+    "ASBUILTNUMBER": "41-610",
+    "POSITION": "Eng Dwg/As Built +/- 2m",
+    "DIAMETER": 300,
+    "MATERIAL": "Polyvinyl chloride",
+    "LINED": null,
+    "LINING_TYPE": null,
+    "LINING_YEAR": null,
+    "LINING_NOTES": null,
+    "UPSTREAMINVERT": 322.347,
+    "DOWNSTREAMINVERT": 321.647,
+    "SLOPE": 1.74,
+    "FROMMH": "W2-14",
+    "TOMH": "W2-13",
+    "LENGTH_M": 40.35663307646852,
+    "Shape__Length": 0.000401566283333365
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -80.5225270536685,
+      43.4611207274688
+     ],
+     [
+      -80.522541716744,
+      43.4611384948383
+     ],
+     [
+      -80.5226297125055,
+      43.4612451215979
+     ],
+     [
+      -80.5228712787483,
+      43.4615378336461
+     ]
+    ]
+   },
+   "properties": {
+    "OBJECTID": 6598,
+    "LIFECYCLESTATUS": "Active",
+    "INSTALLDATE": 1477958400000,
+    "TYPE": "Local Main",
+    "ASSET_ID": 10204787,
+    "ENTID": 132192,
+    "ENTNAME": "W2-17toW2-16",
+    "ROAD_ID": 1583,
+    "OWNER": "City of Waterloo",
+    "ASBUILTNUMBER": "41-611",
+    "POSITION": "Eng Dwg/As Built +/- 2m",
+    "DIAMETER": 300,
+    "MATERIAL": "Polyvinyl chloride",
+    "LINED": null,
+    "LINING_TYPE": null,
+    "LINING_YEAR": null,
+    "LINING_NOTES": null,
+    "UPSTREAMINVERT": 324.68,
+    "DOWNSTREAMINVERT": 323.561,
+    "SLOPE": 2.08,
+    "FROMMH": "W2-17",
+    "TOMH": "W2-16",
+    "LENGTH_M": 54.049236404321405,
+    "Shape__Length": 0.0005408035398765528
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -80.5238683783331,
+      43.4627684335484
+     ],
+     [
+      -80.5236819859827,
+      43.4628533786181
+     ]
+    ]
+   },
+   "properties": {
+    "OBJECTID": 6639,
+    "LIFECYCLESTATUS": "Active",
+    "INSTALLDATE": 1477958400000,
+    "TYPE": "Local Main",
+    "ASSET_ID": 10204792,
+    "ENTID": 132186,
+    "ENTNAME": "W2-12toW2-11D",
+    "ROAD_ID": 30205,
+    "OWNER": "City of Waterloo",
+    "ASBUILTNUMBER": "41-616",
+    "POSITION": "Eng Dwg/As Built +/- 2m",
+    "DIAMETER": 375,
+    "MATERIAL": "Polyvinyl chloride",
+    "LINED": null,
+    "LINING_TYPE": null,
+    "LINING_YEAR": null,
+    "LINING_NOTES": null,
+    "UPSTREAMINVERT": 320.246,
+    "DOWNSTREAMINVERT": 320.22,
+    "SLOPE": 0.15,
+    "FROMMH": "W2-12",
+    "TOMH": "W2-11D",
+    "LENGTH_M": 17.786342535851844,
+    "Shape__Length": 0.00020483596642064316
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -80.5228712787483,
+      43.4615378336461
+     ],
+     [
+      -80.5230886191442,
+      43.4618601845806
+     ]
+    ]
+   },
+   "properties": {
+    "OBJECTID": 6648,
+    "LIFECYCLESTATUS": "Active",
+    "INSTALLDATE": 1477958400000,
+    "TYPE": "Local Main",
+    "ASSET_ID": 10204791,
+    "ENTID": 132193,
+    "ENTNAME": "W2-16toW2-15",
+    "ROAD_ID": 28344,
+    "OWNER": "City of Waterloo",
+    "ASBUILTNUMBER": "41-611",
+    "POSITION": "Eng Dwg/As Built +/- 2m",
+    "DIAMETER": 300,
+    "MATERIAL": "Polyvinyl chloride",
+    "LINED": null,
+    "LINING_TYPE": null,
+    "LINING_YEAR": null,
+    "LINING_NOTES": null,
+    "UPSTREAMINVERT": 323.506,
+    "DOWNSTREAMINVERT": 322.918,
+    "SLOPE": 1.47,
+    "FROMMH": "W2-16",
+    "TOMH": "W2-15",
+    "LENGTH_M": 39.88456008322474,
+    "Shape__Length": 0.00038877625012970565
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -80.5230886191442,
+      43.4618601845806
+     ],
+     [
+      -80.5233772771898,
+      43.4622148716248
+     ]
+    ]
+   },
+   "properties": {
+    "OBJECTID": 6656,
+    "LIFECYCLESTATUS": "Active",
+    "INSTALLDATE": 1477958400000,
+    "TYPE": "Local Main",
+    "ASSET_ID": 10204789,
+    "ENTID": 132187,
+    "ENTNAME": "W2-15toW2-14",
+    "ROAD_ID": 28344,
+    "OWNER": "City of Waterloo",
+    "ASBUILTNUMBER": "41-610",
+    "POSITION": "Eng Dwg/As Built +/- 2m",
+    "DIAMETER": 300,
+    "MATERIAL": "Polyvinyl chloride",
+    "LINED": null,
+    "LINING_TYPE": null,
+    "LINING_YEAR": null,
+    "LINING_NOTES": null,
+    "UPSTREAMINVERT": 322.907,
+    "DOWNSTREAMINVERT": 322.387,
+    "SLOPE": 1.13,
+    "FROMMH": "W2-15",
+    "TOMH": "W2-14",
+    "LENGTH_M": 45.79261295576556,
+    "Shape__Length": 0.0004573033638039647
+   }
+  }
+ ]
+}

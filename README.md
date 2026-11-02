@@ -154,7 +154,7 @@ logging.basicConfig(level=logging.INFO)
 `us_node_type`, `ds_node_type`, in m), and the node layers to canonical node columns (`node_id`,
 `node_type`, `name`, `invert`, `rim_elevation`, `depth`, `has_drop`, `overflow`, `weir`,
 `pipes_in`, `pipes_out`, `flow_monitor`, `access`, `verified`); everything after loading reads
-only those (see `swmmbuilder/schema.py`). Two schemas ship with the package, as TOML files in
+only those (see `swmmbuilder/schema.py`). These schemas ship with the package, as TOML files in
 `swmmbuilder/schemas/`:
 
 - `LONDON_ON` (the default): London, ON's GIS export. The City's GeoJSON is in WGS 84; it
@@ -166,6 +166,19 @@ only those (see `swmmbuilder/schema.py`). Two schemas ship with the package, as 
   cross-section; the other shapes are reported on loading. Flow types other than `SAN`, `Storm`
   and `Combined` (`CSO`, `SCSO`, `FD`, `EO`) pass through unchanged, so e.g.
   `flow_types={"sanitary", "combined"}` keeps sanitary and combined sewers.
+- Six more Ontario cities' open data, each reprojected to its UTM zone 17N CRS:
+  - `WINDSOR_ON`: the SanitarySewer, StormSewer and CombinedSewer layers.
+  - `KITCHENER_ON`: Sanitary Pipes. `CATEGORY` is the structure type.
+  - `WATERLOO_ON`: Sanitary Sewer Gravity Mains. All pipes are taken as circular, and an invert
+    of 111.111 means none.
+  - `PETERBOROUGH_ON`: Sanitary (and Storm) Sewer Pipes. Only circular pipes get a cross-section.
+  - `BARRIE_ON`: Sanitary Pipes. `TYPE` is the structure type.
+  - `SARNIA_ON`: Sanitary and Storm Sewers. All pipes are taken as circular; non-circular sizes
+    (`"W x H"`) are rejected if written.
+
+  Each TOML file's header gives the dataset's URL and its quirks. The layers are ArcGIS services
+  that return at most 1,000–2,000 pipes per query, so download them from the portal (GeoJSON) or
+  page through the REST query.
 
 ```python
 from swmmbuilder import TORONTO_ON, Network
@@ -175,7 +188,8 @@ network = Network("sewer-gravity-main-4326.geojson", schema=TORONTO_ON)
 
 For another city, write a schema file and pass its path as `schema=` (or build a `Schema` in
 Python). The top-level keys are the parameters of `Schema`; `columns` maps canonical columns to
-source columns, and `shapes` and `flow_types` map source codes:
+source columns, and `shapes` and `flow_types` map source codes (or set `default_shape`, e.g.
+`"CIRCULAR"`, where there is no shape column):
 
 ```toml
 name = "My city"
@@ -268,15 +282,53 @@ objects can be passed instead of dicts.
 
 Cross-sections come from the schema's shape codes. For London (`PipeShape`, sizes in mm, written
 in m): `R`/`Round` → `CIRCULAR(Diameter)`, `REC` → `RECT_CLOSED(Height, Width)`, `EGG` →
-`EGG(Height)`, `ARC` → `ARCH`, `ELH`/`ELV` → `HORIZ_ELLIPSE`/`VERT_ELLIPSE` (`Height, Width`). An
-unknown or missing shape or size raises `ValueError` listing the pipe IDs, before anything is
-written.
+`EGG(Height)`, `ARC` → `ARCH`, `ELH`/`ELV` → `HORIZ_ELLIPSE`/`VERT_ELLIPSE` (`Height, Width`). A
+round pipe with no diameter whose height equals its width takes that value as its diameter (logged
+and flagged; see below). An unknown or missing shape or size raises `ValueError`, before anything
+is written.
 
 A node's invert is the lowest invert of the subnetwork pipes connected to it, including the
 drop-structure invert (`DropStructureInvert` in London) of pipes entering it. Each conduit's
 inlet/outlet offset is its GIS pipe invert minus the node invert (`LINK_OFFSETS DEPTH`), so
 conduits keep their GIS inverts; any that slope uphill are reported with a warning.
 `height_correction={node: invert}` overrides a node's invert, and the offsets are measured from it.
+
+## Data gaps
+
+`sub.data_gaps()` lists every gap in a subnetwork's data at once: pipes with an unknown or missing
+shape code (`unknown_shape`) or a missing size (`no_size`), pipe ends with no invert
+(`no_us_invert`, `no_ds_invert`; written at the node invert), and nodes with no invert from any pipe
+(`no_node_invert`). `validate()` reports their counts in `data_gaps`, and `to_inp` refuses a
+subnetwork with any `unknown_shape`, `no_size` or `no_node_invert` gap left, listing all of them.
+
+Gaps can be filled by rules that the user chooses; none is applied by default. Every filled value
+is logged and flagged in the report's `filled_from` column (with `value`, `source` and the `order`
+of the fills), so nothing filled looks like City data. The same options go to `data_gaps` (to see
+what would be filled) and `to_inp` (whose returned model keeps the report as `model.data_gaps`):
+
+```python
+from swmmbuilder import LONDON_ON
+
+fills = dict(
+    size_overrides={145041: 0.25, 207149: dict(height=0.6)},  # values from the City, in m
+    shape_codes={"": "CIRCULAR"},       # missing and blank shape codes are ""
+    size_fill="downstream",             # copy from the downstream pipe of the same shape,
+                                        # else the largest upstream one ("upstream": reversed)
+    invert_fill="interpolate",          # by length between the nearest known inverts
+    headwater_slope=0.005,              # no known invert upstream: downstream invert + slope
+    force_main_discharge=LONDON_ON.design["force_main_discharge"],
+)
+report = sub.data_gaps(**fills)
+sub.to_inp("model.inp", **fills)
+```
+
+`force_main_discharge` sets the missing downstream invert of a force main's last pipe from the
+receiving node's invert (known, or filled first by `invert_fill`/`headwater_slope`), plus
+`height_above_receiving_invert` (default: `max_height_above_receiving_invert`); a callable
+`(pipe, receiving_invert) -> invert` can be passed instead. Design values like this sit in the
+schema's optional `[design]` table, apart from the column mapping, and are used only when passed:
+London's (`london_on.toml`) is the Design Specifications & Requirements Manual's limit of 200 mm
+above the receiving maintenance hole's flow line (Ch. 4, s. 4.8).
 
 ## Tests
 
@@ -293,7 +345,10 @@ network in London's newer export schema with its four node layers
 
 `tests/test_toronto.py` also loads a 31-pipe sanitary catchment from the Toronto dataset
 (`tests/data/toronto_catchment.geojson`, fetched by `tests/data/make_toronto_fixture.py`; contains
-information licensed under the Open Government Licence - Toronto).
+information licensed under the Open Government Licence - Toronto). `tests/test_ontario.py` does
+the same for Barrie, Kitchener, Peterborough, Sarnia, Waterloo and Windsor, with a 14–46 pipe
+sanitary catchment each (`tests/data/<city>_catchment.geojson`, fetched by
+`tests/data/make_ontario_fixtures.py`, whose docstring gives each city's licence).
 
 On macOS, swmm-toolkit's wheel ships `libomp.dylib` and `libswmm-output.dylib` with invalid code
 signatures, and `import pyswmm` is killed (exit 137). Re-sign them ad hoc:

@@ -1,0 +1,1541 @@
+{
+ "type": "FeatureCollection",
+ "features": [
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -78.3603756133852,
+      44.2922066184625
+     ],
+     [
+      -78.3602764169963,
+      44.2921501232397
+     ]
+    ]
+   },
+   "properties": {
+    "OBJECTID": 1096,
+    "FACILITYID": "165932",
+    "MATERIAL": "PVC",
+    "DIAMETER": 250,
+    "MAINSHAPE": "Circular",
+    "UP_MH_ID": "165931",
+    "DOWN_MH_ID": "165933",
+    "UP_ELEVATION": 241.44,
+    "DOWN_ELEVATION": 241.23,
+    "SLOPE": 1.90908021,
+    "LINER_TYPE": null,
+    "MAINTAINED_BY": 1,
+    "Shape__Length": 10.10532035466217
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -78.3616031656833,
+      44.2938368092918
+     ],
+     [
+      -78.3615706807689,
+      44.2938372378222
+     ],
+     [
+      -78.3615425241013,
+      44.2938376088366
+     ],
+     [
+      -78.3615205769384,
+      44.2938378983005
+     ],
+     [
+      -78.3614917330004,
+      44.2938382777243
+     ],
+     [
+      -78.3613849621212,
+      44.293839685454
+     ],
+     [
+      -78.3613477651953,
+      44.2938401760551
+     ]
+    ]
+   },
+   "properties": {
+    "OBJECTID": 1107,
+    "FACILITYID": "88032",
+    "MATERIAL": "PVC",
+    "DIAMETER": 250,
+    "MAINSHAPE": "Circular",
+    "UP_MH_ID": "80555",
+    "DOWN_MH_ID": "80554",
+    "UP_ELEVATION": 247.784,
+    "DOWN_ELEVATION": 246.459,
+    "SLOPE": 6.49821291,
+    "LINER_TYPE": null,
+    "MAINTAINED_BY": 1,
+    "Shape__Length": 20.389717012758975
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -78.3613477651953,
+      44.2938401760551
+     ],
+     [
+      -78.3613159532731,
+      44.2938474603963
+     ],
+     [
+      -78.3613060116446,
+      44.2938497369669
+     ],
+     [
+      -78.3612575205967,
+      44.2938608400457
+     ],
+     [
+      -78.3612029733223,
+      44.2938733308787
+     ],
+     [
+      -78.3611537806025,
+      44.2938845950481
+     ],
+     [
+      -78.3610376166389,
+      44.2939111948105
+     ]
+    ]
+   },
+   "properties": {
+    "OBJECTID": 1108,
+    "FACILITYID": "88033",
+    "MATERIAL": "PVC",
+    "DIAMETER": 250,
+    "MAINSHAPE": "Circular",
+    "UP_MH_ID": "80554",
+    "DOWN_MH_ID": "80553",
+    "UP_ELEVATION": 246.399,
+    "DOWN_ELEVATION": 245.1,
+    "SLOPE": 4.99904877,
+    "LINER_TYPE": null,
+    "MAINTAINED_BY": 1,
+    "Shape__Length": 25.9839950012436
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -78.3595214080289,
+      44.2923050496029
+     ],
+     [
+      -78.359612519983,
+      44.2925091646642
+     ]
+    ]
+   },
+   "properties": {
+    "OBJECTID": 1141,
+    "FACILITYID": "90792",
+    "MATERIAL": "PVC",
+    "DIAMETER": 250,
+    "MAINSHAPE": "Circular",
+    "UP_MH_ID": "83173",
+    "DOWN_MH_ID": "83174",
+    "UP_ELEVATION": 239.77,
+    "DOWN_ELEVATION": 239.63,
+    "SLOPE": 0.58769508,
+    "LINER_TYPE": null,
+    "MAINTAINED_BY": 1,
+    "Shape__Length": 23.821513544681505
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -78.3622524653392,
+      44.2953683956818
+     ],
+     [
+      -78.3622693193405,
+      44.2953383511785
+     ],
+     [
+      -78.3622984950145,
+      44.2952863418782
+     ],
+     [
+      -78.3622999988541,
+      44.2952836631844
+     ],
+     [
+      -78.3623395467726,
+      44.295213163225
+     ],
+     [
+      -78.3623676367055,
+      44.2951630869264
+     ],
+     [
+      -78.3623887053346,
+      44.2951255306251
+     ]
+    ]
+   },
+   "properties": {
+    "OBJECTID": 1317,
+    "FACILITYID": "90723",
+    "MATERIAL": "PVC",
+    "DIAMETER": 250,
+    "MAINSHAPE": "Circular",
+    "UP_MH_ID": "83116",
+    "DOWN_MH_ID": "83115",
+    "UP_ELEVATION": 255.421,
+    "DOWN_ELEVATION": 254.696,
+    "SLOPE": 2.49141345,
+    "LINER_TYPE": null,
+    "MAINTAINED_BY": 1,
+    "Shape__Length": 29.098911895229655
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -78.3619428070553,
+      44.2948430774815
+     ],
+     [
+      -78.3619115303269,
+      44.294823660353
+     ],
+     [
+      -78.3618736180854,
+      44.2948001223304
+     ],
+     [
+      -78.3618338459845,
+      44.2947754312664
+     ],
+     [
+      -78.3617909373297,
+      44.2947487906144
+     ],
+     [
+      -78.3617740989249,
+      44.2947383381227
+     ],
+     [
+      -78.3617361867939,
+      44.2947148000567
+     ],
+     [
+      -78.3616410180572,
+      44.2946557162879
+     ],
+     [
+      -78.3616067561131,
+      44.2946344448235
+     ],
+     [
+      -78.3616050499767,
+      44.2946333853721
+     ],
+     [
+      -78.3615727661351,
+      44.2946133425855
+     ],
+     [
+      -78.361518193955,
+      44.294579461378
+     ],
+     [
+      -78.361485021155,
+      44.2945588659537
+     ],
+     [
+      -78.3614565862487,
+      44.2945412132147
+     ]
+    ]
+   },
+   "properties": {
+    "OBJECTID": 1455,
+    "FACILITYID": "90720",
+    "MATERIAL": "PVC",
+    "DIAMETER": 250,
+    "MAINSHAPE": "Circular",
+    "UP_MH_ID": "83113",
+    "DOWN_MH_ID": "80551",
+    "UP_ELEVATION": 251.585,
+    "DOWN_ELEVATION": 248.425,
+    "SLOPE": 6.15984523,
+    "LINER_TYPE": null,
+    "MAINTAINED_BY": 1,
+    "Shape__Length": 51.29954970057548
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -78.3616162378223,
+      44.2919222310669
+     ],
+     [
+      -78.3603756133852,
+      44.2922066184625
+     ]
+    ]
+   },
+   "properties": {
+    "OBJECTID": 1644,
+    "FACILITYID": "165930",
+    "MATERIAL": "PVC",
+    "DIAMETER": 250,
+    "MAINSHAPE": "Circular",
+    "UP_MH_ID": "165929",
+    "DOWN_MH_ID": "165931",
+    "UP_ELEVATION": 245.66,
+    "DOWN_ELEVATION": 241.19,
+    "SLOPE": 4.30007249,
+    "LINER_TYPE": null,
+    "MAINTAINED_BY": 1,
+    "Shape__Length": 103.95173589954904
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -78.360167301027,
+      44.2937510634249
+     ],
+     [
+      -78.3598091580487,
+      44.2929500407888
+     ]
+    ]
+   },
+   "properties": {
+    "OBJECTID": 1723,
+    "FACILITYID": "90794",
+    "MATERIAL": "PVC",
+    "DIAMETER": 250,
+    "MAINSHAPE": "Circular",
+    "UP_MH_ID": "83176",
+    "DOWN_MH_ID": "83175",
+    "UP_ELEVATION": 241.53,
+    "DOWN_ELEVATION": 239.96,
+    "SLOPE": 1.67914392,
+    "LINER_TYPE": null,
+    "MAINTAINED_BY": 1,
+    "Shape__Length": 93.4985389424591
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -78.3604111039637,
+      44.2943005927997
+     ],
+     [
+      -78.3603126028639,
+      44.2940775979338
+     ]
+    ]
+   },
+   "properties": {
+    "OBJECTID": 1724,
+    "FACILITYID": "90796",
+    "MATERIAL": "PVC",
+    "DIAMETER": 250,
+    "MAINSHAPE": "Circular",
+    "UP_MH_ID": "83177",
+    "DOWN_MH_ID": "80557",
+    "UP_ELEVATION": 246.07,
+    "DOWN_ELEVATION": 244.55,
+    "SLOPE": 5.84615091,
+    "LINER_TYPE": null,
+    "MAINTAINED_BY": 1,
+    "Shape__Length": 25.99964703381042
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -78.3603126028639,
+      44.2940775979338
+     ],
+     [
+      -78.360167301027,
+      44.2937510634249
+     ]
+    ]
+   },
+   "properties": {
+    "OBJECTID": 1790,
+    "FACILITYID": "90795",
+    "MATERIAL": "PVC",
+    "DIAMETER": 250,
+    "MAINSHAPE": "Circular",
+    "UP_MH_ID": "80557",
+    "DOWN_MH_ID": "83176",
+    "UP_ELEVATION": 244.49,
+    "DOWN_ELEVATION": 241.496,
+    "SLOPE": 7.85879061,
+    "LINER_TYPE": null,
+    "MAINTAINED_BY": 1,
+    "Shape__Length": 38.09746496025525
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -78.3614565862487,
+      44.2945412132147
+     ],
+     [
+      -78.3614436644699,
+      44.294525794333
+     ],
+     [
+      -78.3613706627753,
+      44.294438678446
+     ],
+     [
+      -78.361344820565,
+      44.2944078406926
+     ],
+     [
+      -78.3612672953458,
+      44.2943153274293
+     ],
+     [
+      -78.3612414544538,
+      44.2942844905828
+     ],
+     [
+      -78.3611897702853,
+      44.2942228159165
+     ]
+    ]
+   },
+   "properties": {
+    "OBJECTID": 1843,
+    "FACILITYID": "88035",
+    "MATERIAL": "PVC",
+    "DIAMETER": 250,
+    "MAINSHAPE": "Circular",
+    "UP_MH_ID": "80551",
+    "DOWN_MH_ID": "80552",
+    "UP_ELEVATION": 248.375,
+    "DOWN_ELEVATION": 245.814,
+    "SLOPE": 6.20097527,
+    "LINER_TYPE": null,
+    "MAINTAINED_BY": 1,
+    "Shape__Length": 41.29960903451709
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -78.3642500529891,
+      44.2895512893539
+     ],
+     [
+      -78.3642865931767,
+      44.2896350371903
+     ],
+     [
+      -78.3643242734593,
+      44.2897214023455
+     ],
+     [
+      -78.3643459686631,
+      44.289771127907
+     ],
+     [
+      -78.3644024900212,
+      44.2899006751746
+     ],
+     [
+      -78.3644144795836,
+      44.2899281548711
+     ],
+     [
+      -78.3644625515165,
+      44.2900383364494
+     ],
+     [
+      -78.3644733998713,
+      44.2900631987838
+     ],
+     [
+      -78.3645185027303,
+      44.2901665749882
+     ],
+     [
+      -78.3645584674885,
+      44.2902581739174
+     ],
+     [
+      -78.3645801630687,
+      44.2903078994397
+     ],
+     [
+      -78.3646519878906,
+      44.2904725164994
+     ]
+    ]
+   },
+   "properties": {
+    "OBJECTID": 2172,
+    "FACILITYID": "91293",
+    "MATERIAL": "PVC",
+    "DIAMETER": 254,
+    "MAINSHAPE": "Circular",
+    "UP_MH_ID": "83674",
+    "DOWN_MH_ID": "83673",
+    "UP_ELEVATION": 259.964,
+    "DOWN_ELEVATION": 259.022,
+    "SLOPE": 0.87799699,
+    "LINER_TYPE": null,
+    "MAINTAINED_BY": 1,
+    "Shape__Length": 107.28935218334627
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -78.3645290979944,
+      44.2893691710901
+     ],
+     [
+      -78.3644761242852,
+      44.2894037450024
+     ],
+     [
+      -78.3643630887582,
+      44.2894775176877
+     ],
+     [
+      -78.3642500529891,
+      44.2895512893539
+     ]
+    ]
+   },
+   "properties": {
+    "OBJECTID": 2321,
+    "FACILITYID": "91294",
+    "MATERIAL": "PVC",
+    "DIAMETER": 254,
+    "MAINSHAPE": "Circular",
+    "UP_MH_ID": "83675",
+    "DOWN_MH_ID": "83674",
+    "UP_ELEVATION": 260.403,
+    "DOWN_ELEVATION": 260.068,
+    "SLOPE": 1.11303681,
+    "LINER_TYPE": null,
+    "MAINTAINED_BY": 1,
+    "Shape__Length": 30.096907488865064
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -78.3626838746611,
+      44.2916731731612
+     ],
+     [
+      -78.3621917553813,
+      44.291789723126
+     ]
+    ]
+   },
+   "properties": {
+    "OBJECTID": 2695,
+    "FACILITYID": "165926",
+    "MATERIAL": "PVC",
+    "DIAMETER": 250,
+    "MAINSHAPE": "Circular",
+    "UP_MH_ID": "165925",
+    "DOWN_MH_ID": "165927",
+    "UP_ELEVATION": 252.84,
+    "DOWN_ELEVATION": 249.318,
+    "SLOPE": 8.51483231,
+    "LINER_TYPE": null,
+    "MAINTAINED_BY": 1,
+    "Shape__Length": 41.36311638420423
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -78.3630687517458,
+      44.2895602037284
+     ],
+     [
+      -78.3631284218092,
+      44.2896929258302
+     ],
+     [
+      -78.3631977159121,
+      44.289847054706
+     ],
+     [
+      -78.3632238952435,
+      44.2899052800742
+     ]
+    ]
+   },
+   "properties": {
+    "OBJECTID": 2790,
+    "FACILITYID": "91306",
+    "MATERIAL": "PVC",
+    "DIAMETER": 200,
+    "MAINSHAPE": "Circular",
+    "UP_MH_ID": "83684",
+    "DOWN_MH_ID": "83683",
+    "UP_ELEVATION": 260.356,
+    "DOWN_ELEVATION": 256.904,
+    "SLOPE": 8.56579552,
+    "LINER_TYPE": null,
+    "MAINTAINED_BY": 1,
+    "Shape__Length": 40.29981796493029
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -78.3655136326115,
+      44.2902830903479
+     ],
+     [
+      -78.3653402079131,
+      44.2903212163925
+     ],
+     [
+      -78.3652971254361,
+      44.2903306877838
+     ],
+     [
+      -78.3651485284113,
+      44.2903633564971
+     ],
+     [
+      -78.3650868267333,
+      44.2903769219466
+     ],
+     [
+      -78.3649678032031,
+      44.2904030870154
+     ],
+     [
+      -78.3647790447256,
+      44.2904445845044
+     ],
+     [
+      -78.3646519878906,
+      44.2904725164994
+     ]
+    ]
+   },
+   "properties": {
+    "OBJECTID": 2883,
+    "FACILITYID": "91304",
+    "MATERIAL": "PVC",
+    "DIAMETER": 254,
+    "MAINSHAPE": "Circular",
+    "UP_MH_ID": "83682",
+    "DOWN_MH_ID": "83673",
+    "UP_ELEVATION": 262.686,
+    "DOWN_ELEVATION": 258.551,
+    "SLOPE": 5.74859206,
+    "LINER_TYPE": null,
+    "MAINTAINED_BY": 1,
+    "Shape__Length": 71.93065640316547
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -78.3611897702853,
+      44.2942228159165
+     ],
+     [
+      -78.3610376166389,
+      44.2939111948105
+     ]
+    ]
+   },
+   "properties": {
+    "OBJECTID": 2964,
+    "FACILITYID": "90719",
+    "MATERIAL": "PVC",
+    "DIAMETER": 250,
+    "MAINSHAPE": "Circular",
+    "UP_MH_ID": "80552",
+    "DOWN_MH_ID": "80553",
+    "UP_ELEVATION": 245.764,
+    "DOWN_ELEVATION": 245.07,
+    "SLOPE": 1.89100759,
+    "LINER_TYPE": null,
+    "MAINTAINED_BY": 1,
+    "Shape__Length": 36.69955423963334
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -78.3627322841821,
+      44.2940636060952
+     ],
+     [
+      -78.3627085838731,
+      44.2940588461267
+     ],
+     [
+      -78.3627073155244,
+      44.2940585908531
+     ],
+     [
+      -78.3626590540176,
+      44.2940488979632
+     ],
+     [
+      -78.3626315424161,
+      44.2940433720118
+     ],
+     [
+      -78.3626095192516,
+      44.2940389478642
+     ],
+     [
+      -78.3625602950464,
+      44.2940290607365
+     ],
+     [
+      -78.3625234439871,
+      44.2940216588557
+     ],
+     [
+      -78.3624751837964,
+      44.2940119659185
+     ],
+     [
+      -78.3624728905128,
+      44.2940115060042
+     ],
+     [
+      -78.3624246316321,
+      44.2940018121756
+     ],
+     [
+      -78.3623003141397,
+      44.2939768413521
+     ],
+     [
+      -78.3622791928856,
+      44.2939725991314
+     ],
+     [
+      -78.3622520540668,
+      44.2939671474229
+     ],
+     [
+      -78.3622307737924,
+      44.2939628736099
+     ],
+     [
+      -78.3621164431416,
+      44.2939399087109
+     ],
+     [
+      -78.3620948088828,
+      44.2939355627726
+     ],
+     [
+      -78.3620681843446,
+      44.2939302156336
+     ],
+     [
+      -78.3620463711923,
+      44.2939258340422
+     ],
+     [
+      -78.3618939239237,
+      44.2938952125565
+     ],
+     [
+      -78.3618456639922,
+      44.2938855184585
+     ],
+     [
+      -78.3617100571802,
+      44.2938582802585
+     ],
+     [
+      -78.3616617972723,
+      44.2938485869835
+     ],
+     [
+      -78.3616031656833,
+      44.2938368092918
+     ]
+    ]
+   },
+   "properties": {
+    "OBJECTID": 3148,
+    "FACILITYID": "88031",
+    "MATERIAL": "PVC",
+    "DIAMETER": 250,
+    "MAINSHAPE": "Circular",
+    "UP_MH_ID": "80556",
+    "DOWN_MH_ID": "80555",
+    "UP_ELEVATION": 253.928,
+    "DOWN_ELEVATION": 247.844,
+    "SLOPE": 6.50093942,
+    "LINER_TYPE": null,
+    "MAINTAINED_BY": 1,
+    "Shape__Length": 93.58504320154529
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -78.3627860053242,
+      44.2889090853943
+     ],
+     [
+      -78.3627994340152,
+      44.288940008774
+     ],
+     [
+      -78.3628199490299,
+      44.2889872540993
+     ],
+     [
+      -78.3628557597604,
+      44.2890697179509
+     ],
+     [
+      -78.3630239882342,
+      44.2894571246747
+     ],
+     [
+      -78.3630527118193,
+      44.2895232665071
+     ],
+     [
+      -78.3630687517458,
+      44.2895602037284
+     ]
+    ]
+   },
+   "properties": {
+    "OBJECTID": 3204,
+    "FACILITYID": "91308",
+    "MATERIAL": "PVC",
+    "DIAMETER": 200,
+    "MAINSHAPE": "Circular",
+    "UP_MH_ID": "83685",
+    "DOWN_MH_ID": "83684",
+    "UP_ELEVATION": 264.455,
+    "DOWN_ELEVATION": 260.356,
+    "SLOPE": 5.40766863,
+    "LINER_TYPE": null,
+    "MAINTAINED_BY": 1,
+    "Shape__Length": 75.79976294168297
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -78.3584970008918,
+      44.2928017972372
+     ],
+     [
+      -78.3577989007067,
+      44.2930604863047
+     ]
+    ]
+   },
+   "properties": {
+    "OBJECTID": 3281,
+    "FACILITYID": "90857",
+    "MATERIAL": "PVC",
+    "DIAMETER": 300,
+    "MAINSHAPE": "Circular",
+    "UP_MH_ID": "83239",
+    "DOWN_MH_ID": "83240",
+    "UP_ELEVATION": 237.2,
+    "DOWN_ELEVATION": 235.87,
+    "SLOPE": 2.12108781,
+    "LINER_TYPE": null,
+    "MAINTAINED_BY": 1,
+    "Shape__Length": 62.70301468028397
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -78.3577989007067,
+      44.2930604863047
+     ],
+     [
+      -78.3571827391962,
+      44.2934161791258
+     ]
+    ]
+   },
+   "properties": {
+    "OBJECTID": 3581,
+    "FACILITYID": "90858",
+    "MATERIAL": "PVC",
+    "DIAMETER": 300,
+    "MAINSHAPE": "Circular",
+    "UP_MH_ID": "83240",
+    "DOWN_MH_ID": "83241",
+    "UP_ELEVATION": 235.83,
+    "DOWN_ELEVATION": 234.57,
+    "SLOPE": 1.99683987,
+    "LINER_TYPE": null,
+    "MAINTAINED_BY": 1,
+    "Shape__Length": 63.09970167741461
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -78.3602764169963,
+      44.2921501232397
+     ],
+     [
+      -78.3595214080289,
+      44.2923050496029
+     ]
+    ]
+   },
+   "properties": {
+    "OBJECTID": 3745,
+    "FACILITYID": "165934",
+    "MATERIAL": "PVC",
+    "DIAMETER": 250,
+    "MAINSHAPE": "Circular",
+    "UP_MH_ID": "165933",
+    "DOWN_MH_ID": "83173",
+    "UP_ELEVATION": 241.14,
+    "DOWN_ELEVATION": 240,
+    "SLOPE": 1.84009183,
+    "LINER_TYPE": null,
+    "MAINTAINED_BY": 1,
+    "Shape__Length": 62.678342704289065
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -78.3610376166389,
+      44.2939111948105
+     ],
+     [
+      -78.3610216351312,
+      44.2939148576994
+     ],
+     [
+      -78.3608144343806,
+      44.2939624195496
+     ],
+     [
+      -78.3607538824822,
+      44.2939763171199
+     ],
+     [
+      -78.3606325733756,
+      44.294004160533
+     ],
+     [
+      -78.3606194133162,
+      44.2940071809822
+     ],
+     [
+      -78.3605725140486,
+      44.2940179451573
+     ],
+     [
+      -78.3603126028639,
+      44.2940775979338
+     ]
+    ]
+   },
+   "properties": {
+    "OBJECTID": 3884,
+    "FACILITYID": "88034",
+    "MATERIAL": "PVC",
+    "DIAMETER": 250,
+    "MAINSHAPE": "Circular",
+    "UP_MH_ID": "80553",
+    "DOWN_MH_ID": "80557",
+    "UP_ELEVATION": 244.969,
+    "DOWN_ELEVATION": 244.37,
+    "SLOPE": 0.98590802,
+    "LINER_TYPE": null,
+    "MAINTAINED_BY": 1,
+    "Shape__Length": 60.75405624604
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -78.3646519878906,
+      44.2904725164994
+     ],
+     [
+      -78.364623328535,
+      44.2904787798103
+     ],
+     [
+      -78.3644370334954,
+      44.2905194981443
+     ],
+     [
+      -78.3642361262586,
+      44.2905634087769
+     ],
+     [
+      -78.3640206079341,
+      44.2906105134566
+     ],
+     [
+      -78.3638598426721,
+      44.2906456507544
+     ],
+     [
+      -78.3638047133447,
+      44.290657699967
+     ],
+     [
+      -78.3635530389354,
+      44.2907127041917
+     ]
+    ]
+   },
+   "properties": {
+    "OBJECTID": 4056,
+    "FACILITYID": "91303",
+    "MATERIAL": "PVC",
+    "DIAMETER": 254,
+    "MAINSHAPE": "Circular",
+    "UP_MH_ID": "83673",
+    "DOWN_MH_ID": "83681",
+    "UP_ELEVATION": 258.992,
+    "DOWN_ELEVATION": 256.895,
+    "SLOPE": 2.28686353,
+    "LINER_TYPE": null,
+    "MAINTAINED_BY": 1,
+    "Shape__Length": 91.69502395087828
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -78.359612519983,
+      44.2925091646642
+     ],
+     [
+      -78.3584970008918,
+      44.2928017972372
+     ]
+    ]
+   },
+   "properties": {
+    "OBJECTID": 4080,
+    "FACILITYID": "90856",
+    "MATERIAL": "PVC",
+    "DIAMETER": 300,
+    "MAINSHAPE": "Circular",
+    "UP_MH_ID": "83174",
+    "DOWN_MH_ID": "83239",
+    "UP_ELEVATION": 239.61,
+    "DOWN_ELEVATION": 237.23,
+    "SLOPE": 2.51054917,
+    "LINER_TYPE": null,
+    "MAINTAINED_BY": 1,
+    "Shape__Length": 94.79663350550163
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -78.3598091580487,
+      44.2929500407888
+     ],
+     [
+      -78.359612519983,
+      44.2925091646642
+     ]
+    ]
+   },
+   "properties": {
+    "OBJECTID": 4478,
+    "FACILITYID": "90793",
+    "MATERIAL": "PVC",
+    "DIAMETER": 250,
+    "MAINSHAPE": "Circular",
+    "UP_MH_ID": "83175",
+    "DOWN_MH_ID": "83174",
+    "UP_ELEVATION": 239.81,
+    "DOWN_ELEVATION": 239.66,
+    "SLOPE": 0.29154506,
+    "LINER_TYPE": null,
+    "MAINTAINED_BY": 1,
+    "Shape__Length": 51.449139882633595
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -78.3571827391962,
+      44.2934161791258
+     ],
+     [
+      -78.3567017066513,
+      44.2937986111884
+     ]
+    ]
+   },
+   "properties": {
+    "OBJECTID": 4831,
+    "FACILITYID": "90859",
+    "MATERIAL": "PVC",
+    "DIAMETER": 300,
+    "MAINSHAPE": "Circular",
+    "UP_MH_ID": "83241",
+    "DOWN_MH_ID": "83242",
+    "UP_ELEVATION": 234.57,
+    "DOWN_ELEVATION": 234.37,
+    "SLOPE": 0.34917981,
+    "LINER_TYPE": null,
+    "MAINTAINED_BY": 1,
+    "Shape__Length": 57.277079904635094
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -78.3635530389354,
+      44.2907127041917
+     ],
+     [
+      -78.3638496678805,
+      44.2914172504118
+     ]
+    ]
+   },
+   "properties": {
+    "OBJECTID": 4856,
+    "FACILITYID": "165922",
+    "MATERIAL": "PVC",
+    "DIAMETER": 250,
+    "MAINSHAPE": "Circular",
+    "UP_MH_ID": "83681",
+    "DOWN_MH_ID": "165923",
+    "UP_ELEVATION": 256.85,
+    "DOWN_ELEVATION": 255.691,
+    "SLOPE": 1.41685445,
+    "LINER_TYPE": null,
+    "MAINTAINED_BY": 1,
+    "Shape__Length": 81.80092199436477
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -78.3623887053346,
+      44.2951255306251
+     ],
+     [
+      -78.3623816077907,
+      44.2951082721139
+     ],
+     [
+      -78.3623684763693,
+      44.2950763418638
+     ],
+     [
+      -78.3623592504381,
+      44.2950539061776
+     ],
+     [
+      -78.3623450554273,
+      44.2950193882521
+     ],
+     [
+      -78.3623361832557,
+      44.2949978142034
+     ]
+    ]
+   },
+   "properties": {
+    "OBJECTID": 5054,
+    "FACILITYID": "90722",
+    "MATERIAL": "PVC",
+    "DIAMETER": 250,
+    "MAINSHAPE": "Circular",
+    "UP_MH_ID": "83115",
+    "DOWN_MH_ID": "83114",
+    "UP_ELEVATION": 254.636,
+    "DOWN_ELEVATION": 253.912,
+    "SLOPE": 4.89189939,
+    "LINER_TYPE": null,
+    "MAINTAINED_BY": 1,
+    "Shape__Length": 14.799818056796036
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -78.3621917553813,
+      44.291789723126
+     ],
+     [
+      -78.3616162378223,
+      44.2919222310669
+     ]
+    ]
+   },
+   "properties": {
+    "OBJECTID": 5332,
+    "FACILITYID": "165928",
+    "MATERIAL": "PVC",
+    "DIAMETER": 250,
+    "MAINSHAPE": "Circular",
+    "UP_MH_ID": "165927",
+    "DOWN_MH_ID": "165929",
+    "UP_ELEVATION": 249.6,
+    "DOWN_ELEVATION": 245.618,
+    "SLOPE": 8.25415196,
+    "LINER_TYPE": null,
+    "MAINTAINED_BY": 1,
+    "Shape__Length": 48.242387824505265
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -78.3623361832557,
+      44.2949978142034
+     ],
+     [
+      -78.3623054172643,
+      44.2949857111542
+     ],
+     [
+      -78.3622057248336,
+      44.2949464978363
+     ],
+     [
+      -78.3621655752109,
+      44.2949307046327
+     ],
+     [
+      -78.3620032425579,
+      44.2948668506015
+     ],
+     [
+      -78.3619592905838,
+      44.2948495614161
+     ],
+     [
+      -78.3619428070553,
+      44.2948430774815
+     ]
+    ]
+   },
+   "properties": {
+    "OBJECTID": 5406,
+    "FACILITYID": "90721",
+    "MATERIAL": "PVC",
+    "DIAMETER": 250,
+    "MAINSHAPE": "Circular",
+    "UP_MH_ID": "83114",
+    "DOWN_MH_ID": "83113",
+    "UP_ELEVATION": 253.862,
+    "DOWN_ELEVATION": 251.634,
+    "SLOPE": 6.22345057,
+    "LINER_TYPE": null,
+    "MAINTAINED_BY": 1,
+    "Shape__Length": 35.799717460701636
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -78.3632238952435,
+      44.2899052800742
+     ],
+     [
+      -78.3632485374285,
+      44.2899657296337
+     ],
+     [
+      -78.3633323188005,
+      44.2901712560648
+     ],
+     [
+      -78.3633400626575,
+      44.290190254394
+     ],
+     [
+      -78.3633506231713,
+      44.290216160813
+     ],
+     [
+      -78.3634741845759,
+      44.2905192690648
+     ],
+     [
+      -78.3635530389354,
+      44.2907127041917
+     ]
+    ]
+   },
+   "properties": {
+    "OBJECTID": 5420,
+    "FACILITYID": "91305",
+    "MATERIAL": "PVC",
+    "DIAMETER": 200,
+    "MAINSHAPE": "Circular",
+    "UP_MH_ID": "83683",
+    "DOWN_MH_ID": "83681",
+    "UP_ELEVATION": 256.904,
+    "DOWN_ELEVATION": 256.425,
+    "SLOPE": 0.51230104,
+    "LINER_TYPE": null,
+    "MAINTAINED_BY": 1,
+    "Shape__Length": 93.49971248196128
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -78.3632868468857,
+      44.2915408069305
+     ],
+     [
+      -78.3626838746611,
+      44.2916731731612
+     ]
+    ]
+   },
+   "properties": {
+    "OBJECTID": 5536,
+    "FACILITYID": "303196",
+    "MATERIAL": "PVC",
+    "DIAMETER": 250,
+    "MAINSHAPE": "Circular",
+    "UP_MH_ID": "303200",
+    "DOWN_MH_ID": "165925",
+    "UP_ELEVATION": 254.21,
+    "DOWN_ELEVATION": 252.628,
+    "SLOPE": 3.1432964,
+    "LINER_TYPE": null,
+    "MAINTAINED_BY": 1,
+    "Shape__Length": 50.32932944551772
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -78.3638496678805,
+      44.2914172504118
+     ],
+     [
+      -78.3632868468857,
+      44.2915408069305
+     ]
+    ]
+   },
+   "properties": {
+    "OBJECTID": 5537,
+    "FACILITYID": "303198",
+    "MATERIAL": "PVC",
+    "DIAMETER": 250,
+    "MAINSHAPE": "Circular",
+    "UP_MH_ID": "165923",
+    "DOWN_MH_ID": "303200",
+    "UP_ELEVATION": 255.691,
+    "DOWN_ELEVATION": 254.57,
+    "SLOPE": 2.38621409,
+    "LINER_TYPE": null,
+    "MAINTAINED_BY": 1,
+    "Shape__Length": 46.97818210630734
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -78.3650333504983,
+      44.2912197688341
+     ],
+     [
+      -78.3650126129174,
+      44.2911773865968
+     ]
+    ]
+   },
+   "properties": {
+    "OBJECTID": 5738,
+    "FACILITYID": "317524",
+    "MATERIAL": "PVC",
+    "DIAMETER": 250,
+    "MAINSHAPE": "Circular",
+    "UP_MH_ID": "317516",
+    "DOWN_MH_ID": "317514",
+    "UP_ELEVATION": 257.88,
+    "DOWN_ELEVATION": 257.78,
+    "SLOPE": 2.00299536,
+    "LINER_TYPE": null,
+    "MAINTAINED_BY": 1,
+    "Shape__Length": 4.992522798386328
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -78.3650126129174,
+      44.2911773865968
+     ],
+     [
+      -78.3638496678805,
+      44.2914172504118
+     ]
+    ]
+   },
+   "properties": {
+    "OBJECTID": 5739,
+    "FACILITYID": "317526",
+    "MATERIAL": "PVC",
+    "DIAMETER": 250,
+    "MAINSHAPE": "Circular",
+    "UP_MH_ID": "317514",
+    "DOWN_MH_ID": "165923",
+    "UP_ELEVATION": 257.63,
+    "DOWN_ELEVATION": 255.71,
+    "SLOPE": 1.98793358,
+    "LINER_TYPE": null,
+    "MAINTAINED_BY": 1,
+    "Shape__Length": 96.58270372425474
+   }
+  }
+ ]
+}

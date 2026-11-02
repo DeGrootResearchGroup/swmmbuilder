@@ -3,6 +3,7 @@ import math
 import warnings
 
 import geopandas as gpd
+import pandas as pd
 import pytest
 from conftest import DENDRITIC, FIXTURE, REPO, read_sections, subnetwork, write_inp
 from pyproj import Geod
@@ -102,11 +103,20 @@ def test_duplicate_pipe_ids():
         ({"columns": {**LONDON_ON.columns, "colour": "Colour"}}, "colour"),
         ({"columns": {**LONDON_ON.columns, "abandoned": "Abandoned"}}, "abandoned"),
         ({"columns": LONDON_ON.columns, "size_unit": "furlong"}, "furlong"),
+        ({"columns": LONDON_ON.columns, "default_shape": "CIRCULAR"}, "default_shape"),
     ],
 )
 def test_invalid_schema(kwargs, match):
     with pytest.raises(ValueError, match=match):
         Schema(name="bad", **kwargs)
+
+
+def test_default_shape():
+    columns = {k: v for k, v in LONDON_ON.columns.items() if k != "shape"}
+    schema = Schema(name="round", columns=columns, size_unit="mm", default_shape="CIRCULAR")
+    pipe = schema.normalize(london_rows({"PipeShape": "REC", "Diameter": 250})).iloc[0]
+    assert pipe["shape"] == "CIRCULAR" and pd.isna(pipe["shape_code"])
+    assert xsection(pipe) == pytest.approx(("CIRCULAR", 0.25, 0.0))
 
 
 # The fixture in another city's schema: other column names and codes, sizes in m, lengths in cm.

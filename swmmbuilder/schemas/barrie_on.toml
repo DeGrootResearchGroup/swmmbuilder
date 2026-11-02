@@ -1,0 +1,34 @@
+# Barrie, ON: the Sanitary Pipes dataset of the City of Barrie Open Data portal
+# (https://gispublic.barrie.ca/arcgis/rest/services/Open_Data/SanitaryInfrastructure/MapServer/2).
+# Sizes are WIDTH and HEIGHT (equal for circular pipes). Both published ELLIPSE pipes are wider
+# than they are tall, so ELLIPSE is taken to be a horizontal ellipse. TYPE is the structure type
+# (force mains are kept, and reported by validate); the Storm Linear dataset has the same columns
+# but other TYPE codes (CULVERT, DITCH, ...), which pass through. An invert of 0 means none. Lengths are computed from the geometry, reprojected to UTM zone 17N
+# (EPSG:26917, metres).
+name = "Barrie, ON"
+nonpositive_inverts_missing = true
+size_unit = "mm"
+crs = "EPSG:26917"
+
+[columns]
+pipe_id = "ASSETID"
+from_node = "FROM_ID"
+to_node = "TO_ID"
+us_invert = "INV_UP_ELV"
+ds_invert = "INV_DN_ELV"
+shape = "PIPESHP"
+diameter = "WIDTH"
+height = "HEIGHT"
+width = "WIDTH"
+structure_type = "TYPE"
+material = "MATERIAL"
+
+[shapes]
+CIRCULAR = "CIRCULAR"
+CLOSED_RECT = "RECT_CLOSED"
+ELLIPSE = "HORIZ_ELLIPSE"
+
+[structure_types]
+LOCAL = "gravity"
+TRUNK = "gravity"
+FORCE = "force_main"

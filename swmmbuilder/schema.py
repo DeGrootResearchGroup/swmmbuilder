@@ -55,8 +55,10 @@ are dropped:
 ``verified``       bool: the record has been verified
 =================  ===========================================================================
 
-Schemas can be written in TOML (see :meth:`Schema.from_toml`); the presets :data:`LONDON_ON` and
-:data:`TORONTO_ON` are loaded from ``swmmbuilder/schemas``.
+Schemas can be written in TOML (see :meth:`Schema.from_toml`); the presets (:data:`LONDON_ON`,
+:data:`TORONTO_ON`, :data:`BARRIE_ON`, :data:`KITCHENER_ON`, :data:`PETERBOROUGH_ON`,
+:data:`SARNIA_ON`, :data:`WATERLOO_ON` and :data:`WINDSOR_ON`) are loaded from
+``swmmbuilder/schemas``.
 """
 
 import tomllib
@@ -119,6 +121,9 @@ REQUIRED_COLUMNS = ("pipe_id", "from_node", "to_node")
 UNITS = {"m": 1, "cm": 100, "mm": 1000, "ft": 1 / 0.3048, "in": 1 / 0.0254}
 
 INVERT_COLUMNS = ("us_invert", "ds_invert", "drop_invert")
+
+# Design rules a schema's ``design`` table may hold (see :func:`swmmbuilder.gaps.fill_gaps`).
+DESIGN_RULES = ("force_main_discharge",)
 SIZE_COLUMNS = ("diameter", "height", "width")
 
 
@@ -157,6 +162,9 @@ class Schema:
         required to read node layers.
     rim_range : tuple of float or None
         (lowest, highest) plausible rim elevation, in m; rims outside it are treated as missing.
+    default_shape : str or None
+        SWMM cross-section of every pipe, for data with no shape column (``shape`` must then not
+        be mapped); e.g. ``'CIRCULAR'`` where only a diameter is published.
     abandoned : str or None
         Source column that flags abandoned pipes (older exports; ``status`` takes precedence).
     abandoned_values : frozenset
@@ -173,6 +181,12 @@ class Schema:
     crs : str or None
         If set, the geometry is reprojected to this CRS on loading. Data with no CRS are taken
         to be in this CRS already.
+    design : dict
+        Design rule -> its parameters, from a design standard (see :data:`DESIGN_RULES`), e.g.
+        ``{'force_main_discharge': {'max_height_above_receiving_invert': 0.2}}``. They are used
+        only when passed to the .inp writer, e.g.
+        ``to_inp(..., force_main_discharge=schema.design['force_main_discharge'])``, so a schema
+        can map the columns without adopting the standard.
     """
 
     name: str
@@ -184,6 +198,7 @@ class Schema:
     node_types: dict = field(default_factory=dict)
     node_columns: dict = field(default_factory=dict)
     rim_range: tuple | None = None
+    default_shape: str | None = None
     abandoned: str | None = None
     abandoned_values: frozenset = frozenset()
     null_values: frozenset = frozenset()
@@ -193,6 +208,7 @@ class Schema:
     invert_unit: str = "m"
     size_unit: str = "m"
     crs: str | None = None
+    design: dict = field(default_factory=dict)
 
     def _reprojected(self, data):
         """``data`` in :attr:`crs`, if set (data with no CRS are taken to be in it already)."""
@@ -210,6 +226,8 @@ class Schema:
                 f"Schema {self.name!r} maps columns that cannot be mapped: "
                 f"{sorted(unknown | derived)}. Canonical columns: {list(CANONICAL_COLUMNS)}."
             )
+        if self.default_shape is not None and "shape" in self.columns:
+            raise ValueError(f"Schema {self.name!r} maps shape and also sets default_shape.")
         missing = [c for c in REQUIRED_COLUMNS if c not in self.columns]
         if missing:
             raise ValueError(f"Schema {self.name!r} does not map required columns: {missing}.")
@@ -218,6 +236,12 @@ class Schema:
             raise ValueError(
                 f"Schema {self.name!r} maps node columns that cannot be mapped: "
                 f"{sorted(unknown)}. Canonical node columns: {list(NODE_COLUMNS)}."
+            )
+        unknown = set(self.design) - set(DESIGN_RULES)
+        if unknown:
+            raise ValueError(
+                f"Schema {self.name!r} has unknown design rules: {sorted(unknown)}. "
+                f"Known rules: {list(DESIGN_RULES)}."
             )
         for unit in (self.length_unit, self.invert_unit, self.size_unit):
             if unit not in UNITS:
@@ -332,6 +356,8 @@ class Schema:
             out[column] = inverts
         codes = source("shape")
         out["shape"] = codes.map(self.shapes)
+        if self.default_shape is not None:
+            out["shape"] = pd.Series(self.default_shape, index=data.index, dtype=object)
         out["shape_code"] = codes
         for column in SIZE_COLUMNS:
             out[column] = pd.to_numeric(source(column), errors="coerce") / UNITS[self.size_unit]
@@ -465,3 +491,21 @@ LONDON_ON = _preset("london_on")
 
 # Toronto, ON, Sewer Gravity Mains. See swmmbuilder/schemas/toronto_on.toml.
 TORONTO_ON = _preset("toronto_on")
+
+# Barrie, ON, Sanitary Pipes. See swmmbuilder/schemas/barrie_on.toml.
+BARRIE_ON = _preset("barrie_on")
+
+# Kitchener, ON, Sanitary Pipes. See swmmbuilder/schemas/kitchener_on.toml.
+KITCHENER_ON = _preset("kitchener_on")
+
+# Peterborough, ON, Sanitary and Storm Sewer Pipes. See swmmbuilder/schemas/peterborough_on.toml.
+PETERBOROUGH_ON = _preset("peterborough_on")
+
+# Sarnia, ON, Sanitary and Storm Sewers. See swmmbuilder/schemas/sarnia_on.toml.
+SARNIA_ON = _preset("sarnia_on")
+
+# Waterloo, ON, Sanitary Sewer Gravity Mains. See swmmbuilder/schemas/waterloo_on.toml.
+WATERLOO_ON = _preset("waterloo_on")
+
+# Windsor, ON, Sanitary, Storm and Combined Sewers. See swmmbuilder/schemas/windsor_on.toml.
+WINDSOR_ON = _preset("windsor_on")

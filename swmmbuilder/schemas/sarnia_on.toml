@@ -1,0 +1,29 @@
+# Sarnia, ON: the Sanitary Sewers Open Data and Storm Sewers Open Data datasets of the City of
+# Sarnia Open Data portal
+# (https://services1.arcgis.com/ICybsLmBXrZCZV3x/arcgis/rest/services/Sanitary_Sewers_Open_Data_AGOL/FeatureServer/0
+# and .../Storm_Sewers_Open_Data_AGOL/FeatureServer/1), which share their columns. There is no
+# shape column; every pipe is taken to be circular. Diam_m is a text column in mm despite its name;
+# non-circular pipes are given as "W x H" and so have no diameter, and are rejected if they are
+# written. An invert of 0 means none. Flow types other than Sanitary, Combined and Storm (e.g.
+# Future Storm) pass through unchanged. Lengths are computed from the geometry, reprojected to UTM
+# zone 17N (EPSG:26917, metres).
+name = "Sarnia, ON"
+nonpositive_inverts_missing = true
+size_unit = "mm"
+default_shape = "CIRCULAR"
+crs = "EPSG:26917"
+
+[columns]
+pipe_id = "Asset_ID"
+from_node = "MH_Upstream"
+to_node = "MH_Downstream"
+us_invert = "UpStreamIn"
+ds_invert = "DownStream"
+diameter = "Diam_m"
+flow_type = "Asset_Type"
+material = "Material"
+
+[flow_types]
+Sanitary = "sanitary"
+Combined = "combined"
+Storm = "storm"

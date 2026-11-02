@@ -10,10 +10,10 @@ import networkx as nx
 import pandas as pd
 from shapely import Point
 
+from .gaps import lowest_inverts
 from .geometry import node_positions, to_geodataframe
 from .schema import LONDON_ON, NODE_COLUMNS, as_schema
 from .subnetwork import Subnetwork
-from .swmm import lowest_inverts
 
 logger = logging.getLogger(__name__)
 
@@ -86,7 +86,8 @@ class Network:
 
     schema : Schema, str or Path
         How the GIS columns map to the canonical columns: a :class:`Schema` (default
-        :data:`LONDON_ON`; see also :data:`TORONTO_ON`) or the path to a schema TOML file.
+        :data:`LONDON_ON`; see :mod:`swmmbuilder.schema` for the other presets) or the path to a
+        schema TOML file.
 
     status : iterable of str or None
         Canonical pipe statuses to keep (default ``{'built'}``; the others are ``'abandoned'``,

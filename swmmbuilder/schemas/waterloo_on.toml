@@ -1,0 +1,21 @@
+# Waterloo, ON: the Sanitary Sewer Gravity Mains dataset of the City of Waterloo Open Data portal
+# (https://services.arcgis.com/ZpeBVw5o1kjit7LT/arcgis/rest/services/Sanitary_Sewer_Gravity_Mains/FeatureServer/0).
+# There is no shape column; every pipe is taken to be circular. An invert of 111.111 is a
+# placeholder for none. The service stores the geometry in WGS 84, which is why LENGTH_M (not
+# Shape__Length) is the length; the geometry is reprojected to UTM zone 17N (EPSG:26917, metres).
+name = "Waterloo, ON"
+null_values = [111.111]
+nonpositive_inverts_missing = true
+size_unit = "mm"
+default_shape = "CIRCULAR"
+crs = "EPSG:26917"
+
+[columns]
+pipe_id = "ASSET_ID"
+from_node = "FROMMH"
+to_node = "TOMH"
+length = "LENGTH_M"
+us_invert = "UPSTREAMINVERT"
+ds_invert = "DOWNSTREAMINVERT"
+diameter = "DIAMETER"
+material = "MATERIAL"

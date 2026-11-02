@@ -85,3 +85,10 @@ pipes_out = "PipesOut"
 flow_monitor = "FlowMonitor"
 access = "Location"
 verified = "Verified"
+
+# City of London Design Specifications & Requirements Manual, used only when passed to the .inp
+# writer, e.g. to_inp(..., force_main_discharge=LONDON_ON.design["force_main_discharge"]).
+[design.force_main_discharge]
+# Ch. 4, s. 4.8: force mains enter the gravity system not more than 200 mm above the flow line of
+# the receiving maintenance hole.
+max_height_above_receiving_invert = 0.2
