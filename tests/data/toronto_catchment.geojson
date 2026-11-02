@@ -1,0 +1,1365 @@
+{
+ "type": "FeatureCollection",
+ "name": "Sewer Gravity Main - 4326",
+ "crs": {
+  "type": "name",
+  "properties": {
+   "name": "urn:ogc:def:crs:OGC:1.3:CRS84"
+  }
+ },
+ "features": [
+  {
+   "type": "Feature",
+   "properties": {
+    "_id": 1094,
+    "Sewer Gravity Asset Identification": "SL867",
+    "Sewer Gravity Upstream Maintenance Hole": "MH5171718314",
+    "Sewer Gravity Downstream Maintenance Hole": "MH5174418397",
+    "Sewer Gravity Twin Number": 1,
+    "Sewer Gravity Flow Type": "SAN",
+    "Sewer Gravity Structure Type": "SL",
+    "Sewer Gravity Location Description": "ARNALL AVE",
+    "Sewer Gravity Owned By": "City",
+    "Sewer Gravity Managed By": "TW Distribution and Collection",
+    "Sewer Gravity Install Date": "1981-01-01T00:00:00",
+    "Sewer Gravity Diameter": 250,
+    "Sewer Gravity Material": "CP",
+    "Sewer Gravity Main Shape": "Circular",
+    "Upstream Elevation": "185.94",
+    "Downstream Elevation": "185.25",
+    "Sewer Gravity Measured Length": 87.7,
+    "Sewer Gravity Trunk Sewer": "No",
+    "Sewer Gravity Trunk Name": "None"
+   },
+   "geometry": {
+    "type": "MultiLineString",
+    "coordinates": [
+     [
+      [
+       -79.3318417390454,
+       43.8072889405136
+      ],
+      [
+       -79.3313674307577,
+       43.8074019076977
+      ],
+      [
+       -79.3313187759837,
+       43.8074135013382
+      ],
+      [
+       -79.3310516595511,
+       43.8074771136879
+      ],
+      [
+       -79.3308059472606,
+       43.8075356264678
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "_id": 1405,
+    "Sewer Gravity Asset Identification": "SL945",
+    "Sewer Gravity Upstream Maintenance Hole": "MH5160218717",
+    "Sewer Gravity Downstream Maintenance Hole": "MH5155518733",
+    "Sewer Gravity Twin Number": 1,
+    "Sewer Gravity Flow Type": "SAN",
+    "Sewer Gravity Structure Type": "SL",
+    "Sewer Gravity Location Description": "EAGLE POINT RD",
+    "Sewer Gravity Owned By": "City",
+    "Sewer Gravity Managed By": "TW Distribution and Collection",
+    "Sewer Gravity Install Date": "1981-01-01T00:00:00",
+    "Sewer Gravity Diameter": 250,
+    "Sewer Gravity Material": "CP",
+    "Sewer Gravity Main Shape": "Circular",
+    "Upstream Elevation": "183.54",
+    "Downstream Elevation": "183.08",
+    "Sewer Gravity Measured Length": 50.2,
+    "Sewer Gravity Trunk Sewer": "No",
+    "Sewer Gravity Trunk Name": "None"
+   },
+   "geometry": {
+    "type": "MultiLineString",
+    "coordinates": [
+     [
+      [
+       -79.3268391291606,
+       43.8062543985886
+      ],
+      [
+       -79.3266866206554,
+       43.8059261308458
+      ],
+      [
+       -79.3266764056683,
+       43.8059041616388
+      ],
+      [
+       -79.3266403261921,
+       43.805826481313
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "_id": 1406,
+    "Sewer Gravity Asset Identification": "SL918",
+    "Sewer Gravity Upstream Maintenance Hole": "MH5156418557",
+    "Sewer Gravity Downstream Maintenance Hole": "MH5149618579",
+    "Sewer Gravity Twin Number": 1,
+    "Sewer Gravity Flow Type": "SAN",
+    "Sewer Gravity Structure Type": "SL",
+    "Sewer Gravity Location Description": "SPRINGHOUSE SQ",
+    "Sewer Gravity Owned By": "City",
+    "Sewer Gravity Managed By": "TW Distribution and Collection",
+    "Sewer Gravity Install Date": "1981-01-01T00:00:00",
+    "Sewer Gravity Diameter": 250,
+    "Sewer Gravity Material": "CP",
+    "Sewer Gravity Main Shape": "Circular",
+    "Upstream Elevation": "182.84",
+    "Downstream Elevation": "182.5",
+    "Sewer Gravity Measured Length": 71.7,
+    "Sewer Gravity Trunk Sewer": "No",
+    "Sewer Gravity Trunk Name": "None"
+   },
+   "geometry": {
+    "type": "MultiLineString",
+    "coordinates": [
+     [
+      [
+       -79.3288220278989,
+       43.8059129220809
+      ],
+      [
+       -79.328727941973,
+       43.8056957462677
+      ],
+      [
+       -79.3285789245922,
+       43.8053517703023
+      ],
+      [
+       -79.3285551441096,
+       43.8052969088429
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "_id": 1407,
+    "Sewer Gravity Asset Identification": "SL928",
+    "Sewer Gravity Upstream Maintenance Hole": "MH5151618655",
+    "Sewer Gravity Downstream Maintenance Hole": "MH5153618675",
+    "Sewer Gravity Twin Number": 1,
+    "Sewer Gravity Flow Type": "SAN",
+    "Sewer Gravity Structure Type": "SL",
+    "Sewer Gravity Location Description": "CROWFOOT PL",
+    "Sewer Gravity Owned By": "City",
+    "Sewer Gravity Managed By": "TW Distribution and Collection",
+    "Sewer Gravity Install Date": "1981-01-01T00:00:00",
+    "Sewer Gravity Diameter": 250,
+    "Sewer Gravity Material": "CP",
+    "Sewer Gravity Main Shape": "Circular",
+    "Upstream Elevation": "183.56",
+    "Downstream Elevation": "183.31",
+    "Sewer Gravity Measured Length": 27.900000000000002,
+    "Sewer Gravity Trunk Sewer": "No",
+    "Sewer Gravity Trunk Name": "None"
+   },
+   "geometry": {
+    "type": "MultiLineString",
+    "coordinates": [
+     [
+      [
+       -79.3276042076499,
+       43.8054798662268
+      ],
+      [
+       -79.3273560502272,
+       43.8056554274119
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "_id": 1483,
+    "Sewer Gravity Asset Identification": "SL937",
+    "Sewer Gravity Upstream Maintenance Hole": "MH5140018701",
+    "Sewer Gravity Downstream Maintenance Hole": "MH5135618705",
+    "Sewer Gravity Twin Number": 1,
+    "Sewer Gravity Flow Type": "SAN",
+    "Sewer Gravity Structure Type": "SL",
+    "Sewer Gravity Location Description": "BROOKSHIRE BLVD",
+    "Sewer Gravity Owned By": "City",
+    "Sewer Gravity Managed By": "TW Distribution and Collection",
+    "Sewer Gravity Install Date": "1981-01-01T00:00:00",
+    "Sewer Gravity Diameter": 250,
+    "Sewer Gravity Material": "CP",
+    "Sewer Gravity Main Shape": "Circular",
+    "Upstream Elevation": "180.6",
+    "Downstream Elevation": "180.26",
+    "Sewer Gravity Measured Length": 43.800000000000004,
+    "Sewer Gravity Trunk Sewer": "No",
+    "Sewer Gravity Trunk Name": "None"
+   },
+   "geometry": {
+    "type": "MultiLineString",
+    "coordinates": [
+     [
+      [
+       -79.3270354996467,
+       43.8044292609146
+      ],
+      [
+       -79.3270038229658,
+       43.8041352905228
+      ],
+      [
+       -79.3269931713855,
+       43.8040364241379
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "_id": 1484,
+    "Sewer Gravity Asset Identification": "SL939",
+    "Sewer Gravity Upstream Maintenance Hole": "MH5135618705",
+    "Sewer Gravity Downstream Maintenance Hole": "MH5132718717",
+    "Sewer Gravity Twin Number": 1,
+    "Sewer Gravity Flow Type": "SAN",
+    "Sewer Gravity Structure Type": "SL",
+    "Sewer Gravity Location Description": "BROOKSHIRE BLVD",
+    "Sewer Gravity Owned By": "City",
+    "Sewer Gravity Managed By": "TW Distribution and Collection",
+    "Sewer Gravity Install Date": "1981-01-01T00:00:00",
+    "Sewer Gravity Diameter": 250,
+    "Sewer Gravity Material": "CP",
+    "Sewer Gravity Main Shape": "Circular",
+    "Upstream Elevation": "180",
+    "Downstream Elevation": "180.28",
+    "Sewer Gravity Measured Length": 31.2,
+    "Sewer Gravity Trunk Sewer": "No",
+    "Sewer Gravity Trunk Name": "None"
+   },
+   "geometry": {
+    "type": "MultiLineString",
+    "coordinates": [
+     [
+      [
+       -79.3269931713855,
+       43.8040364241379
+      ],
+      [
+       -79.3268409624167,
+       43.8037782126213
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "_id": 1485,
+    "Sewer Gravity Asset Identification": "SL954",
+    "Sewer Gravity Upstream Maintenance Hole": "MH5132718717",
+    "Sewer Gravity Downstream Maintenance Hole": "MH5130118747",
+    "Sewer Gravity Twin Number": 1,
+    "Sewer Gravity Flow Type": "SAN",
+    "Sewer Gravity Structure Type": "SL",
+    "Sewer Gravity Location Description": "BROOKSHIRE BLVD",
+    "Sewer Gravity Owned By": "City",
+    "Sewer Gravity Managed By": "TW Distribution and Collection",
+    "Sewer Gravity Install Date": "1972-01-01T00:00:00",
+    "Sewer Gravity Diameter": 250,
+    "Sewer Gravity Material": "CP",
+    "Sewer Gravity Main Shape": "Circular",
+    "Upstream Elevation": "179.73",
+    "Downstream Elevation": "179.34",
+    "Sewer Gravity Measured Length": 39.9,
+    "Sewer Gravity Trunk Sewer": "No",
+    "Sewer Gravity Trunk Name": "None"
+   },
+   "geometry": {
+    "type": "MultiLineString",
+    "coordinates": [
+     [
+      [
+       -79.3268409624167,
+       43.8037782126213
+      ],
+      [
+       -79.3264753909126,
+       43.8035361491897
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "_id": 1486,
+    "Sewer Gravity Asset Identification": "SL942",
+    "Sewer Gravity Upstream Maintenance Hole": "MH5126418667",
+    "Sewer Gravity Downstream Maintenance Hole": "MH5128618731",
+    "Sewer Gravity Twin Number": 1,
+    "Sewer Gravity Flow Type": "SAN",
+    "Sewer Gravity Structure Type": "SL",
+    "Sewer Gravity Location Description": "BLAIRWOOD TER",
+    "Sewer Gravity Owned By": "City",
+    "Sewer Gravity Managed By": "TW Distribution and Collection",
+    "Sewer Gravity Install Date": "1972-01-01T00:00:00",
+    "Sewer Gravity Diameter": 250,
+    "Sewer Gravity Material": "CP",
+    "Sewer Gravity Main Shape": "Circular",
+    "Upstream Elevation": "180.62",
+    "Downstream Elevation": "180.1",
+    "Sewer Gravity Measured Length": 66.9,
+    "Sewer Gravity Trunk Sewer": "No",
+    "Sewer Gravity Trunk Name": "None"
+   },
+   "geometry": {
+    "type": "MultiLineString",
+    "coordinates": [
+     [
+      [
+       -79.3274638015672,
+       43.8032129482862
+      ],
+      [
+       -79.3268231806233,
+       43.8033684548187
+      ],
+      [
+       -79.3266754182069,
+       43.8034043253093
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "_id": 1487,
+    "Sewer Gravity Asset Identification": "SL953",
+    "Sewer Gravity Upstream Maintenance Hole": "MH5128618731",
+    "Sewer Gravity Downstream Maintenance Hole": "MH5130118747",
+    "Sewer Gravity Twin Number": 1,
+    "Sewer Gravity Flow Type": "SAN",
+    "Sewer Gravity Structure Type": "SL",
+    "Sewer Gravity Location Description": "BLAIRWOOD TER",
+    "Sewer Gravity Owned By": "City",
+    "Sewer Gravity Managed By": "TW Distribution and Collection",
+    "Sewer Gravity Install Date": "1972-01-01T00:00:00",
+    "Sewer Gravity Diameter": 250,
+    "Sewer Gravity Material": "CP",
+    "Sewer Gravity Main Shape": "Circular",
+    "Upstream Elevation": "180.04",
+    "Downstream Elevation": "179.34",
+    "Sewer Gravity Measured Length": 21.8,
+    "Sewer Gravity Trunk Sewer": "No",
+    "Sewer Gravity Trunk Name": "None"
+   },
+   "geometry": {
+    "type": "MultiLineString",
+    "coordinates": [
+     [
+      [
+       -79.3266754182069,
+       43.8034043253093
+      ],
+      [
+       -79.3265013656443,
+       43.8035190234929
+      ],
+      [
+       -79.3264753909126,
+       43.8035361491897
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "_id": 1488,
+    "Sewer Gravity Asset Identification": "SL930",
+    "Sewer Gravity Upstream Maintenance Hole": "MH5148118758",
+    "Sewer Gravity Downstream Maintenance Hole": "MH5145718683",
+    "Sewer Gravity Twin Number": 1,
+    "Sewer Gravity Flow Type": "SAN",
+    "Sewer Gravity Structure Type": "SL",
+    "Sewer Gravity Location Description": "MCNICOLL AVE",
+    "Sewer Gravity Owned By": "City",
+    "Sewer Gravity Managed By": "TW Distribution and Collection",
+    "Sewer Gravity Install Date": "1981-01-01T00:00:00",
+    "Sewer Gravity Diameter": 250,
+    "Sewer Gravity Material": "CP",
+    "Sewer Gravity Main Shape": "Circular",
+    "Upstream Elevation": "181.99",
+    "Downstream Elevation": "181.28",
+    "Sewer Gravity Measured Length": 78.60000000000001,
+    "Sewer Gravity Trunk Sewer": "No",
+    "Sewer Gravity Trunk Name": "None"
+   },
+   "geometry": {
+    "type": "MultiLineString",
+    "coordinates": [
+     [
+      [
+       -79.3263290501299,
+       43.8051574509688
+      ],
+      [
+       -79.3264713017643,
+       43.8051248579775
+      ],
+      [
+       -79.3272604734361,
+       43.804944032922
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "_id": 1492,
+    "Sewer Gravity Asset Identification": "SL963",
+    "Sewer Gravity Upstream Maintenance Hole": "MH5130118747",
+    "Sewer Gravity Downstream Maintenance Hole": "MH5128918783",
+    "Sewer Gravity Twin Number": 1,
+    "Sewer Gravity Flow Type": "SAN",
+    "Sewer Gravity Structure Type": "SL",
+    "Sewer Gravity Location Description": "BROOKSHIRE BLVD",
+    "Sewer Gravity Owned By": "City",
+    "Sewer Gravity Managed By": "TW Distribution and Collection",
+    "Sewer Gravity Install Date": "1972-01-01T00:00:00",
+    "Sewer Gravity Diameter": 250,
+    "Sewer Gravity Material": "CP",
+    "Sewer Gravity Main Shape": "Circular",
+    "Upstream Elevation": "179.24",
+    "Downstream Elevation": "179",
+    "Sewer Gravity Measured Length": 38.7,
+    "Sewer Gravity Trunk Sewer": "No",
+    "Sewer Gravity Trunk Name": "None"
+   },
+   "geometry": {
+    "type": "MultiLineString",
+    "coordinates": [
+     [
+      [
+       -79.3264753909126,
+       43.8035361491897
+      ],
+      [
+       -79.3263975273124,
+       43.8035193608747
+      ],
+      [
+       -79.326014979101,
+       43.8034368689886
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "_id": 1494,
+    "Sewer Gravity Asset Identification": "SL925",
+    "Sewer Gravity Upstream Maintenance Hole": "MH5124518608",
+    "Sewer Gravity Downstream Maintenance Hole": "MH5126418667",
+    "Sewer Gravity Twin Number": 1,
+    "Sewer Gravity Flow Type": "SAN",
+    "Sewer Gravity Structure Type": "SL",
+    "Sewer Gravity Location Description": "BLAIRWOOD TER",
+    "Sewer Gravity Owned By": "City",
+    "Sewer Gravity Managed By": "TW Distribution and Collection",
+    "Sewer Gravity Install Date": "1972-01-01T00:00:00",
+    "Sewer Gravity Diameter": 250,
+    "Sewer Gravity Material": "CP",
+    "Sewer Gravity Main Shape": "Circular",
+    "Upstream Elevation": "181.23",
+    "Downstream Elevation": "180.65",
+    "Sewer Gravity Measured Length": 61.4,
+    "Sewer Gravity Trunk Sewer": "No",
+    "Sewer Gravity Trunk Name": "None"
+   },
+   "geometry": {
+    "type": "MultiLineString",
+    "coordinates": [
+     [
+      [
+       -79.328188086432,
+       43.8030395887275
+      ],
+      [
+       -79.3275533082675,
+       43.8031915256961
+      ],
+      [
+       -79.3274638015672,
+       43.8032129482862
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "_id": 1495,
+    "Sewer Gravity Asset Identification": "SL914",
+    "Sewer Gravity Upstream Maintenance Hole": "MH5145018452",
+    "Sewer Gravity Downstream Maintenance Hole": "MH5148718569",
+    "Sewer Gravity Twin Number": 1,
+    "Sewer Gravity Flow Type": "SAN",
+    "Sewer Gravity Structure Type": "SL",
+    "Sewer Gravity Location Description": "SPRINGHOUSE SQ",
+    "Sewer Gravity Owned By": "City",
+    "Sewer Gravity Managed By": "TW Distribution and Collection",
+    "Sewer Gravity Install Date": "1981-01-01T00:00:00",
+    "Sewer Gravity Diameter": 250,
+    "Sewer Gravity Material": "CP",
+    "Sewer Gravity Main Shape": "Circular",
+    "Upstream Elevation": "183.61",
+    "Downstream Elevation": "182.72",
+    "Sewer Gravity Measured Length": 122.8,
+    "Sewer Gravity Trunk Sewer": "No",
+    "Sewer Gravity Trunk Name": "None"
+   },
+   "geometry": {
+    "type": "MultiLineString",
+    "coordinates": [
+     [
+      [
+       -79.3301389863602,
+       43.8048893179916
+      ],
+      [
+       -79.3297169085258,
+       43.8049838586985
+      ],
+      [
+       -79.3294176514493,
+       43.8050508847952
+      ],
+      [
+       -79.3291342501366,
+       43.8051143693718
+      ],
+      [
+       -79.3286806799701,
+       43.8052159610411
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "_id": 1496,
+    "Sewer Gravity Asset Identification": "SL915",
+    "Sewer Gravity Upstream Maintenance Hole": "MH5149618579",
+    "Sewer Gravity Downstream Maintenance Hole": "MH5148718569",
+    "Sewer Gravity Twin Number": 1,
+    "Sewer Gravity Flow Type": "SAN",
+    "Sewer Gravity Structure Type": "SL",
+    "Sewer Gravity Location Description": "SPRINGHOUSE SQ",
+    "Sewer Gravity Owned By": "City",
+    "Sewer Gravity Managed By": "TW Distribution and Collection",
+    "Sewer Gravity Install Date": "1981-01-01T00:00:00",
+    "Sewer Gravity Diameter": 250,
+    "Sewer Gravity Material": "CP",
+    "Sewer Gravity Main Shape": "Circular",
+    "Upstream Elevation": "182.42000000000002",
+    "Downstream Elevation": "182.36",
+    "Sewer Gravity Measured Length": 13.5,
+    "Sewer Gravity Trunk Sewer": "No",
+    "Sewer Gravity Trunk Name": "None"
+   },
+   "geometry": {
+    "type": "MultiLineString",
+    "coordinates": [
+     [
+      [
+       -79.3285551441096,
+       43.8052969088429
+      ],
+      [
+       -79.3285690773249,
+       43.8052879286285
+      ],
+      [
+       -79.3286285082976,
+       43.8052496010001
+      ],
+      [
+       -79.3286806799701,
+       43.8052159610411
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "_id": 1497,
+    "Sewer Gravity Asset Identification": "SL919",
+    "Sewer Gravity Upstream Maintenance Hole": "MH5148718569",
+    "Sewer Gravity Downstream Maintenance Hole": "MH5143718620",
+    "Sewer Gravity Twin Number": 1,
+    "Sewer Gravity Flow Type": "SAN",
+    "Sewer Gravity Structure Type": "SL",
+    "Sewer Gravity Location Description": "SPRINGHOUSE SQ",
+    "Sewer Gravity Owned By": "City",
+    "Sewer Gravity Managed By": "TW Distribution and Collection",
+    "Sewer Gravity Install Date": "1981-01-01T00:00:00",
+    "Sewer Gravity Diameter": 250,
+    "Sewer Gravity Material": "CP",
+    "Sewer Gravity Main Shape": "Circular",
+    "Upstream Elevation": "182.19",
+    "Downstream Elevation": "181.75",
+    "Sewer Gravity Measured Length": 71.5,
+    "Sewer Gravity Trunk Sewer": "No",
+    "Sewer Gravity Trunk Name": "None"
+   },
+   "geometry": {
+    "type": "MultiLineString",
+    "coordinates": [
+     [
+      [
+       -79.3286806799701,
+       43.8052159610411
+      ],
+      [
+       -79.3286478118885,
+       43.8051923468489
+      ],
+      [
+       -79.3280495424328,
+       43.8047626801915
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "_id": 1525,
+    "Sewer Gravity Asset Identification": "SL880",
+    "Sewer Gravity Upstream Maintenance Hole": "MH5180918434",
+    "Sewer Gravity Downstream Maintenance Hole": "MH5174218428",
+    "Sewer Gravity Twin Number": 1,
+    "Sewer Gravity Flow Type": "SAN",
+    "Sewer Gravity Structure Type": "SL",
+    "Sewer Gravity Location Description": "HUNTSMILL BLVD",
+    "Sewer Gravity Owned By": "City",
+    "Sewer Gravity Managed By": "TW Distribution and Collection",
+    "Sewer Gravity Install Date": "1976-01-01T00:00:00",
+    "Sewer Gravity Diameter": 250,
+    "Sewer Gravity Material": "CP",
+    "Sewer Gravity Main Shape": "Circular",
+    "Upstream Elevation": "186.20000000000002",
+    "Downstream Elevation": "184.89000000000001",
+    "Sewer Gravity Measured Length": 67.6,
+    "Sewer Gravity Trunk Sewer": "No",
+    "Sewer Gravity Trunk Name": "None"
+   },
+   "geometry": {
+    "type": "MultiLineString",
+    "coordinates": [
+     [
+      [
+       -79.3303477184016,
+       43.808118408182
+      ],
+      [
+       -79.3304194367902,
+       43.8075420654897
+      ],
+      [
+       -79.3304231125608,
+       43.8075124482869
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "_id": 1535,
+    "Sewer Gravity Asset Identification": "SL946",
+    "Sewer Gravity Upstream Maintenance Hole": "MH5153618675",
+    "Sewer Gravity Downstream Maintenance Hole": "MH5155518733",
+    "Sewer Gravity Twin Number": 1,
+    "Sewer Gravity Flow Type": "SAN",
+    "Sewer Gravity Structure Type": "SL",
+    "Sewer Gravity Location Description": "CROWFOOT PL",
+    "Sewer Gravity Owned By": "City",
+    "Sewer Gravity Managed By": "TW Distribution and Collection",
+    "Sewer Gravity Install Date": "1981-01-01T00:00:00",
+    "Sewer Gravity Diameter": 250,
+    "Sewer Gravity Material": "CP",
+    "Sewer Gravity Main Shape": "Circular",
+    "Upstream Elevation": "183.17000000000002",
+    "Downstream Elevation": "182.73",
+    "Sewer Gravity Measured Length": 60.6,
+    "Sewer Gravity Trunk Sewer": "No",
+    "Sewer Gravity Trunk Name": "None"
+   },
+   "geometry": {
+    "type": "MultiLineString",
+    "coordinates": [
+     [
+      [
+       -79.3273560502272,
+       43.8056554274119
+      ],
+      [
+       -79.3271747285473,
+       43.8056987637642
+      ],
+      [
+       -79.3268247082063,
+       43.8057824123556
+      ],
+      [
+       -79.3266757723552,
+       43.805818002018
+      ],
+      [
+       -79.3266403261921,
+       43.805826481313
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "_id": 1543,
+    "Sewer Gravity Asset Identification": "SL956",
+    "Sewer Gravity Upstream Maintenance Hole": "MH5155518733",
+    "Sewer Gravity Downstream Maintenance Hole": "MH5148118758",
+    "Sewer Gravity Twin Number": 1,
+    "Sewer Gravity Flow Type": "SAN",
+    "Sewer Gravity Structure Type": "SL",
+    "Sewer Gravity Location Description": "EAGLE POINT RD",
+    "Sewer Gravity Owned By": "City",
+    "Sewer Gravity Managed By": "TW Distribution and Collection",
+    "Sewer Gravity Install Date": "1981-01-01T00:00:00",
+    "Sewer Gravity Diameter": 250,
+    "Sewer Gravity Material": "CP",
+    "Sewer Gravity Main Shape": "Circular",
+    "Upstream Elevation": "182.53",
+    "Downstream Elevation": "182.13",
+    "Sewer Gravity Measured Length": 78.4,
+    "Sewer Gravity Trunk Sewer": "No",
+    "Sewer Gravity Trunk Name": "None"
+   },
+   "geometry": {
+    "type": "MultiLineString",
+    "coordinates": [
+     [
+      [
+       -79.3266403261921,
+       43.805826481313
+      ],
+      [
+       -79.3264859656618,
+       43.8054947270376
+      ],
+      [
+       -79.3263290501299,
+       43.8051574509688
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "_id": 1572,
+    "Sewer Gravity Asset Identification": "SL912",
+    "Sewer Gravity Upstream Maintenance Hole": "MH5158718555",
+    "Sewer Gravity Downstream Maintenance Hole": "MH5156418557",
+    "Sewer Gravity Twin Number": 1,
+    "Sewer Gravity Flow Type": "SAN",
+    "Sewer Gravity Structure Type": "SL",
+    "Sewer Gravity Location Description": "SPRINGHOUSE SQ",
+    "Sewer Gravity Owned By": "City",
+    "Sewer Gravity Managed By": "TW Distribution and Collection",
+    "Sewer Gravity Install Date": "1981-01-01T00:00:00",
+    "Sewer Gravity Diameter": 250,
+    "Sewer Gravity Material": "CP",
+    "Sewer Gravity Main Shape": "Circular",
+    "Upstream Elevation": "183.02",
+    "Downstream Elevation": "182.91",
+    "Sewer Gravity Measured Length": 22.6,
+    "Sewer Gravity Trunk Sewer": "No",
+    "Sewer Gravity Trunk Name": "None"
+   },
+   "geometry": {
+    "type": "MultiLineString",
+    "coordinates": [
+     [
+      [
+       -79.3288521738699,
+       43.8061152582531
+      ],
+      [
+       -79.3288493934375,
+       43.8060965857803
+      ],
+      [
+       -79.3288220278989,
+       43.8059129220809
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "_id": 8801,
+    "Sewer Gravity Asset Identification": "SL931",
+    "Sewer Gravity Upstream Maintenance Hole": "MH5143718620",
+    "Sewer Gravity Downstream Maintenance Hole": "MH5145718683",
+    "Sewer Gravity Twin Number": 1,
+    "Sewer Gravity Flow Type": "SAN",
+    "Sewer Gravity Structure Type": "SL",
+    "Sewer Gravity Location Description": "MCNICOLL AVE",
+    "Sewer Gravity Owned By": "City",
+    "Sewer Gravity Managed By": "TW Distribution and Collection",
+    "Sewer Gravity Install Date": "1981-01-01T00:00:00",
+    "Sewer Gravity Diameter": 250,
+    "Sewer Gravity Material": "CP",
+    "Sewer Gravity Main Shape": "Circular",
+    "Upstream Elevation": "181.68",
+    "Downstream Elevation": "181.36",
+    "Sewer Gravity Measured Length": 66.6,
+    "Sewer Gravity Trunk Sewer": "No",
+    "Sewer Gravity Trunk Name": "None"
+   },
+   "geometry": {
+    "type": "MultiLineString",
+    "coordinates": [
+     [
+      [
+       -79.3280495424328,
+       43.8047626801915
+      ],
+      [
+       -79.3280125807738,
+       43.804771175636
+      ],
+      [
+       -79.3273492590182,
+       43.8049236265347
+      ],
+      [
+       -79.3272604734361,
+       43.804944032922
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "_id": 8802,
+    "Sewer Gravity Asset Identification": "SL936",
+    "Sewer Gravity Upstream Maintenance Hole": "MH5145718683",
+    "Sewer Gravity Downstream Maintenance Hole": "MH5140018701",
+    "Sewer Gravity Twin Number": 1,
+    "Sewer Gravity Flow Type": "SAN",
+    "Sewer Gravity Structure Type": "SL",
+    "Sewer Gravity Location Description": "BROOKSHIRE BLVD",
+    "Sewer Gravity Owned By": "City",
+    "Sewer Gravity Managed By": "TW Distribution and Collection",
+    "Sewer Gravity Install Date": "1981-01-01T00:00:00",
+    "Sewer Gravity Diameter": 250,
+    "Sewer Gravity Material": "CP",
+    "Sewer Gravity Main Shape": "Circular",
+    "Upstream Elevation": "181.19",
+    "Downstream Elevation": "180.74",
+    "Sewer Gravity Measured Length": 60,
+    "Sewer Gravity Trunk Sewer": "No",
+    "Sewer Gravity Trunk Name": "None"
+   },
+   "geometry": {
+    "type": "MultiLineString",
+    "coordinates": [
+     [
+      [
+       -79.3272604734361,
+       43.804944032922
+      ],
+      [
+       -79.3272136411313,
+       43.8048368758611
+      ],
+      [
+       -79.3270354996467,
+       43.8044292609146
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "_id": 8825,
+    "Sewer Gravity Asset Identification": "SL879",
+    "Sewer Gravity Upstream Maintenance Hole": "MH5174418397",
+    "Sewer Gravity Downstream Maintenance Hole": "MH5174218428",
+    "Sewer Gravity Twin Number": 1,
+    "Sewer Gravity Flow Type": "SAN",
+    "Sewer Gravity Structure Type": "SL",
+    "Sewer Gravity Location Description": "ARNALL AVE",
+    "Sewer Gravity Owned By": "City",
+    "Sewer Gravity Managed By": "TW Distribution and Collection",
+    "Sewer Gravity Install Date": "1981-01-01T00:00:00",
+    "Sewer Gravity Diameter": 250,
+    "Sewer Gravity Material": "CP",
+    "Sewer Gravity Main Shape": "Circular",
+    "Upstream Elevation": "185.17000000000002",
+    "Downstream Elevation": "184.9",
+    "Sewer Gravity Measured Length": 30.900000000000002,
+    "Sewer Gravity Trunk Sewer": "No",
+    "Sewer Gravity Trunk Name": "None"
+   },
+   "geometry": {
+    "type": "MultiLineString",
+    "coordinates": [
+     [
+      [
+       -79.3308059472606,
+       43.8075356264678
+      ],
+      [
+       -79.3305693146778,
+       43.8075213061875
+      ],
+      [
+       -79.3304231125608,
+       43.8075124482869
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "_id": 8826,
+    "Sewer Gravity Asset Identification": "SL877",
+    "Sewer Gravity Upstream Maintenance Hole": "MH5174218428",
+    "Sewer Gravity Downstream Maintenance Hole": "MH5169918424",
+    "Sewer Gravity Twin Number": 1,
+    "Sewer Gravity Flow Type": "SAN",
+    "Sewer Gravity Structure Type": "SL",
+    "Sewer Gravity Location Description": "HUNTSMILL BLVD",
+    "Sewer Gravity Owned By": "City",
+    "Sewer Gravity Managed By": "TW Distribution and Collection",
+    "Sewer Gravity Install Date": "1976-01-01T00:00:00",
+    "Sewer Gravity Diameter": 250,
+    "Sewer Gravity Material": "CP",
+    "Sewer Gravity Main Shape": "Circular",
+    "Upstream Elevation": "184.69",
+    "Downstream Elevation": "184.5",
+    "Sewer Gravity Measured Length": 43.1,
+    "Sewer Gravity Trunk Sewer": "No",
+    "Sewer Gravity Trunk Name": "None"
+   },
+   "geometry": {
+    "type": "MultiLineString",
+    "coordinates": [
+     [
+      [
+       -79.3304231125608,
+       43.8075124482869
+      ],
+      [
+       -79.3304698330971,
+       43.80712574884
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "_id": 8827,
+    "Sewer Gravity Asset Identification": "SL885",
+    "Sewer Gravity Upstream Maintenance Hole": "MH5169918424",
+    "Sewer Gravity Downstream Maintenance Hole": "MH5166918433",
+    "Sewer Gravity Twin Number": 1,
+    "Sewer Gravity Flow Type": "SAN",
+    "Sewer Gravity Structure Type": "SL",
+    "Sewer Gravity Location Description": "HUNTSMILL BLVD",
+    "Sewer Gravity Owned By": "City",
+    "Sewer Gravity Managed By": "TW Distribution and Collection",
+    "Sewer Gravity Install Date": "1976-01-01T00:00:00",
+    "Sewer Gravity Diameter": 250,
+    "Sewer Gravity Material": "CP",
+    "Sewer Gravity Main Shape": "Circular",
+    "Upstream Elevation": "184.44",
+    "Downstream Elevation": "184.29",
+    "Sewer Gravity Measured Length": 30.900000000000002,
+    "Sewer Gravity Trunk Sewer": "No",
+    "Sewer Gravity Trunk Name": "None"
+   },
+   "geometry": {
+    "type": "MultiLineString",
+    "coordinates": [
+     [
+      [
+       -79.3304698330971,
+       43.80712574884
+      ],
+      [
+       -79.3303676307435,
+       43.8068576160873
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "_id": 8828,
+    "Sewer Gravity Asset Identification": "SL886",
+    "Sewer Gravity Upstream Maintenance Hole": "MH5164118371",
+    "Sewer Gravity Downstream Maintenance Hole": "MH5166918433",
+    "Sewer Gravity Twin Number": 1,
+    "Sewer Gravity Flow Type": "SAN",
+    "Sewer Gravity Structure Type": "SL",
+    "Sewer Gravity Location Description": "CHADBURY PL",
+    "Sewer Gravity Owned By": "City",
+    "Sewer Gravity Managed By": "TW Distribution and Collection",
+    "Sewer Gravity Install Date": "1981-01-01T00:00:00",
+    "Sewer Gravity Diameter": 250,
+    "Sewer Gravity Material": "CP",
+    "Sewer Gravity Main Shape": "Circular",
+    "Upstream Elevation": "185.55",
+    "Downstream Elevation": "184.73",
+    "Sewer Gravity Measured Length": 68.2001449,
+    "Sewer Gravity Trunk Sewer": "No",
+    "Sewer Gravity Trunk Name": "None"
+   },
+   "geometry": {
+    "type": "MultiLineString",
+    "coordinates": [
+     [
+      [
+       -79.3311352991699,
+       43.8065973876072
+      ],
+      [
+       -79.3305003418,
+       43.806815192718
+      ],
+      [
+       -79.3303676307435,
+       43.8068576160873
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "_id": 8829,
+    "Sewer Gravity Asset Identification": "SL905",
+    "Sewer Gravity Upstream Maintenance Hole": "MH5166918433",
+    "Sewer Gravity Downstream Maintenance Hole": "MH5160818480",
+    "Sewer Gravity Twin Number": 1,
+    "Sewer Gravity Flow Type": "SAN",
+    "Sewer Gravity Structure Type": "SL",
+    "Sewer Gravity Location Description": "HUNTSMILL BLVD",
+    "Sewer Gravity Owned By": "City",
+    "Sewer Gravity Managed By": "TW Distribution and Collection",
+    "Sewer Gravity Install Date": "1976-01-01T00:00:00",
+    "Sewer Gravity Diameter": 250,
+    "Sewer Gravity Material": "CP",
+    "Sewer Gravity Main Shape": "Circular",
+    "Upstream Elevation": "184.16",
+    "Downstream Elevation": "183.65",
+    "Sewer Gravity Measured Length": 76.8,
+    "Sewer Gravity Trunk Sewer": "No",
+    "Sewer Gravity Trunk Name": "None"
+   },
+   "geometry": {
+    "type": "MultiLineString",
+    "coordinates": [
+     [
+      [
+       -79.3303676307435,
+       43.8068576160873
+      ],
+      [
+       -79.3303498919401,
+       43.8068410457131
+      ],
+      [
+       -79.3297824532417,
+       43.8063111526084
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "_id": 8830,
+    "Sewer Gravity Asset Identification": "SL911",
+    "Sewer Gravity Upstream Maintenance Hole": "MH5160818480",
+    "Sewer Gravity Downstream Maintenance Hole": "MH5158718555",
+    "Sewer Gravity Twin Number": 1,
+    "Sewer Gravity Flow Type": "SAN",
+    "Sewer Gravity Structure Type": "SL",
+    "Sewer Gravity Location Description": "HUNTSMILL BLVD",
+    "Sewer Gravity Owned By": "City",
+    "Sewer Gravity Managed By": "TW Distribution and Collection",
+    "Sewer Gravity Install Date": "1976-01-01T00:00:00",
+    "Sewer Gravity Diameter": 250,
+    "Sewer Gravity Material": "CP",
+    "Sewer Gravity Main Shape": "Circular",
+    "Upstream Elevation": "183.57",
+    "Downstream Elevation": "183.22",
+    "Sewer Gravity Measured Length": 77.9,
+    "Sewer Gravity Trunk Sewer": "No",
+    "Sewer Gravity Trunk Name": "None"
+   },
+   "geometry": {
+    "type": "MultiLineString",
+    "coordinates": [
+     [
+      [
+       -79.3297824532417,
+       43.8063111526084
+      ],
+      [
+       -79.3297504186298,
+       43.8063044170661
+      ],
+      [
+       -79.3289051504815,
+       43.8061264089423
+      ],
+      [
+       -79.3288521738699,
+       43.8061152582531
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "_id": 8831,
+    "Sewer Gravity Asset Identification": "SL876",
+    "Sewer Gravity Upstream Maintenance Hole": "MH5154218465",
+    "Sewer Gravity Downstream Maintenance Hole": "MH5152418418",
+    "Sewer Gravity Twin Number": 1,
+    "Sewer Gravity Flow Type": "SAN",
+    "Sewer Gravity Structure Type": "SL",
+    "Sewer Gravity Location Description": "SPRINGHOUSE SQ",
+    "Sewer Gravity Owned By": "City",
+    "Sewer Gravity Managed By": "TW Distribution and Collection",
+    "Sewer Gravity Install Date": "1981-01-01T00:00:00",
+    "Sewer Gravity Diameter": 250,
+    "Sewer Gravity Material": "CP",
+    "Sewer Gravity Main Shape": "Circular",
+    "Upstream Elevation": "185.05",
+    "Downstream Elevation": "184.55",
+    "Sewer Gravity Measured Length": 50.2,
+    "Sewer Gravity Trunk Sewer": "No",
+    "Sewer Gravity Trunk Name": "None"
+   },
+   "geometry": {
+    "type": "MultiLineString",
+    "coordinates": [
+     [
+      [
+       -79.3299678632183,
+       43.8057159779358
+      ],
+      [
+       -79.330549039466,
+       43.8055528317904
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "_id": 8832,
+    "Sewer Gravity Asset Identification": "SL904",
+    "Sewer Gravity Upstream Maintenance Hole": "MH5158618465",
+    "Sewer Gravity Downstream Maintenance Hole": "MH5160818480",
+    "Sewer Gravity Twin Number": 1,
+    "Sewer Gravity Flow Type": "SAN",
+    "Sewer Gravity Structure Type": "SL",
+    "Sewer Gravity Location Description": "SPRINGHOUSE SQ",
+    "Sewer Gravity Owned By": "City",
+    "Sewer Gravity Managed By": "TW Distribution and Collection",
+    "Sewer Gravity Install Date": "1981-01-01T00:00:00",
+    "Sewer Gravity Diameter": 250,
+    "Sewer Gravity Material": "CP",
+    "Sewer Gravity Main Shape": "Circular",
+    "Upstream Elevation": "184.48",
+    "Downstream Elevation": "184.07",
+    "Sewer Gravity Measured Length": 26.8,
+    "Sewer Gravity Trunk Sewer": "No",
+    "Sewer Gravity Trunk Name": "None"
+   },
+   "geometry": {
+    "type": "MultiLineString",
+    "coordinates": [
+     [
+      [
+       -79.3299714255879,
+       43.806111978231
+      ],
+      [
+       -79.3299267100583,
+       43.8061591225384
+      ],
+      [
+       -79.329836481078,
+       43.8062542110107
+      ],
+      [
+       -79.3297824532417,
+       43.8063111526084
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "_id": 8833,
+    "Sewer Gravity Asset Identification": "SL894",
+    "Sewer Gravity Upstream Maintenance Hole": "MH5152418418",
+    "Sewer Gravity Downstream Maintenance Hole": "MH5145518442",
+    "Sewer Gravity Twin Number": 1,
+    "Sewer Gravity Flow Type": "SAN",
+    "Sewer Gravity Structure Type": "SL",
+    "Sewer Gravity Location Description": "SPRINGHOUSE SQ",
+    "Sewer Gravity Owned By": "City",
+    "Sewer Gravity Managed By": "TW Distribution and Collection",
+    "Sewer Gravity Install Date": "1981-01-01T00:00:00",
+    "Sewer Gravity Diameter": 250,
+    "Sewer Gravity Material": "CP",
+    "Sewer Gravity Main Shape": "Circular",
+    "Upstream Elevation": "184.39000000000001",
+    "Downstream Elevation": "183.82",
+    "Sewer Gravity Measured Length": 73.2,
+    "Sewer Gravity Trunk Sewer": "No",
+    "Sewer Gravity Trunk Name": "None"
+   },
+   "geometry": {
+    "type": "MultiLineString",
+    "coordinates": [
+     [
+      [
+       -79.330549039466,
+       43.8055528317904
+      ],
+      [
+       -79.3302874240327,
+       43.8049974258749
+      ],
+      [
+       -79.330255401861,
+       43.8049294649055
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "_id": 8834,
+    "Sewer Gravity Asset Identification": "SL903",
+    "Sewer Gravity Upstream Maintenance Hole": "MH5145518442",
+    "Sewer Gravity Downstream Maintenance Hole": "MH5145018452",
+    "Sewer Gravity Twin Number": 1,
+    "Sewer Gravity Flow Type": "SAN",
+    "Sewer Gravity Structure Type": "SL",
+    "Sewer Gravity Location Description": "SPRINGHOUSE SQ",
+    "Sewer Gravity Owned By": "City",
+    "Sewer Gravity Managed By": "TW Distribution and Collection",
+    "Sewer Gravity Install Date": "1981-01-01T00:00:00",
+    "Sewer Gravity Diameter": 250,
+    "Sewer Gravity Material": "CP",
+    "Sewer Gravity Main Shape": "Circular",
+    "Upstream Elevation": "183.73",
+    "Downstream Elevation": "183.68",
+    "Sewer Gravity Measured Length": 10.4,
+    "Sewer Gravity Trunk Sewer": "No",
+    "Sewer Gravity Trunk Name": "None"
+   },
+   "geometry": {
+    "type": "MultiLineString",
+    "coordinates": [
+     [
+      [
+       -79.330255401861,
+       43.8049294649055
+      ],
+      [
+       -79.3301389863602,
+       43.8048893179916
+      ]
+     ]
+    ]
+   }
+  }
+ ]
+}
