@@ -12,7 +12,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import pytest
-from conftest import DENDRITIC, FIXTURE, nodes_of, subnetwork
+from conftest import DENDRITIC, FIXTURE, nodes_of, subnetwork, with_pipes
 from matplotlib.collections import LineCollection, PatchCollection
 from mpl_toolkits.axes_grid1.anchored_artists import AnchoredSizeBar
 from pyproj import CRS
@@ -302,16 +302,75 @@ def test_shares_must_not_be_negative():
         maps._shares_table(pd.DataFrame({"a": [-1.0]}), None, 0.0)
 
 
-def test_reaches_split_at_junctions(network):
+def test_stems_follow_the_widest_pipe(network):
     sub = network.subnetwork(nodes_of(DENDRITIC))
     pipe = {(u, v): k for u, v, k in sub.graph.edges(keys=True)}
     ids = sorted(pipe.values())
-    runs = maps._reaches(sub.graph, ids)
-    assert sorted(p for run in runs for p in run) == ids
-    # A1 -> A2 -> J1 is one reach (A2 has one pipe in and one out); J1 is a junction.
-    assert [pipe["A1", "A2"], pipe["A2", "J1"]] in runs
-    assert [pipe["B1", "B2"], pipe["B2", "J1"]] in runs
-    assert [pipe["J2", "OUT"]] in runs  # J2 has two pipes in
+    widths = pd.Series(1.0, index=ids)
+    widths[pipe["B2", "J1"]] = 2.0  # B is the main stem at J1
+    chains = maps._stems(sub.graph, ids, widths)
+    assert sorted(p for chain in chains for p in chain) == ids
+    trunk = [pipe["J1", "J2"], pipe["J2", "OUT"]]
+    assert [pipe["B1", "B2"], pipe["B2", "J1"], *trunk] in chains
+    assert [pipe["A1", "A2"], pipe["A2", "J1"]] in chains  # ends at J1
+    assert [pipe["C1", "J1"]] in chains
+
+
+def test_stems_survive_a_cycle():
+    net = with_pipes(("A2", "A1"))  # A1 <-> A2
+    pipe = {(u, v): k for u, v, k in net.graph.edges(keys=True)}
+    ids = [pipe["A1", "A2"], 2000]
+    chains = maps._stems(net.graph, ids)
+    assert sorted(p for chain in chains for p in chain) == sorted(ids)
+
+
+def test_merged_splits_only_visible_changes():
+    chain = [1, 2, 3, 4]
+    table = pd.DataFrame({"x": [0.50, 0.59, 0.60, 0.61]}, chain).assign(y=lambda t: 1 - t.x)
+    widths = pd.Series([10.0, 10.2, 10.4, 15.0], index=chain)
+    # 4 is much wider than 3; 2 is within 0.5 m and 0.02 of 3; 1 differs from 3 by 0.1.
+    assert maps._merged(chain, table, widths, 0.5, 0.02) == [[1], [2, 3], [4]]
+    assert maps._merged(chain, table, widths, 0.0, 0.0) == [[1], [2], [3], [4]]
+    assert maps._merged(chain, table, widths, 10.0, 1.0) == [chain]
+
+
+@pytest.mark.parametrize("turn", [90, 30, -60])
+def test_mitred_bend_has_no_gap(turn):
+    angle = np.radians(turn)
+    joint = np.array([100.0, 0.0])
+    end = joint + 80 * np.array([np.cos(angle), np.sin(angle)])
+    upstream, downstream = LineString([(0, 0), joint]), LineString([joint, end])
+    before, after = np.array([1.0, 0.0]), (end - joint) / 80
+    shares = (0.6, 0.4)
+    first = maps.mitred_strands(upstream, shares, 12, after=after)
+    second = maps.mitred_strands(downstream, shares, 8, before=before)
+    # Strand offsets: (-6, 1.2) and (1.2, 6) upstream, (-4, 0.8) and (0.8, 4) downstream.
+    for a, b, overlap in zip(first, second, (4.8, 2.8), strict=True):
+        assert_meet_along_cut(a, b, overlap)
+    # Square-cut ribbons overlap on the inside of the bend and leave a wedge on the outside.
+    square = maps.ribbon_strands(upstream, shares, 12), maps.ribbon_strands(downstream, shares, 8)
+    inner = 1 if turn > 0 else 0  # the left of the line is the inside of a left turn
+    assert square[0][inner].intersection(square[1][inner]).area > 1
+
+
+def assert_meet_along_cut(a, b, width):
+    """Strands ``a`` and ``b`` don't overlap and share an edge at least ``width`` long."""
+    assert a.intersection(b).area == pytest.approx(0, abs=1e-6)
+    eps = 1e-6
+    shared = a.buffer(eps).intersection(b.buffer(eps)).area / (2 * eps)
+    assert shared >= 0.99 * width
+
+
+def test_plot_ribbons_trunk_is_one_band(ax, sub):
+    pipe = {(u, v): k for u, v, k in sub.graph.edges(keys=True)}
+    stem = [pipe["A1", "A2"], pipe["A2", "J1"], pipe["J1", "J2"], pipe["J2", "OUT"]]
+    shares = pd.DataFrame({"x": [1.0, 1.01, 2.0, 2.02], "y": [1.0, 1.0, 2.0, 2.0]}, index=stem)
+    layer = maps.plot_ribbons(ax, sub, shares, context=False, max_width=10)
+    assert len(layer.artist.get_paths()) == 4  # A1 -> J1 and J1 -> OUT, two strands each
+    pieces = [Polygon(p.to_polygons()[0]) for p in layer.artist.get_paths()]
+    assert_meet_along_cut(pieces[0], pieces[2], 0.99 * 5 / 2)  # strand x: offsets (-2.5, 0)
+    layer = maps.plot_ribbons(ax, sub, shares, context=False, max_width=10, merge_tol=0)
+    assert len(layer.artist.get_paths()) == 8
 
 
 def test_plot_ribbons(ax, sub):

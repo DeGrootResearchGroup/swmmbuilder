@@ -114,8 +114,9 @@ sub.to_geodataframe("pipes", values=concentration)  # or "nodes" (rows of net.no
 - **Ribbons.** `plot_ribbons` splits each pipe into strands, one per category, as wide as its
   share. By default the ribbon width is proportional to the pipe's total load, with the largest
   2.5 % of the network's extent wide (`max_width=` in metres to override); ribbons under 5 % of
-  that (`min_width=`) leave their pipes as thin grey context. Consecutive pipes between
-  junctions with the same shares are drawn as one ribbon.
+  that (`min_width=`) leave their pipes as thin grey context. Pipes are joined into one ribbon
+  along main stems (the widest ribbon through each junction) until the width or a share
+  visibly changes (`merge_tol=`), and the joins are mitred, so a trunk reads as one band.
 - **Zones.** `node_group_polygons` makes Voronoi tiles (or concave hulls) clipped to the network
   footprint, the area near the pipes, so zones cover the serviced area. Its default distance is
   twice the median pipe length, at most 5 % of the extent (`maps.footprint_distance`;

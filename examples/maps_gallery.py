@@ -6,7 +6,8 @@ and the 2,692-pipe tests/data/toronto_large_catchment.geojson.gz ("toronto_large
 across). Pass ``--pipes`` (London schema) and ``--outlet`` to render another network instead.
 The values are synthetic: "flow" is the number of nodes upstream of each pipe, "concentration"
 decays with the distance to the outlet, and the zones are the largest disjoint branches plus the
-rest. Images are named after the network, e.g. toronto_large_ribbons.png.
+rest. Images are named after the network, e.g. toronto_large_ribbons.png, or after the outlet
+with ``--pipes``, e.g. WM6002_ribbons.png.
 
     python examples/maps_gallery.py [OUT_DIR] [--pipes PATH --outlet NODE]
 
@@ -133,7 +134,13 @@ def render(name, net, outlet, out_dir):
             ax, sub, [outlet], labels={outlet: "Outlet"}, name="Outlet", legend=False
         )
         maps.map_axes(ax, north_arrow=True)
-        maps.add_legends(ax, groups, ribbons, site)
+        # The zones and the ribbons share a palette: one legend, the one with more entries.
+        labels = [{h.get_label() for h in layer.handles} for layer in (groups, ribbons)]
+        if labels[0] <= labels[1] or labels[1] <= labels[0]:
+            key = groups if len(labels[0]) > len(labels[1]) else ribbons
+            maps.add_legends(ax, key, site)
+        else:
+            maps.add_legends(ax, groups, ribbons, site)
 
     figure("combined", combined)
 
@@ -153,7 +160,7 @@ def main():
         if args.outlet is None:
             parser.error("--pipes needs --outlet")
         net = Network(read_pipes(args.pipes), schema=LONDON_ON)
-        render(args.pipes.name.split(".")[0], net, args.outlet, args.out_dir)
+        render(args.outlet, net, args.outlet, args.out_dir)
     print(f"Wrote {len(list(args.out_dir.glob('*.png')))} images to {args.out_dir}/")
 
 

@@ -497,40 +497,107 @@ def ribbon_strands(line, shares, width):
     return strands
 
 
-def _reaches(graph, pipe_ids):
-    """``pipe_ids`` as runs in flow order between junctions: a run continues through a node with
-    exactly one pipe in and one out (in ``graph``) when both pipes are in ``pipe_ids``. Pipes not
-    in ``graph`` are runs of their own."""
+def _stems(graph, pipe_ids, widths=None):
+    """``pipe_ids`` as chains in flow order along main stems. At each node, the widest incoming
+    pipe in ``pipe_ids`` (by ``widths``, a Series by pipe ID; else the first) continues into the
+    widest outgoing one; other pipes start or end a chain there. Pipes not in ``graph`` are
+    chains of their own."""
     wanted = set(pipe_ids)
     ends = {key: (up, down) for up, down, key in graph.edges(keys=True) if key in wanted}
+    rank = {key: i for i, key in enumerate(pipe_ids)}
 
-    def through(node):
-        return graph.in_degree(node) == 1 and graph.out_degree(node) == 1
+    def widest(keys):
+        keys = [k for k in keys if k in ends]
+        if not keys:
+            return None
+        if widths is None:
+            return min(keys, key=rank.get)
+        return max(keys, key=lambda k: (widths[k], -rank[k]))
 
-    def pipe_in(node):
-        return next(iter(graph.in_edges(node, keys=True)))[2]
+    following = {}
+    for node in {n for ends_ in ends.values() for n in ends_}:
+        main_in = widest(k for _, _, k in graph.in_edges(node, keys=True))
+        main_out = widest(k for _, _, k in graph.out_edges(node, keys=True))
+        if main_in is not None and main_out is not None and main_in != main_out:
+            following[main_in] = main_out
+    preceding = {b: a for a, b in following.items()}
 
-    def pipe_out(node):
-        return next(iter(graph.out_edges(node, keys=True)))[2]
-
-    runs, seen = [], set()
-    for key in pipe_ids:
-        if key not in ends or key in seen:
+    chains, seen = [], set()
+    # Chain heads first, then what is left: pipes on cycles and pipes not in the graph.
+    starts = [k for k in pipe_ids if k in ends and k not in preceding] + list(pipe_ids)
+    for key in starts:
+        if key in seen:
             continue
-        up, _ = ends[key]
-        if through(up) and pipe_in(up) in ends:
-            continue  # not the start of a run
-        run = [key]
-        while through(ends[run[-1]][1]) and pipe_out(ends[run[-1]][1]) in ends:
-            following = pipe_out(ends[run[-1]][1])
-            if following in seen or following in run:
-                break
-            run.append(following)
-        seen.update(run)
-        runs.append(run)
-    # Pipes on cycles of through nodes, and pipes not in the graph.
-    runs += [[key] for key in pipe_ids if key not in seen]
-    return runs
+        chain = [key]
+        while following.get(chain[-1]) not in seen | set(chain) | {None}:
+            chain.append(following[chain[-1]])
+        seen.update(chain)
+        chains.append(chain)
+    return chains
+
+
+def _merged(chain, table, widths, width_tol, share_tol):
+    """``chain`` split into runs, each drawn with the shares and width of its downstream pipe:
+    walking upstream, a run continues while a pipe's width is within ``width_tol`` (metres) and
+    each of its shares within ``share_tol`` of the run's downstream pipe."""
+    runs = [[chain[-1]]]
+    for pipe in reversed(chain[:-1]):
+        last = runs[-1][-1]
+        if abs(widths[pipe] - widths[last]) <= width_tol + 1e-9 and (
+            np.abs(table.loc[pipe].to_numpy() - table.loc[last].to_numpy()).max()
+            <= share_tol + 1e-9
+        ):
+            runs[-1].insert(0, pipe)
+        else:
+            runs.append([pipe])
+    return runs[::-1]
+
+
+def _direction(a, b):
+    d = np.asarray(b, dtype=float)[:2] - np.asarray(a, dtype=float)[:2]
+    n = np.hypot(*d)
+    return d / n if n > 0 else None
+
+
+def _half_plane(point, normal, size):
+    """The square of side ``2 * size`` on the side of the line through ``point`` that ``normal``
+    points to."""
+    p = np.asarray(point, dtype=float)[:2]
+    t = np.array([-normal[1], normal[0]])
+    return shapely.Polygon(
+        [p - t * size, p + t * size, p + (t + normal) * size, p + (normal - t) * size]
+    )
+
+
+def mitred_strands(line, shares, width, before=None, after=None):
+    """:func:`ribbon_strands` along ``line``, with the ends cut on the bisector of the angle
+    with the neighbouring pieces, so that consecutive pieces meet without a gap or an overlap.
+
+    ``before`` is the direction (a 2-vector) in which the line arrives at its start from the
+    piece upstream, ``after`` the direction in which it leaves its end into the piece
+    downstream; None leaves that end cut square, as in :func:`ribbon_strands`.
+    """
+    coords = [tuple(c[:2]) for c in line.coords]
+    first = _direction(coords[0], coords[1])
+    last = _direction(coords[-2], coords[-1])
+    reach = 2 * width + 1.0
+    cuts = []
+    if before is not None and first is not None:
+        normal = before + first
+        if np.hypot(*normal) > 1e-6:
+            coords.insert(0, tuple(np.asarray(coords[0]) - before * reach))
+            cuts.append((line.coords[0], normal / np.hypot(*normal)))
+    if after is not None and last is not None:
+        normal = last + after
+        if np.hypot(*normal) > 1e-6:
+            coords.append(tuple(np.asarray(coords[-1]) + after * reach))
+            cuts.append((line.coords[-1], -normal / np.hypot(*normal)))
+    strands = ribbon_strands(LineString(coords), shares, width)
+    size = line.length + 4 * reach
+    for point, normal in cuts:
+        keep = _half_plane(point, normal, size)
+        strands = [s.intersection(keep) if not s.is_empty else s for s in strands]
+    return strands
 
 
 def _shares_table(shares, top_k, min_share):
@@ -674,6 +741,7 @@ def plot_ribbons(
     min_share=0.0,
     other_color=NEUTRAL_COLOR,
     order="category",
+    merge_tol=(0.05, 0.02),
     context=True,
     legend=True,
     title=None,
@@ -684,8 +752,11 @@ def plot_ribbons(
     """Draw pipes as ribbons of parallel strands, one per category, each as wide as its share of
     the pipe's load (a mass-flow map).
 
-    Consecutive pipes between junctions with the same shares and width are drawn as one ribbon,
-    so there are no notches where they meet.
+    Pipes are joined into runs along main stems (at each node, the widest incoming ribbon
+    continues into the widest outgoing one), and a run is split only where its ribbon visibly
+    changes (see ``merge_tol``). Each run is drawn as one ribbon with the shares and width of its
+    downstream pipe, and consecutive runs are cut on the bisector of the angle between them, so
+    a trunk reads as one band with no gaps or overlaps at its bends.
 
     Parameters
     ----------
@@ -728,6 +799,11 @@ def plot_ribbons(
         Order of the strands from the right of the pipe to its left (looking downstream): the
         order of the columns (with 'other' last), or by decreasing share.
 
+    merge_tol : float or (float, float)
+        ``(width, share)``: a run continues while the width differs from that of its downstream
+        pipe by at most ``width`` times the widest ribbon, and every share by at most ``share``.
+        A number sets both. 0 joins only pipes with the same width and shares.
+
     context : bool
         Draw every pipe as a thin grey line beneath the ribbons.
 
@@ -748,6 +824,7 @@ def plot_ribbons(
     """
     if order not in ("category", "share"):
         raise ValueError(f"order must be 'category' or 'share', not {order!r}.")
+    width_tol, share_tol = (merge_tol, merge_tol) if np.isscalar(merge_tol) else merge_tol
     pipes = _geodata(net, "pipes", crs)
     raw = shares.astype(float).fillna(0.0)
     raw = raw.loc[raw.index.isin(pipes.index)]
@@ -781,28 +858,28 @@ def plot_ribbons(
             )
         )
 
+    width_tol *= widths.max() if len(widths) else 0.0
+    runs = [
+        _merged(chain, table, widths, width_tol, share_tol)
+        for chain in _stems(net.graph, list(table.index), widths)
+    ]
+    lines = {run[-1]: _joined(pipes.geometry[p] for p in run) for chain in runs for run in chain}
+
+    def heading(line, end):
+        coords = list(line.coords)
+        return _direction(*coords[-2:]) if end else _direction(*coords[:2])
+
     patches, facecolors, drawn = [], [], set()
-    for reach in _reaches(net.graph, list(table.index)):
-        # Split the reach where the shares or the width change.
-        runs = [[reach[0]]]
-        for pipe in reach[1:]:
-            previous = runs[-1][-1]
-            same = np.allclose(table.loc[pipe], table.loc[previous], rtol=1e-6) and np.isclose(
-                widths[pipe], widths[previous], rtol=1e-6
-            )
-            if same:
-                runs[-1].append(pipe)
-            else:
-                runs.append([pipe])
-        for run in runs:
-            row = table.loc[run[0]]
+    for chain in runs:
+        for i, run in enumerate(chain):
+            row = table.loc[run[-1]]
             row = row[row > 0]
             if order == "share":
                 row = row.sort_values(ascending=False, kind="stable")
-            line = _joined(pipes.geometry[p] for p in run)
-            for category, strand in zip(
-                row.index, ribbon_strands(line, row.to_numpy(), widths[run[0]]), strict=True
-            ):
+            before = heading(lines[chain[i - 1][-1]], end=True) if i > 0 else None
+            after = heading(lines[chain[i + 1][-1]], end=False) if i + 1 < len(chain) else None
+            strands = mitred_strands(lines[run[-1]], row.to_numpy(), widths[run[-1]], before, after)
+            for category, strand in zip(row.index, strands, strict=True):
                 path = _path(strand)
                 if path is not None:
                     patches.append(PathPatch(path))
