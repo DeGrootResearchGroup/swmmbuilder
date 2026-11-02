@@ -1,4 +1,5 @@
-"""Map plotting (#26): to_geodataframe, static plots, group polygons, basemaps and export."""
+"""Map plotting (#26): to_geodataframe, map styling and keys, static plots, group polygons,
+basemaps and export."""
 
 import json
 import sys
@@ -12,8 +13,9 @@ import pandas as pd
 import pytest
 from conftest import DENDRITIC, FIXTURE, nodes_of, subnetwork
 from matplotlib.collections import LineCollection, PatchCollection
+from mpl_toolkits.axes_grid1.anchored_artists import AnchoredSizeBar
 from pyproj import CRS
-from shapely import LineString, Point
+from shapely import LineString, Point, Polygon
 
 from swmmbuilder import Network, maps
 
@@ -92,6 +94,89 @@ def test_plot_crs_without_crs_is_utm():
     assert maps.plot_crs(Network(data)) == CRS.from_epsg(32617)
 
 
+# ---- Scaling and colours --------------------------------------------------------------------
+
+
+def test_scaled_sqrt_is_proportional_from_zero():
+    out = maps._scaled(np.array([0.0, 1.0, 4.0, np.nan, -1.0]), (1, 5), "sqrt")
+    assert out == pytest.approx([1, 3, 5, 1, 1])
+
+
+def test_scaled_linear_and_log():
+    assert maps._scaled(np.array([1.0, 2.0, 4.0]), (0, 4), "linear") == pytest.approx([1, 2, 4])
+    assert maps._scaled(np.array([1.0, 10.0, 100.0, 0.0]), (1, 3), "log") == pytest.approx(
+        [1, 2, 3, 1]
+    )
+    with pytest.raises(ValueError, match="scale"):
+        maps._scaled(np.array([1.0]), (0, 1), "cube")
+
+
+def test_category_colors():
+    colours = maps.category_colors(["Z1", "Z2", "rest", "other"])
+    assert colours == {
+        "Z1": maps.TABLEAU10[0],
+        "Z2": maps.TABLEAU10[1],
+        "rest": maps.NEUTRAL_COLOR,
+        "other": maps.NEUTRAL_COLOR,
+    }
+    assert maps.category_colors(["a", "b"], ["red", "blue"]) == {"a": "red", "b": "blue"}
+    assert maps.category_colors(["a", "rest"], {"a": "red", "rest": "k"})["rest"] == "k"
+    with pytest.raises(ValueError, match="colour"):
+        maps.category_colors(["a", "b"], {"a": "red"})
+
+
+# ---- Map axes and keys ----------------------------------------------------------------------
+
+
+def test_map_axes_style(ax, sub):
+    maps.plot_pipes(ax, sub)
+    maps.plot_markers(ax, sub, ["OUT"])  # restyling replaces the scale bar
+    assert not ax.axison
+    bars = [a for a in ax.artists if isinstance(a, AnchoredSizeBar)]
+    assert len(bars) == 1
+    length = bars[0].size_bar.get_children()[0].get_width()
+    x0, x1 = ax.get_xlim()
+    assert (x1 - x0) / 10 < length <= (x1 - x0) / 5
+    assert length / 10 ** np.floor(np.log10(length)) in (1, 2, 5)
+
+
+def test_map_axes_north_arrow_and_no_style(ax, sub):
+    maps.map_axes(ax, north_arrow=True)
+    assert "N" in [t.get_text() for t in ax.texts]
+    fig, plain = plt.subplots()
+    maps.plot_pipes(plain, sub, style=False)
+    assert plain.axison and not plain.artists
+    plt.close(fig)
+
+
+def test_nice_length():
+    assert [maps._nice_length(x) for x in (0.9, 1.7, 3.0, 740.0, 1999.0)] == [0.5, 1, 2, 500, 1000]
+
+
+def test_add_legends_stacks_keys_outside(ax, sub):
+    ids = sub.to_geodataframe("pipes").index
+    values = pd.Series(np.arange(1, len(ids) + 1, dtype=float), index=ids)
+    first = maps.plot_pipes(ax, sub, values, label="conc", legend=False)
+    second = maps.plot_pipes(ax, sub, values * 2, label="flow", legend=False)
+    groups = maps.plot_groups(ax, maps.node_group_polygons(sub, GROUPS), legend=False)
+    assert first.colorbar is None and groups.legend is None
+    maps.add_legends(ax, first, second, groups)
+    tops = [layer.colorbar.ax.get_position().y1 for layer in (first, second)]
+    assert tops[0] > tops[1]
+    for layer in (first, second):
+        assert layer.colorbar.ax.get_position().x0 > ax.get_position().x1  # outside the map
+    assert [t.get_text() for t in groups.legend.get_texts()] == list(GROUPS)
+
+
+def test_log_colorbar_has_no_minor_labels(ax, sub):
+    ids = sub.to_geodataframe("pipes").index
+    values = pd.Series(np.logspace(0, 6, len(ids)), index=ids)
+    layer = maps.plot_pipes(ax, sub, values, norm="log", label="conc")
+    assert isinstance(
+        layer.colorbar.ax.yaxis.get_minor_formatter(), matplotlib.ticker.NullFormatter
+    )
+
+
 # ---- plot_pipes -----------------------------------------------------------------------------
 
 
@@ -99,38 +184,46 @@ def test_plot_pipes_colours_by_value(ax, network):
     pipes = network.to_geodataframe("pipes")
     values = pd.Series(np.arange(len(pipes), dtype=float), index=pipes.index)
     values.iloc[0] = np.nan
-    lines = maps.plot_pipes(ax, network, values, label="conc")
+    layer = maps.plot_pipes(ax, network, values, label="conc")
+    lines = layer.artist
     assert isinstance(lines, LineCollection)
-    assert len(lines.get_paths()) == len(pipes)
+    assert len(lines.get_paths()) == len(pipes) == len(layer.ids)
     array = lines.get_array()
     assert array.mask[0] and not array.mask[1:].any()  # NaN drawn as missing
-    assert lines.colorbar is not None
-    assert lines.get_cmap().get_bad() == pytest.approx(matplotlib.colors.to_rgba("0.85"))
+    assert layer.mappable is lines and layer.colorbar is not None
+    assert layer.colorbar.ax.yaxis.label.get_text() == "conc"
+    assert lines.get_cmap().get_bad() == pytest.approx(matplotlib.colors.to_rgba("0.75"))
 
 
 def test_plot_pipes_missing_pipes_are_masked(ax, sub):
     first = sub.to_geodataframe("pipes").index[0]
-    lines = maps.plot_pipes(ax, sub, {first: 3.0}, colorbar=False)
-    assert lines.get_array().count() == 1
-    assert lines.colorbar is None
+    layer = maps.plot_pipes(ax, sub, {first: 3.0}, legend=False)
+    assert layer.artist.get_array().count() == 1
+    assert layer.colorbar is None
 
 
 def test_plot_pipes_log_norm_masks_nonpositive(ax, sub):
     ids = sub.to_geodataframe("pipes").index
     values = pd.Series(np.linspace(0, 10, len(ids)), index=ids)
-    lines = maps.plot_pipes(ax, sub, values, norm="log")
+    lines = maps.plot_pipes(ax, sub, values, norm="log").artist
     ax.figure.canvas.draw()
     assert isinstance(lines.norm, matplotlib.colors.LogNorm)
     assert lines.norm.vmin == pytest.approx(values[values > 0].min())
 
 
-def test_plot_pipes_widths(ax, sub):
+def test_plot_pipes_sqrt_widths_thin_first(ax, sub):
     ids = sub.to_geodataframe("pipes").index
-    flow = pd.Series(np.linspace(1, 3, len(ids)), index=ids)
-    lines = maps.plot_pipes(ax, sub, width=flow, width_range=(1, 5))
-    widths = np.asarray(lines.get_linewidths())
-    assert widths.min() == pytest.approx(1) and widths.max() == pytest.approx(5)
-    assert maps.plot_pipes(ax, sub, width=2).get_linewidths() == pytest.approx([2])
+    flow = pd.Series(np.linspace(1, 1000, len(ids))[::-1], index=ids)
+    layer = maps.plot_pipes(ax, sub, width=flow, width_range=(0, 4))
+    widths = np.asarray(layer.artist.get_linewidths())
+    assert list(widths) == sorted(widths)  # thick pipes drawn last
+    expected = 4 * np.sqrt(flow[layer.ids] / flow.max())
+    assert widths == pytest.approx(expected.to_numpy())
+    lines = maps.plot_pipes(ax, sub, width=flow, width_scale="linear", width_range=(0, 4)).artist
+    assert max(lines.get_linewidths()) == pytest.approx(4)
+    assert maps.plot_pipes(ax, sub, width=2).artist.get_linewidths() == pytest.approx(
+        [2] * len(ids)
+    )
 
 
 def test_plot_pipes_in_metric_crs(ax, network):
@@ -187,25 +280,70 @@ def test_shares_must_not_be_negative():
         maps._shares_table(pd.DataFrame({"a": [-1.0]}), None, 0.0)
 
 
+def test_reaches_split_at_junctions(network):
+    sub = network.subnetwork(nodes_of(DENDRITIC))
+    pipe = {(u, v): k for u, v, k in sub.graph.edges(keys=True)}
+    ids = sorted(pipe.values())
+    runs = maps._reaches(sub.graph, ids)
+    assert sorted(p for run in runs for p in run) == ids
+    # A1 -> A2 -> J1 is one reach (A2 has one pipe in and one out); J1 is a junction.
+    assert [pipe["A1", "A2"], pipe["A2", "J1"]] in runs
+    assert [pipe["B1", "B2"], pipe["B2", "J1"]] in runs
+    assert [pipe["J2", "OUT"]] in runs  # J2 has two pipes in
+
+
 def test_plot_ribbons(ax, sub):
     ids = list(sub.to_geodataframe("pipes").index)
     rng = np.random.default_rng(0)
     shares = pd.DataFrame(rng.random((len(ids), 4)), index=ids, columns=list("abcd"))
-    ribbons = maps.plot_ribbons(ax, sub, shares, width=5, top_k=2)
-    assert isinstance(ribbons, PatchCollection)
-    assert len(ribbons.get_paths()) == 3 * len(ids)  # top 2 + other on every pipe
-    labels = [t.get_text() for t in ax.get_legend().get_texts()]
-    assert labels[-1] == "other"
+    layer = maps.plot_ribbons(ax, sub, shares, width=5, top_k=2)
+    assert isinstance(layer.artist, PatchCollection)
+    assert len(layer.artist.get_paths()) == 3 * len(ids)  # top 2 + other; every pipe differs
+    assert [t.get_text() for t in layer.legend.get_texts()][-1] == "other"
+    assert len(ax.collections) == 2  # grey context beneath the ribbons
+
+
+def test_plot_ribbons_merges_reaches(ax, sub):
+    pipe = {(u, v): k for u, v, k in sub.graph.edges(keys=True)}
+    chain = [pipe["A1", "A2"], pipe["A2", "J1"]]
+    shares = pd.DataFrame({"x": [1.0, 1.0], "y": [3.0, 3.0]}, index=chain)
+    layer = maps.plot_ribbons(ax, sub, shares, width=6, context=False)
+    assert len(layer.artist.get_paths()) == 2  # one ribbon of two strands for the reach
+    assert [t.get_text() for t in layer.legend.get_texts()] == ["x", "y"]  # no 'other'
+
+
+def test_plot_ribbons_width_proportional_to_load(ax, sub):
+    pipe = {(u, v): k for u, v, k in sub.graph.edges(keys=True)}
+    big, small, tiny = pipe["J2", "OUT"], pipe["B1", "B2"], pipe["C1", "J1"]
+    shares = pd.DataFrame({"x": [6.0, 3.0, 0.3], "y": [4.0, 0.0, 0.0]}, index=[big, small, tiny])
+    layer = maps.plot_ribbons(ax, sub, shares, max_width=20, min_width=3, context=False)
+    assert layer.ids == [big, small]  # tiny is 0.6 m wide, below min_width
+    lengths = maps._geodata(sub, "pipes").geometry.length
+    areas = [Polygon(p.to_polygons()[0]).area for p in layer.artist.get_paths()]
+    assert len(areas) == 3  # x and y on the big pipe, x on the small one
+    assert sum(areas[:2]) / lengths[big] == pytest.approx(20, rel=0.05)
+    assert areas[2] / lengths[small] == pytest.approx(6, rel=0.05)  # 3 / 10 of the largest load
 
 
 def test_plot_ribbons_colours(ax, sub):
     pipe = sub.to_geodataframe("pipes").index[0]
     shares = pd.DataFrame({"x": [0.25], "y": [0.75]}, index=[pipe])
-    ribbons = maps.plot_ribbons(ax, sub, shares, {"x": "red", "y": "blue"}, order="share")
-    faces = [matplotlib.colors.to_hex(c) for c in ribbons.get_facecolors()]
+    layer = maps.plot_ribbons(ax, sub, shares, {"x": "red", "y": "blue"}, order="share")
+    faces = [matplotlib.colors.to_hex(c) for c in layer.artist.get_facecolors()]
     assert faces == ["#0000ff", "#ff0000"]  # largest share first
     with pytest.raises(ValueError, match="colour"):
         maps.plot_ribbons(ax, sub, shares, {"x": "red"})
+
+
+def test_ribbons_and_groups_share_colours(ax, sub):
+    polygons = maps.node_group_polygons(sub, GROUPS)
+    groups = maps.plot_groups(ax, polygons)
+    ids = list(sub.to_geodataframe("pipes").index)
+    shares = pd.DataFrame(1.0, index=ids, columns=list(GROUPS))
+    ribbons = maps.plot_ribbons(ax, sub, shares)
+    fills = {h.get_label(): matplotlib.colors.to_hex(h.get_facecolor()) for h in groups.handles}
+    strands = {h.get_label(): matplotlib.colors.to_hex(h.get_facecolor()) for h in ribbons.handles}
+    assert fills == strands
 
 
 # ---- Group polygons -------------------------------------------------------------------------
@@ -223,13 +361,21 @@ def test_node_group_polygons(sub, method):
             assert geometry.covers(nodes[node]), (group, node)
 
 
-def test_voronoi_tiles_partition_the_hull(sub):
-    polygons = maps.node_group_polygons(sub, GROUPS)
+def test_voronoi_tiles_partition_the_footprint(sub):
+    polygons = maps.node_group_polygons(sub, GROUPS, footprint=50)
+    footprint = maps.network_footprint(sub, 50)
+    assert polygons.geometry.union_all().area == pytest.approx(footprint.area, rel=1e-6)
+    assert polygons.geometry.area.sum() == pytest.approx(footprint.area, rel=1e-6)  # no overlap
+    pipes = maps._geodata(sub, "pipes").geometry
+    assert footprint.contains(pipes.union_all())
+    assert footprint.area < pipes.union_all().convex_hull.buffer(50).area
+
+
+def test_voronoi_without_footprint_fills_the_hull(sub):
+    polygons = maps.node_group_polygons(sub, GROUPS, footprint=None)
     nodes = maps._geodata(sub, "nodes").geometry
     hull = nodes.union_all().convex_hull.buffer(10.0)
-    union = polygons.geometry.union_all()
-    assert union.area == pytest.approx(hull.area, rel=1e-6)
-    assert polygons.geometry.area.sum() == pytest.approx(hull.area, rel=1e-6)  # no overlap
+    assert polygons.geometry.area.sum() == pytest.approx(hull.area, rel=1e-6)
 
 
 def test_voronoi_clip_to(sub):
@@ -251,46 +397,67 @@ def test_node_group_polygons_errors(sub):
         maps.node_group_polygons(sub, GROUPS, "kriging")
 
 
-def test_plot_groups(ax, sub):
+def test_plot_groups_by_category(ax, sub):
     polygons = maps.node_group_polygons(sub, GROUPS)
-    shaded = maps.plot_groups(
+    layer = maps.plot_groups(ax, polygons, hatch_groups={"North": ["A", "B"]})
+    assert layer.mappable is None and layer.colorbar is None
+    faces = [matplotlib.colors.to_hex(c) for c in layer.artist.get_facecolors()]
+    assert faces == list(maps.TABLEAU10[:4])
+    labels = [t.get_text() for t in layer.legend.get_texts()]
+    assert labels == [*GROUPS, "North"]
+    hatched = [c for c in ax.collections if c.get_hatch()]
+    assert matplotlib.colors.to_hex(hatched[0].get_edgecolor()[0]) == matplotlib.colors.to_hex(
+        "0.55"
+    )
+
+
+def test_plot_groups_by_value(ax, sub):
+    polygons = maps.node_group_polygons(sub, GROUPS)
+    layer = maps.plot_groups(
         ax, polygons, {"A": 1.0, "B": 2.0, "trunk": 3.0}, hatch_groups=[["A", "B"], ["C"]]
     )
-    assert isinstance(shaded, PatchCollection)
-    assert len(shaded.get_paths()) == len(GROUPS)
-    assert shaded.get_array().mask.tolist() == [False, False, True, False]  # C has no value
-    hatched = [c for c in ax.collections if c.get_hatch()]
-    assert [c.get_label() for c in hatched] == ["set 1", "set 2"]
-    assert maps.plot_groups(ax, polygons).get_array() is None
+    assert isinstance(layer.artist, PatchCollection)
+    assert len(layer.artist.get_paths()) == len(GROUPS)
+    assert layer.artist.get_array().mask.tolist() == [False, False, True, False]  # C: no value
+    assert layer.colorbar is not None
+    assert [h.get_label() for h in layer.handles] == ["set 1", "set 2"]
+    single = maps.plot_groups(ax, polygons, color="tan")
+    assert single.artist.get_array() is None and not single.handles
 
 
 # ---- Markers and basemaps -------------------------------------------------------------------
 
 
 def test_plot_markers(ax, sub):
-    markers = maps.plot_markers(ax, sub, ["A1", "OUT"], sizes={"A1": 1.0, "OUT": 3.0})
+    layer = maps.plot_markers(ax, sub, ["A1", "OUT"], sizes={"A1": 1.0, "OUT": 4.0}, labels=True)
     nodes = maps._geodata(sub, "nodes").geometry
     expected = [[nodes[n].x, nodes[n].y] for n in ["A1", "OUT"]]
-    np.testing.assert_allclose(markers.get_offsets(), expected)
-    assert markers.get_sizes().tolist() == pytest.approx([20, 200])
+    np.testing.assert_allclose(layer.artist.get_offsets(), expected)
+    assert layer.artist.get_sizes().tolist() == pytest.approx([20 + 180 / 4, 200])
     assert sorted(t.get_text() for t in ax.texts) == ["A1", "OUT"]
+    assert all(t.get_path_effects() for t in ax.texts)  # white halo
 
 
-def test_plot_markers_custom_labels_and_errors(ax, sub):
-    maps.plot_markers(ax, sub, ["A1", "B1"], labels={"A1": "Sampler 1"})
+def test_plot_markers_labels_and_errors(ax, sub):
+    maps.plot_markers(ax, sub, ["A1", "B1"])
+    assert not ax.texts  # no labels by default
+    layer = maps.plot_markers(ax, sub, ["A1", "B1"], labels={"A1": "Sampler 1"}, name="Samplers")
     assert [t.get_text() for t in ax.texts] == ["Sampler 1"]
+    assert [t.get_text() for t in layer.legend.get_texts()] == ["Samplers"]
     with pytest.raises(ValueError, match="not in the network"):
         maps.plot_markers(ax, sub, ["D1"])
 
 
 def test_add_basemap_vector_layer(ax, sub, tmp_path):
     maps.plot_pipes(ax, sub)
-    road = gpd.GeoDataFrame(geometry=[LineString([(-81.31, 42.98), (-81.28, 42.99)])], crs=4326)
+    limits = ax.get_xlim(), ax.get_ylim()
+    road = gpd.GeoDataFrame(geometry=[LineString([(-81.4, 42.9), (-81.2, 43.1)])], crs=4326)
     road.to_file(tmp_path / "roads.geojson")
     before = len(ax.collections)
     maps.add_basemap(ax, sub, layer=tmp_path / "roads.geojson")
     assert len(ax.collections) == before + 1
     assert ax.collections[-1].get_zorder() == 0
+    assert (ax.get_xlim(), ax.get_ylim()) == limits  # the long road does not zoom out
     with pytest.raises(ValueError, match="CRS"):
         maps.add_basemap(ax, sub, layer=road.set_crs(None, allow_override=True))
 

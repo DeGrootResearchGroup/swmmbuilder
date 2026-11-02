@@ -27,3 +27,6 @@ var/
 # SWMM outputs
 *.out
 *.rpt
+
+# Map gallery images (examples/maps_gallery.py)
+maps_gallery/

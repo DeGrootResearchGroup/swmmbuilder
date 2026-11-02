@@ -84,18 +84,22 @@ sub.to_inp("model.inp")  # outfalls default to the outfall nodes of the subnetwo
 `swmmbuilder.maps` draws values computed elsewhere (concentrations, flows, each upstream
 area's share of a pipe's load, ...) on the network: pandas Series or DataFrames indexed by pipe
 ID, node ID or group name. Static plots use matplotlib and draw in a metric CRS (the network's
-CRS if projected, else its UTM zone; see `maps.plot_crs`), so ribbon widths are in metres.
+CRS if projected, else its UTM zone; see `maps.plot_crs`). Each one styles the axes as a map
+(no ticks or frame, a scale bar; `maps.map_axes`, or `style=False`) and returns a `DrawnLayer`
+with its artist and its key.
 
 ```python
 import matplotlib.pyplot as plt
 
 fig, ax = plt.subplots()
-zones = maps.node_group_polygons(sub, {"north": ["A1", "A2"], "south": ["B1", "B2"]})
-maps.plot_groups(ax, zones, zone_values, hatch_groups=[["north", "south"]])
-maps.plot_pipes(ax, sub, concentration, norm="log", width=flow)   # missing values in grey
-maps.plot_ribbons(ax, sub, shares, width=10, top_k=4)             # pipes x areas, rows sum to 1
-maps.plot_markers(ax, sub, ["A1", "OUT"])
-maps.add_basemap(ax, sub)                       # web tiles; or layer="roads.gpkg" for offline
+zones = maps.node_group_polygons(sub, {"Z1": ["A1", "A2"], "Z2": ["B1", "B2"], "rest": [...]})
+colours = maps.category_colors(zones.index)       # one palette for zones and ribbons
+groups = maps.plot_groups(ax, zones, colors=colours, label="Zone", legend=False)
+pipes = maps.plot_pipes(ax, sub, concentration, norm="log", width=flow, legend=False)
+ribbons = maps.plot_ribbons(ax, sub, loads, colours, title="Upstream zone", legend=False)
+site = maps.plot_markers(ax, sub, ["OUT"], labels={"OUT": "Treatment plant"}, legend=False)
+maps.add_legends(ax, groups, pipes, ribbons)      # stacked to the right of the map
+maps.add_basemap(ax, sub)                         # web tiles; or layer="roads.gpkg" for offline
 
 maps.to_leaflet(sub, "map.html", [maps.PipeLayer(concentration, name="Concentration"),
                                   maps.GroupLayer(zones), maps.MarkerLayer(["OUT"])])
@@ -103,9 +107,27 @@ maps.to_geojson(sub, "pipes.geojson", values=concentration)
 sub.to_geodataframe("pipes", values=concentration)  # or "nodes" (rows of net.nodes)
 ```
 
-Web-tile basemaps and `to_leaflet` need the optional `maps` extra
-(`pip install "swmmbuilder[maps]"`: contextily, xyzservices, folium). `generate_gmap`
-(Google Maps) is deprecated in favour of `to_leaflet`.
+- **Pipes.** `plot_pipes` colours pipes by value (missing values in grey) and, with `width=`,
+  scales line widths by the square root of the value by default (`width_scale="linear"` or
+  `"log"`), drawing thick pipes last.
+- **Ribbons.** `plot_ribbons` splits each pipe into strands, one per category, as wide as its
+  share. By default the ribbon width is proportional to the pipe's total load (`max_width` for
+  the largest); `min_width` leaves small pipes as thin grey context. Consecutive pipes between
+  junctions with the same shares are drawn as one ribbon.
+- **Zones.** `node_group_polygons` makes Voronoi tiles (or concave hulls) clipped to the network
+  footprint, the area within `footprint=100` m of a pipe, so zones cover the serviced area.
+  `plot_groups` fills them lightly by category (with a legend) or by value (with a colour bar),
+  and can hatch sets of zones.
+- **Keys.** With `legend=True` (the default) each plot adds its colour bar or legend to a column
+  to the right of the map, below those already there. To compose several layers, pass
+  `legend=False` and call `maps.add_legends(ax, *layers)` once.
+- **Units.** Pipe line widths and marker sizes are in points: they stay the same when you zoom.
+  Ribbon widths, footprints and buffers are in metres: they scale with the map.
+
+`python examples/maps_gallery.py` renders every static plot on the Toronto test catchment (CI
+uploads the images as the `maps-gallery` artifact). Web-tile basemaps and `to_leaflet` need the
+optional `maps` extra (`pip install "swmmbuilder[maps]"`: contextily, xyzservices, folium).
+`generate_gmap` (Google Maps) is deprecated in favour of `to_leaflet`.
 
 ## Logging
 

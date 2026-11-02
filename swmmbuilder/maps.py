@@ -5,9 +5,16 @@ The functions here only draw: they take per-pipe, per-node or per-group values c
 or DataFrames indexed by pipe ID, node ID or group name.
 
 Static plots take a :class:`~swmmbuilder.Network` or :class:`~swmmbuilder.Subnetwork`
-(``net``) and draw in a metric CRS (see :func:`plot_crs`), so ribbon widths and polygon buffers
-are in metres. Functions drawing on the same axes must use the same ``crs``; the default is the
-same for a network and all its subnetworks.
+(``net``) and draw in a metric CRS (see :func:`plot_crs`). Functions drawing on the same axes must
+use the same ``crs``; the default is the same for a network and all its subnetworks.
+
+Units: pipe line widths and marker sizes are in points, so they stay the same on screen when you
+zoom; ribbon widths, footprints and buffers are in metres of the plot CRS, so they scale with the
+map.
+
+Each static plot styles the axes as a map (:func:`map_axes`) and returns a :class:`DrawnLayer`.
+With ``legend=True`` (the default) its colour bar or legend is stacked to the right of the axes
+(see :func:`add_legends`), below those of earlier plots on the same axes.
 
 ``contextily`` (web-tile basemaps) and ``folium`` (:func:`to_leaflet`) are optional: install them
 with ``pip install 'swmmbuilder[maps]'``.
@@ -17,18 +24,24 @@ import importlib
 import logging
 import os
 import warnings
+import weakref
 from dataclasses import dataclass, field
 
 import geopandas as gpd
 import gmplot
 import matplotlib as mpl
+import matplotlib.patheffects as pe
 import numpy as np
 import pandas as pd
 import shapely
 from matplotlib.collections import LineCollection, PatchCollection
 from matplotlib.colors import LogNorm, Normalize, to_hex
+from matplotlib.legend import Legend
+from matplotlib.lines import Line2D
 from matplotlib.patches import Patch, PathPatch
 from matplotlib.path import Path
+from matplotlib.ticker import LogFormatterSciNotation, LogLocator, NullFormatter
+from mpl_toolkits.axes_grid1.anchored_artists import AnchoredSizeBar
 from pyproj import CRS, Transformer
 from shapely import LineString, MultiPoint
 
@@ -40,6 +53,24 @@ WGS84 = CRS.from_epsg(4326)
 
 # Name of the strand that lumps the categories dropped by plot_ribbons' top_k and min_share.
 OTHER = "other"
+
+# Categories drawn in NEUTRAL_COLOR by category_colors.
+NEUTRAL_CATEGORIES = frozenset({"other", "rest"})
+
+# Tableau 10 (2016), designed to stay distinguishable for colour-blind readers, without its grey,
+# which is kept for the neutral categories.
+TABLEAU10 = (
+    "#4e79a7",
+    "#f28e2b",
+    "#e15759",
+    "#76b7b2",
+    "#59a14f",
+    "#edc948",
+    "#b07aa1",
+    "#ff9da7",
+    "#9c755f",
+)
+NEUTRAL_COLOR = "#bab0ac"
 
 DEFAULT_HATCHES = ("//", "\\\\", "xx", "..", "++", "oo")
 
@@ -96,6 +127,14 @@ def _check_nodes(net, nodes):
         raise ValueError(f"Nodes not in the network: {', '.join(missing)}")
 
 
+def network_footprint(net, distance=100.0, crs=None):
+    """The area served by the pipes of ``net``: within about ``distance`` metres of a pipe, with
+    narrow gaps between pipes filled in, as a shapely geometry in the plot CRS."""
+    pipes = _geodata(net, "pipes", crs).geometry.to_numpy()
+    smooth = distance / 3
+    return shapely.union_all(shapely.buffer(pipes, distance + smooth)).buffer(-smooth)
+
+
 # ---- Values and colours ---------------------------------------------------------------------
 
 
@@ -107,19 +146,38 @@ def _aligned(values, index, what="values"):
     return series.reindex(index).to_numpy()
 
 
-def _scaled(values, out_range):
-    """``values`` mapped linearly from their range onto ``out_range``; NaN maps to the low end
-    and constant values to the middle."""
+SCALES = ("sqrt", "linear", "log")
+
+
+def _scaled(values, out_range, scale="linear"):
+    """``values`` mapped onto ``out_range``.
+
+    'linear' and 'sqrt' are proportional to the value (or its square root) from 0 at the low end
+    to the largest value at the high end; 'log' maps the range of the logarithms. NaN, and values
+    that the scale cannot take (negative, or non-positive for 'log'), map to the low end.
+    """
+    if scale not in SCALES:
+        raise ValueError(f"scale must be one of {SCALES}, not {scale!r}.")
     lo, hi = out_range
-    finite = values[np.isfinite(values)]
+    values = np.asarray(values, dtype=float)
+    with np.errstate(invalid="ignore", divide="ignore"):
+        if scale == "log":
+            t = np.where(values > 0, np.log10(values), np.nan)
+        else:
+            t = np.where(values >= 0, values, np.nan)
+            t = np.sqrt(t) if scale == "sqrt" else t
+    finite = t[np.isfinite(t)]
     if not len(finite):
-        return np.full(len(values), float(lo))
-    vmin, vmax = finite.min(), finite.max()
-    if vmax == vmin:
-        out = np.full(len(values), (lo + hi) / 2)
+        return np.full(len(t), float(lo))
+    if scale == "log":
+        tmin, tmax = finite.min(), finite.max()
     else:
-        out = lo + (values - vmin) / (vmax - vmin) * (hi - lo)
-    return np.where(np.isfinite(values), out, lo)
+        tmin, tmax = 0.0, finite.max()
+    if tmax == tmin:
+        out = np.full(len(t), float(hi))
+    else:
+        out = lo + (t - tmin) / (tmax - tmin) * (hi - lo)
+    return np.where(np.isfinite(t), out, lo)
 
 
 def _norm(norm, vmin, vmax):
@@ -150,9 +208,207 @@ def _hex_colours(values, cmap, norm, missing_color):
     return [to_hex(c) for c in cmap(np.ma.masked_invalid(norm(masked)))]
 
 
-def _finish(ax):
+def category_colors(categories, colors=None, other=NEUTRAL_COLOR):
+    """{category: colour} for categorical maps, e.g. zones and the ribbons of their loads.
+
+    ``colors`` (a dict, or a list in the order of the categories) where given; otherwise Tableau 10
+    in order, repeating after 9 categories. The neutral categories 'other' and 'rest' get
+    ``other`` unless ``colors`` names them. Pass the result as ``colors`` to both
+    :func:`plot_groups` and :func:`plot_ribbons` so that a group and its strands match.
+    """
+    categories = list(dict.fromkeys(categories))
+    named = [c for c in categories if c not in NEUTRAL_CATEGORIES]
+    if colors is None:
+        if len(named) > len(TABLEAU10):
+            logger.warning(
+                "%d categories for %d colours: colours repeat", len(named), len(TABLEAU10)
+            )
+        colors = {c: TABLEAU10[i % len(TABLEAU10)] for i, c in enumerate(named)}
+    elif not isinstance(colors, dict):
+        colors = dict(zip(named, colors, strict=False))
+    missing = [c for c in named if c not in colors]
+    if missing:
+        raise ValueError(f"No colour for categories {missing}.")
+    return {c: colors.get(c, other) if c in NEUTRAL_CATEGORIES else colors[c] for c in categories}
+
+
+# ---- Map axes and keys ----------------------------------------------------------------------
+
+
+@dataclass
+class DrawnLayer:
+    """What a static plot drew, and its key for :func:`add_legends`.
+
+    Attributes
+    ----------
+    artist : matplotlib.artist.Artist
+        The main collection drawn.
+
+    ids : list
+        Pipe IDs, node IDs or group names of the elements of ``artist``, in its order.
+
+    mappable : matplotlib.cm.ScalarMappable or None
+        Source of a colour bar, for plots coloured by value.
+
+    handles : list
+        Legend handles, for categories, hatched sets or named markers.
+
+    title : str or None
+        Colour bar label or legend title.
+
+    colorbar : matplotlib.colorbar.Colorbar or None
+        The colour bar, once :func:`add_legends` has drawn it.
+
+    legend : matplotlib.legend.Legend or None
+        The legend, once :func:`add_legends` has drawn it.
+    """
+
+    artist: object
+    ids: list = field(default_factory=list)
+    mappable: object = None
+    handles: list = field(default_factory=list)
+    title: str | None = None
+    colorbar: object = None
+    legend: object = None
+
+
+# Per-axes state: the scale bar and north arrow (replaced on restyling) and the top of the free
+# space in the column of keys to the right of the axes, in axes fraction.
+_AXES_STATE = weakref.WeakKeyDictionary()
+
+
+def _state(ax):
+    return _AXES_STATE.setdefault(ax, {"key_top": 1.0, "decorations": []})
+
+
+def _nice_length(length):
+    """The largest 1, 2 or 5 x 10^n not above ``length``."""
+    power = 10 ** np.floor(np.log10(length))
+    return max(m * power for m in (1, 2, 5) if m * power <= length)
+
+
+def map_axes(ax, scalebar=True, north_arrow=False, units="m"):
+    """Style ``ax`` as a map: equal aspect, no ticks or frame, a scale bar about a fifth of the
+    width (rounded to 1, 2 or 5 x 10^n, in km from 1000 m) and optionally a north arrow.
+
+    Every static plot calls it unless ``style=False``; calling it again (e.g. after changing the
+    limits) replaces the scale bar and arrow. ``units`` are those of the plot CRS.
+    """
     ax.set_aspect("equal")
     ax.autoscale_view()
+    ax.set_axis_off()
+    state = _state(ax)
+    for artist in state["decorations"]:
+        artist.remove()
+    state["decorations"] = []
+
+    if scalebar:
+        (x0, x1), (y0, y1) = ax.get_xlim(), ax.get_ylim()
+        if x1 > x0:
+            length = _nice_length((x1 - x0) / 5)
+            text = (
+                f"{length / 1000:g} km"
+                if units == "m" and length >= 1000
+                else f"{length:g} {units}"
+            )
+            bar = AnchoredSizeBar(
+                ax.transData,
+                length,
+                text,
+                "lower left",
+                pad=0.4,
+                sep=3,
+                frameon=False,
+                size_vertical=abs(y1 - y0) / 200,
+                fontproperties={"size": 8},
+            )
+            ax.add_artist(bar)
+            state["decorations"].append(bar)
+
+    if north_arrow:
+        arrow = ax.annotate(
+            "",
+            xy=(0.96, 0.93),
+            xytext=(0.96, 0.83),
+            xycoords="axes fraction",
+            arrowprops={"arrowstyle": "-|>", "color": "0.2", "linewidth": 1.2},
+        )
+        letter = ax.text(
+            0.96, 0.94, "N", transform=ax.transAxes, ha="center", va="bottom", fontsize=9
+        )
+        state["decorations"] += [arrow, letter]
+
+
+def _finish(ax, style):
+    if style:
+        map_axes(ax)
+    else:
+        ax.set_aspect("equal")
+        ax.autoscale_view()
+
+
+def _renderer(fig):
+    try:
+        return fig.canvas.get_renderer()
+    except AttributeError:
+        return None
+
+
+def add_legends(ax, *layers, x=1.02, colorbar_height=0.3):
+    """Draw the colour bars and legends of ``layers`` in a column to the right of ``ax``, from the
+    top, below the keys already added to ``ax``.
+
+    Colour bars are compact (``colorbar_height`` of the axes) with small type, and only major
+    ticks on a log norm; legends are frameless, titled and left-aligned. The colour bar and
+    legend are stored on each layer.
+    """
+    state = _state(ax)
+    fig = ax.figure
+    for layer in layers:
+        if layer.mappable is not None:
+            top = state["key_top"]
+            cax = ax.inset_axes([x, top - colorbar_height, 0.03, colorbar_height])
+            layer.colorbar = fig.colorbar(layer.mappable, cax=cax)
+            layer.colorbar.set_label(layer.title or "", size=8)
+            layer.colorbar.ax.tick_params(labelsize=7)
+            norm = layer.mappable.norm
+            if isinstance(norm, LogNorm) and norm.vmin and norm.vmax:
+                # Label the decades only, or 1, 2 and 5 x 10^n over less than two decades.
+                decades = np.log10(norm.vmax / norm.vmin)
+                subs = (1.0,) if decades >= 2 else (1.0, 2.0, 5.0)
+                layer.colorbar.ax.yaxis.set_major_locator(LogLocator(subs=subs))
+                layer.colorbar.ax.yaxis.set_major_formatter(
+                    LogFormatterSciNotation(labelOnlyBase=False, minor_thresholds=(np.inf, np.inf))
+                )
+                layer.colorbar.ax.yaxis.set_minor_formatter(NullFormatter())
+            state["key_top"] = top - colorbar_height - 0.08
+        if layer.handles:
+            top = state["key_top"]
+            legend = Legend(
+                ax,
+                layer.handles,
+                [h.get_label() for h in layer.handles],
+                loc="upper left",
+                bbox_to_anchor=(x - 0.01, top),
+                bbox_transform=ax.transAxes,
+                frameon=False,
+                fontsize=8,
+                title=None if layer.mappable is not None else layer.title,
+                title_fontsize=8,
+                alignment="left",
+            )
+            ax.add_artist(legend)
+            legend.set_clip_on(False)  # outside the axes, and in a tight bounding box
+            layer.legend = legend
+            renderer = _renderer(fig)
+            if renderer is not None:
+                height = (
+                    legend.get_window_extent(renderer).height
+                    / ax.get_window_extent(renderer).height
+                )
+            else:
+                height = 0.06 * (len(layer.handles) + 1)
+            state["key_top"] = top - height - 0.04
 
 
 # ---- Shapes ---------------------------------------------------------------------------------
@@ -174,9 +430,15 @@ def _path(geometry):
     return Path.make_compound_path(*[Path(np.asarray(r.coords)[:, :2], closed=True) for r in rings])
 
 
-def _line(geometry):
-    """A pipe geometry as one LineString (the parts of a MultiLineString joined in order)."""
-    return LineString(line_coords(geometry))
+def _joined(geometries):
+    """One LineString through pipe geometries in flow order, without repeating shared ends."""
+    coords = []
+    for geometry in geometries:
+        part = line_coords(geometry)
+        if coords and np.allclose(coords[-1], part[0]):
+            part = part[1:]
+        coords += part
+    return LineString(coords)
 
 
 def ribbon_strands(line, shares, width):
@@ -204,6 +466,42 @@ def ribbon_strands(line, shares, width):
     return strands
 
 
+def _reaches(graph, pipe_ids):
+    """``pipe_ids`` as runs in flow order between junctions: a run continues through a node with
+    exactly one pipe in and one out (in ``graph``) when both pipes are in ``pipe_ids``. Pipes not
+    in ``graph`` are runs of their own."""
+    wanted = set(pipe_ids)
+    ends = {key: (up, down) for up, down, key in graph.edges(keys=True) if key in wanted}
+
+    def through(node):
+        return graph.in_degree(node) == 1 and graph.out_degree(node) == 1
+
+    def pipe_in(node):
+        return next(iter(graph.in_edges(node, keys=True)))[2]
+
+    def pipe_out(node):
+        return next(iter(graph.out_edges(node, keys=True)))[2]
+
+    runs, seen = [], set()
+    for key in pipe_ids:
+        if key not in ends or key in seen:
+            continue
+        up, _ = ends[key]
+        if through(up) and pipe_in(up) in ends:
+            continue  # not the start of a run
+        run = [key]
+        while through(ends[run[-1]][1]) and pipe_out(ends[run[-1]][1]) in ends:
+            following = pipe_out(ends[run[-1]][1])
+            if following in seen or following in run:
+                break
+            run.append(following)
+        seen.update(run)
+        runs.append(run)
+    # Pipes on cycles of through nodes, and pipes not in the graph.
+    runs += [[key] for key in pipe_ids if key not in seen]
+    return runs
+
+
 def _shares_table(shares, top_k, min_share):
     """``shares`` with rows normalised to sum to 1 and the categories below ``min_share`` or
     outside each row's ``top_k`` lumped into an 'other' column."""
@@ -224,19 +522,6 @@ def _shares_table(shares, top_k, min_share):
     return table.loc[:, (table > 0).any()]
 
 
-def _category_colours(categories, colors, other_color):
-    named = [c for c in categories if c != OTHER]
-    if colors is None:
-        cmap = mpl.colormaps["tab10" if len(named) <= 10 else "tab20"]
-        colors = {c: cmap(i % cmap.N) for i, c in enumerate(named)}
-    elif not isinstance(colors, dict):
-        colors = dict(zip(named, colors, strict=False))
-    missing = [c for c in named if c not in colors]
-    if missing:
-        raise ValueError(f"No colour for categories {missing}.")
-    return {**{c: colors[c] for c in named}, OTHER: other_color}
-
-
 # ---- Static plots ---------------------------------------------------------------------------
 
 
@@ -249,12 +534,14 @@ def plot_pipes(
     norm="linear",
     vmin=None,
     vmax=None,
-    color="0.3",
-    missing_color="0.85",
+    color="0.35",
+    missing_color="0.75",
     width=None,
-    width_range=(0.5, 6.0),
-    colorbar=True,
+    width_range=(0.4, 4.0),
+    width_scale="sqrt",
+    legend=True,
     label=None,
+    style=True,
     crs=None,
     zorder=2,
 ):
@@ -277,40 +564,54 @@ def plot_pipes(
         the range of the values).
 
     width : float, pandas.Series or dict, optional
-        Line width in points: one for every pipe, or a value per pipe (e.g. flow) mapped
-        linearly onto ``width_range``. Default 1.5.
+        Line width in points (constant on screen when zooming): one for every pipe, or a value
+        per pipe (e.g. flow) mapped onto ``width_range`` by ``width_scale``. Default 1.
 
-    colorbar : bool
-        Add a colour bar (labelled ``label``) when ``values`` are given.
+    width_scale : {'sqrt', 'linear', 'log'}
+        How per-pipe widths are scaled: proportional to the square root of the value (the
+        default, readable over several orders of magnitude) or to the value, from 0 at the low
+        end of ``width_range``; or the range of the logarithms onto ``width_range``.
+
+    legend : bool
+        Add a colour bar (labelled ``label``) next to the axes when ``values`` are given.
+
+    style : bool
+        Style the axes as a map (:func:`map_axes`).
 
     crs : optional
         CRS to draw in; default :func:`plot_crs`.
 
     Returns
     ----------
-    matplotlib.collections.LineCollection
-        The pipes, one line each, in the order of ``net.to_geodataframe('pipes')``. Its colour
-        bar, if any, is its ``colorbar`` attribute.
+    DrawnLayer
+        ``artist``: a LineCollection with one line per pipe, thinnest first so that thick pipes
+        are drawn on top; ``ids``: the pipe IDs in that order.
     """
     pipes = _geodata(net, "pipes", crs)
     if width is None:
-        linewidths = 1.5
+        linewidths = np.full(len(pipes), 1.0)
     elif np.isscalar(width):
-        linewidths = float(width)
+        linewidths = np.full(len(pipes), float(width))
     else:
-        linewidths = _scaled(_aligned(width, pipes.index, "widths"), width_range)
+        linewidths = _scaled(_aligned(width, pipes.index, "widths"), width_range, width_scale)
+    order = np.argsort(linewidths, kind="stable")
+    pipes, linewidths = pipes.iloc[order], linewidths[order]
+
     segments = [np.asarray(line_coords(g)) for g in pipes.geometry]
     lines = LineCollection(segments, linewidths=linewidths, capstyle="round", zorder=zorder)
     if values is None:
         lines.set_color(color)
     else:
-        values = _aligned(values, pipes.index)
-        _colour_by(lines, values, cmap, norm, vmin, vmax, missing_color)
+        _colour_by(lines, _aligned(values, pipes.index), cmap, norm, vmin, vmax, missing_color)
     ax.add_collection(lines)
-    if values is not None and colorbar:
-        ax.figure.colorbar(lines, ax=ax, label=label)
-    _finish(ax)
-    return lines
+
+    layer = DrawnLayer(
+        lines, list(pipes.index), mappable=None if values is None else lines, title=label
+    )
+    if legend:
+        add_legends(ax, layer)
+    _finish(ax, style)
+    return layer
 
 
 def plot_ribbons(
@@ -319,17 +620,25 @@ def plot_ribbons(
     shares,
     colors=None,
     *,
-    width=10.0,
+    width="total",
+    max_width=30.0,
+    min_width=0.0,
     top_k=None,
-    other_color="0.7",
     min_share=0.0,
+    other_color=NEUTRAL_COLOR,
     order="category",
+    context=True,
     legend=True,
+    title=None,
+    style=True,
     crs=None,
     zorder=2,
 ):
-    """Draw each pipe as a ribbon of parallel strands, one per category, each as wide as its
-    share of the pipe (a mass-flow map).
+    """Draw pipes as ribbons of parallel strands, one per category, each as wide as its share of
+    the pipe's load (a mass-flow map).
+
+    Consecutive pipes between junctions with the same shares and width are drawn as one ribbon,
+    so there are no notches where they meet.
 
     Parameters
     ----------
@@ -337,82 +646,138 @@ def plot_ribbons(
         Axes to draw on.
 
     net : Network or Subnetwork
-        The pipes. Pipes with no shares are not drawn.
+        The pipes. Pipes with no shares are not drawn as ribbons.
 
     shares : pandas.DataFrame
-        Pipes (index: pipe ID) x categories (e.g. upstream areas). Each row is normalised to sum
-        to 1, so loads can be given directly; NaN counts as 0 and rows summing to 0 are skipped.
+        Pipes (index: pipe ID) x categories (e.g. upstream areas): the load of each category in
+        each pipe, or its share. NaN counts as 0 and rows summing to 0 are skipped.
 
     colors : dict or list, optional
-        Colour per category (a list in the order of the columns). Default: tab10, or tab20 for
-        more than 10 categories.
+        Colour per category; default :func:`category_colors` of the columns.
 
-    width : float, pandas.Series or dict
-        Total ribbon width in metres (of the plot CRS): one for every pipe, or per pipe ID.
+    width : 'total', float, pandas.Series or dict
+        Ribbon width in metres (it scales with the map). 'total' (the default): proportional to
+        the row total, ``max_width`` for the largest, so that the ribbons show the load. A
+        number: the same for every pipe; a Series or dict: per pipe ID.
+
+    max_width : float
+        Width in metres of the pipe with the largest total, for ``width='total'``.
+
+    min_width : float
+        Pipes narrower than this (in metres) are not drawn as ribbons; with ``context`` they
+        are still drawn as thin grey lines.
 
     top_k : int, optional
         Keep only each pipe's ``top_k`` largest categories and lump the rest into 'other'.
 
-    other_color
-        Colour of the 'other' strand.
-
     min_share : float
         Lump categories with a smaller share of the pipe into 'other'.
+
+    other_color
+        Colour of the 'other' strand.
 
     order : {'category', 'share'}
         Order of the strands from the right of the pipe to its left (looking downstream): the
         order of the columns (with 'other' last), or by decreasing share.
 
+    context : bool
+        Draw every pipe as a thin grey line beneath the ribbons.
+
     legend : bool
-        Add a legend of the categories drawn.
+        Add a legend (titled ``title``) of the categories drawn.
+
+    style : bool
+        Style the axes as a map (:func:`map_axes`).
 
     crs : optional
         CRS to draw in; default :func:`plot_crs`.
 
     Returns
     ----------
-    matplotlib.collections.PatchCollection
-        One patch per strand drawn.
+    DrawnLayer
+        ``artist``: a PatchCollection with one patch per strand; ``ids``: the pipe IDs drawn as
+        ribbons; ``handles``: one per category drawn.
     """
     if order not in ("category", "share"):
         raise ValueError(f"order must be 'category' or 'share', not {order!r}.")
     pipes = _geodata(net, "pipes", crs)
-    table = _shares_table(shares, top_k, min_share)
-    table = table.loc[table.index.isin(pipes.index)]
-    widths = (
-        pd.Series(float(width), index=table.index)
-        if np.isscalar(width)
-        else pd.Series(_aligned(width, table.index, "widths"), index=table.index)
-    )
-    palette = _category_colours(table.columns, colors, other_color)
+    raw = shares.astype(float).fillna(0.0)
+    raw = raw.loc[raw.index.isin(pipes.index)]
+    if isinstance(width, str):
+        if width != "total":
+            raise ValueError(f"width must be 'total', a number or per-pipe values, not {width!r}.")
+        totals = raw.sum(axis=1)
+        widths = totals / totals.max() * max_width if len(totals) else totals
+    elif np.isscalar(width):
+        widths = pd.Series(float(width), index=raw.index)
+    else:
+        widths = pd.Series(_aligned(width, raw.index, "widths"), index=raw.index)
+    widths = widths[np.isfinite(widths) & (widths > 0) & (widths >= min_width)]
 
-    patches, facecolors = [], []
-    for pipe_id, row in table.iterrows():
-        row = row[row > 0]
-        if order == "share":
-            row = row.sort_values(ascending=False, kind="stable")
-        if not np.isfinite(widths[pipe_id]) or widths[pipe_id] <= 0:
-            continue
-        strands = ribbon_strands(_line(pipes.geometry[pipe_id]), row.to_numpy(), widths[pipe_id])
-        for category, strand in zip(row.index, strands, strict=True):
-            path = _path(strand)
-            if path is not None:
-                patches.append(PathPatch(path))
-                facecolors.append(palette[category])
+    table = _shares_table(raw.loc[widths.index], top_k, min_share)
+    widths = widths.loc[table.index]
+    palette = category_colors(table.columns, colors, other_color)
+
+    if context:
+        ax.add_collection(
+            LineCollection(
+                [np.asarray(line_coords(g)) for g in pipes.geometry],
+                linewidths=0.3,
+                color="0.8",
+                zorder=zorder - 0.5,
+            )
+        )
+
+    patches, facecolors, drawn = [], [], set()
+    for reach in _reaches(net.graph, list(table.index)):
+        # Split the reach where the shares or the width change.
+        runs = [[reach[0]]]
+        for pipe in reach[1:]:
+            previous = runs[-1][-1]
+            same = np.allclose(table.loc[pipe], table.loc[previous], rtol=1e-6) and np.isclose(
+                widths[pipe], widths[previous], rtol=1e-6
+            )
+            if same:
+                runs[-1].append(pipe)
+            else:
+                runs.append([pipe])
+        for run in runs:
+            row = table.loc[run[0]]
+            row = row[row > 0]
+            if order == "share":
+                row = row.sort_values(ascending=False, kind="stable")
+            line = _joined(pipes.geometry[p] for p in run)
+            for category, strand in zip(
+                row.index, ribbon_strands(line, row.to_numpy(), widths[run[0]]), strict=True
+            ):
+                path = _path(strand)
+                if path is not None:
+                    patches.append(PathPatch(path))
+                    facecolors.append(palette[category])
+                    drawn.add(category)
 
     ribbons = PatchCollection(
         patches, facecolors=facecolors, edgecolors="none", linewidths=0, zorder=zorder
     )
     ax.add_collection(ribbons)
+    handles = [Patch(color=palette[c], label=str(c)) for c in table.columns if c in drawn]
+    layer = DrawnLayer(ribbons, list(table.index), handles=handles, title=title)
     if legend:
-        handles = [Patch(color=palette[c], label=str(c)) for c in table.columns]
-        ax.legend(handles=handles)
-    _finish(ax)
-    return ribbons
+        add_legends(ax, layer)
+    _finish(ax, style)
+    return layer
 
 
 def node_group_polygons(
-    net, groups, method="voronoi", *, clip_to=None, buffer=10.0, ratio=0.3, crs=None
+    net,
+    groups,
+    method="voronoi",
+    *,
+    clip_to=None,
+    footprint=100.0,
+    buffer=10.0,
+    ratio=0.3,
+    crs=None,
 ):
     """Polygons covering groups of nodes (e.g. drainage zones).
 
@@ -426,14 +791,18 @@ def node_group_polygons(
 
     method : {'voronoi', 'concave_hull'}
         'voronoi': the union of the Voronoi tiles of each group's nodes (computed over the
-        grouped nodes only), clipped to ``clip_to``; a node may then be in only one group.
-        'concave_hull': the concave hull of each group's nodes (see ``ratio``) grown by
-        ``buffer``, clipped to ``clip_to`` if given; hulls may overlap.
+        grouped nodes only); a node may then be in only one group. 'concave_hull': the concave
+        hull of each group's nodes (see ``ratio``) grown by ``buffer``; hulls may overlap.
 
     clip_to : shapely geometry, GeoSeries or GeoDataFrame, optional
         Area to clip to. A shapely geometry must be in the plot CRS; a GeoSeries or GeoDataFrame
-        is reprojected and its geometries merged. Default for 'voronoi': the convex hull of all
-        the nodes of ``net``, grown by ``buffer``.
+        is reprojected and its geometries merged. Default: the network footprint (see
+        ``footprint``), so that the polygons cover the serviced area.
+
+    footprint : float or None
+        Default clip area: the :func:`network_footprint` of ``net`` at this distance in metres.
+        None: the convex hull of all the nodes of ``net`` grown by ``buffer`` for 'voronoi', and
+        no clipping for 'concave_hull'.
 
     buffer : float
         Distance in metres by which hulls are grown, so that groups of one or two nodes, and
@@ -468,6 +837,8 @@ def node_group_polygons(
 
     if clip_to is not None and not isinstance(clip_to, shapely.Geometry):
         clip_to = _with_crs(clip_to).to_crs(crs).geometry.union_all()
+    if clip_to is None and footprint is not None:
+        clip_to = network_footprint(net, footprint, crs)
 
     if method == "concave_hull":
         polygons = {
@@ -512,23 +883,27 @@ def plot_groups(
     ax,
     polygons,
     values=None,
+    colors=None,
     *,
     cmap="viridis",
     norm="linear",
     vmin=None,
     vmax=None,
-    color="0.85",
+    color=None,
     missing_color="0.85",
-    edgecolor="0.3",
-    linewidth=0.8,
-    alpha=0.6,
+    edgecolor="white",
+    linewidth=1.2,
+    alpha=0.3,
     hatch_groups=None,
     hatches=DEFAULT_HATCHES,
-    colorbar=True,
+    hatch_color="0.55",
+    legend=True,
     label=None,
+    style=True,
     zorder=1,
 ):
-    """Draw group polygons, shaded by a per-group value.
+    """Draw group polygons as light fills: by category (the default), by a per-group value, or
+    in one colour.
 
     Parameters
     ----------
@@ -540,24 +915,41 @@ def plot_groups(
         :func:`node_group_polygons`.
 
     values : pandas.Series or dict, optional
-        Value per group, coloured through ``cmap``/``norm`` (groups with no value in
-        ``missing_color``). Without values every polygon is filled with ``color``.
+        Value per group, coloured through ``cmap``/``norm`` with a colour bar (groups with no
+        value in ``missing_color``).
 
-    hatch_groups : list of list, optional
-        Sets of groups that belong together: the outline of each set is drawn hatched, with
-        the hatches of ``hatches`` in turn.
+    colors : dict or list, optional
+        Without ``values``: colour per group (default :func:`category_colors` of the groups),
+        with a legend of the groups.
 
-    colorbar : bool
-        Add a colour bar (labelled ``label``) when ``values`` are given.
+    color : optional
+        Without ``values``: one colour for every group, and no legend.
+
+    edgecolor, linewidth, alpha
+        Outlines and opacity of the fills; light by default, so that pipes drawn on top stand
+        out.
+
+    hatch_groups : list of list, or dict, optional
+        Sets of groups that belong together: the outline of each set is hatched in
+        ``hatch_color``, with the hatches of ``hatches`` in turn. A dict names the sets for the
+        legend (default 'set 1', 'set 2', ...).
+
+    legend : bool
+        Add the colour bar (labelled ``label``) or the legend (titled ``label``) next to the
+        axes, with the hatched sets.
+
+    style : bool
+        Style the axes as a map (:func:`map_axes`).
 
     Returns
     ----------
-    matplotlib.collections.PatchCollection
-        The polygons, one patch per group that has an area. The hatched sets are separate
-        collections, labelled 'set 1', 'set 2', ... for a legend.
+    DrawnLayer
+        ``artist``: a PatchCollection with one patch per group that has an area; ``ids``: those
+        groups.
     """
     paths = [(g, _path(geometry)) for g, geometry in polygons.geometry.items()]
     paths = [(g, p) for g, p in paths if p is not None]
+    ids = [g for g, _ in paths]
     shaded = PatchCollection(
         [PathPatch(p) for _, p in paths],
         edgecolors=edgecolor,
@@ -565,33 +957,47 @@ def plot_groups(
         alpha=alpha,
         zorder=zorder,
     )
-    if values is None:
+    handles, mappable = [], None
+    if values is not None:
+        values = _aligned(values, pd.Index(ids), "group values")
+        _colour_by(shaded, values, cmap, norm, vmin, vmax, missing_color)
+        mappable = shaded
+    elif color is not None:
         shaded.set_facecolor(color)
     else:
-        values = _aligned(values, pd.Index([g for g, _ in paths]), "group values")
-        _colour_by(shaded, values, cmap, norm, vmin, vmax, missing_color)
+        palette = category_colors(ids, colors)
+        shaded.set_facecolor([palette[g] for g in ids])
+        handles = [
+            Patch(facecolor=palette[g], alpha=min(1.0, 2 * alpha), label=str(g)) for g in ids
+        ]
     ax.add_collection(shaded)
 
-    for i, members in enumerate(hatch_groups or []):
+    sets = hatch_groups or []
+    if not isinstance(sets, dict):
+        sets = {f"set {i + 1}": members for i, members in enumerate(sets)}
+    for i, (name, members) in enumerate(sets.items()):
         path = _path(shapely.union_all(list(polygons.geometry.loc[list(members)])))
         if path is None:
             continue
+        hatch = hatches[i % len(hatches)]
         ax.add_collection(
             PatchCollection(
                 [PathPatch(path)],
                 facecolors="none",
-                edgecolors=edgecolor,
-                linewidths=1.5 * linewidth,
-                hatch=hatches[i % len(hatches)],
+                edgecolors=hatch_color,
+                linewidths=linewidth,
+                hatch=hatch,
                 zorder=zorder + 0.1,
-                label=f"set {i + 1}",
+                label=name,
             )
         )
+        handles.append(Patch(facecolor="none", edgecolor=hatch_color, hatch=hatch, label=name))
 
-    if values is not None and colorbar:
-        ax.figure.colorbar(shaded, ax=ax, label=label)
-    _finish(ax)
-    return shaded
+    layer = DrawnLayer(shaded, ids, mappable=mappable, handles=handles, title=label)
+    if legend:
+        add_legends(ax, layer)
+    _finish(ax, style)
+    return layer
 
 
 def plot_markers(
@@ -599,14 +1005,17 @@ def plot_markers(
     net,
     node_ids,
     sizes=None,
-    labels=True,
+    labels=False,
     *,
-    color="crimson",
+    name=None,
+    color="#c0392b",
     marker="o",
     size=60.0,
     size_range=(20.0, 200.0),
     edgecolor="white",
     fontsize=8,
+    legend=True,
+    style=True,
     crs=None,
     zorder=4,
 ):
@@ -624,19 +1033,29 @@ def plot_markers(
         Nodes to mark.
 
     sizes : pandas.Series or dict, optional
-        Value per node, mapped linearly onto marker areas ``size_range`` (points²). Default:
-        every marker of area ``size``.
+        Value per node; marker areas (points²) are proportional to it, up to ``size_range[1]``
+        and from ``size_range[0]``. Default: every marker of area ``size``.
 
     labels : bool, dict or pandas.Series
-        Label each marker with its node ID (True), with the given text per node, or not at all.
+        No labels (the default), the node IDs (True), or the given text per node, e.g.
+        ``{"WM6002": "Medway P.S."}``. Labels have a white halo.
+
+    name : str, optional
+        Legend entry for the markers.
+
+    legend : bool
+        Add the legend entry ``name`` next to the axes, if given.
+
+    style : bool
+        Style the axes as a map (:func:`map_axes`).
 
     crs : optional
         CRS to draw in; default :func:`plot_crs`.
 
     Returns
     ----------
-    matplotlib.collections.PathCollection
-        The markers, in the order of ``node_ids``.
+    DrawnLayer
+        ``artist``: the markers (a PathCollection), in the order of ``node_ids``.
 
     Raises
     ----------
@@ -652,21 +1071,43 @@ def plot_markers(
     points = positions.loc[node_ids]
     x, y = points.x.to_numpy(), points.y.to_numpy()
     s = size if sizes is None else _scaled(_aligned(sizes, points.index, "sizes"), size_range)
-    markers = ax.scatter(x, y, s=s, c=color, marker=marker, edgecolors=edgecolor, zorder=zorder)
+    markers = ax.scatter(
+        x, y, s=s, c=color, marker=marker, edgecolors=edgecolor, linewidths=1.2, zorder=zorder
+    )
     if labels is not False and labels is not None:
         texts = {n: n for n in node_ids} if labels is True else dict(labels)
+        halo = [pe.withStroke(linewidth=3, foreground="white")]
         for node, xi, yi in zip(node_ids, x, y, strict=True):
             if node in texts:
                 ax.annotate(
                     str(texts[node]),
                     (xi, yi),
-                    xytext=(4, 4),
+                    xytext=(6, 4),
                     textcoords="offset points",
                     fontsize=fontsize,
-                    zorder=zorder,
+                    color="0.1",
+                    path_effects=halo,
+                    zorder=zorder + 0.1,
                 )
-    _finish(ax)
-    return markers
+    handles = []
+    if name is not None:
+        handles = [
+            Line2D(
+                [],
+                [],
+                linestyle="none",
+                marker=marker,
+                markerfacecolor=color,
+                markeredgecolor=edgecolor,
+                markersize=np.sqrt(size),
+                label=name,
+            )
+        ]
+    layer = DrawnLayer(markers, node_ids, handles=handles)
+    if legend:
+        add_legends(ax, layer)
+    _finish(ax, style)
+    return layer
 
 
 def _optional(module):
@@ -692,7 +1133,7 @@ def add_basemap(
     **kwargs,
 ):
     """Draw a basemap beneath what is on ``ax``: web tiles, or a vector layer for offline and
-    publication use.
+    publication use. The extent of the axes is kept.
 
     Call it after plotting the network, so that the tiles cover the axes' extent.
 
@@ -722,8 +1163,10 @@ def add_basemap(
             layer = gpd.read_file(layer)
         if layer.crs is None:
             raise ValueError("The basemap layer has no CRS.")
+        xlim, ylim = ax.get_xlim(), ax.get_ylim()
         layer.to_crs(crs).plot(ax=ax, color=color, linewidth=linewidth, zorder=zorder, **kwargs)
-        _finish(ax)
+        ax.set_xlim(xlim)
+        ax.set_ylim(ylim)
         return
     cx = _optional("contextily")
     if source is None:
