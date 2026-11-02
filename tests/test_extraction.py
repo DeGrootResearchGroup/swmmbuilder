@@ -144,7 +144,7 @@ def test_node_list_round_trip(network, sub, tmp_path):
 
 def test_writer_consumes_catchment(sub, tmp_path):
     sub.catchment("J1", max_hops=1)
-    sections = read_sections(write_inp(sub, tmp_path))
+    sections = read_sections(write_inp(sub, tmp_path, routing="DYNWAVE"))
     nodes = {row[0] for row in sections["JUNCTIONS"] + sections["OUTFALLS"]}
     assert nodes == {"A2", "B2", "C1", "J1", "J2", "OUT"}
     conduits = {row[0]: (row[1], row[2]) for row in sections["CONDUITS"]}

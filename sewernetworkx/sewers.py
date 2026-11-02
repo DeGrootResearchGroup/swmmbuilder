@@ -6,8 +6,10 @@ of levels, and generates a .inp file to be used by pyswmm.
 """
 
 import os
+import re
 import shutil
 import warnings
+from dataclasses import dataclass, field
 from pathlib import Path
 
 import geopandas as gpd
@@ -28,6 +30,37 @@ def _pipe_records(data):
         if pd.isna(up) or pd.isna(down) or "Abandoned" in (up, down):
             continue
         yield oid, up, down, length
+
+
+@dataclass
+class TopologyReport:
+    """Topology problems of a subnetwork, as returned by :meth:`SubNetwork.validate`.
+
+    Attributes
+    ----------
+    splits : dict
+        Node -> sorted OBJECTIDs of its outlet pipes, for every node with more than one outlet
+        pipe. Parallel pipes count separately, as they do in SWMM.
+
+    cycles : list of list
+        Each directed cycle as a list of nodes in flow order, starting from its smallest node.
+
+    dead_ends : list
+        Nodes with no outlet pipe that are not outfalls.
+
+    parallel_pipes : dict
+        (upstream, downstream) -> sorted OBJECTIDs, for every node pair joined by more than one pipe.
+    """
+
+    splits: dict = field(default_factory=dict)
+    cycles: list = field(default_factory=list)
+    dead_ends: list = field(default_factory=list)
+    parallel_pipes: dict = field(default_factory=dict)
+
+    @property
+    def is_dendritic(self):
+        """True when the network has no splits and no cycles, as kinematic-wave routing requires."""
+        return not self.splits and not self.cycles
 
 
 class Network:
@@ -355,6 +388,72 @@ class SubNetwork(Network):
     def _pipe_length(u, v, pipes):
         """Dijkstra weight: the shortest of the (possibly parallel) pipes from u to v."""
         return min(attrs["length"] for attrs in pipes.values())
+
+    def _outfalls(self):
+        return (
+            [self.outfall_node] if isinstance(self.outfall_node, str) else list(self.outfall_node)
+        )
+
+    def _outfall_types(self):
+        types = self.outfall_node_type
+        return [types] if isinstance(types, str) else list(types)
+
+    def _outfall_invert(self, node):
+        """Lowest downstream invert of the subnetwork pipes entering ``node``."""
+        pipes = [p for up in self.subgraph.successors(node) for p in self._edge_pipes(up, node)]
+        rows = self.full_data[self.full_data["OBJECTID"].isin(pipes)]
+        if rows.empty:
+            return self.get_upstream_invert(node)
+        return rows["DownstreamInvert"].min()
+
+    def _edge_pipes(self, up, down):
+        """OBJECTIDs of the pipes from ``up`` to ``down`` in ``subgraph``.
+
+        Uses the ``pipes`` edge attribute, or the full network's pipes when a subgraph was built
+        without it.
+        """
+        pipes = self.subgraph.edges[down, up].get("pipes")
+        if pipes is None:
+            pipes = sorted(self.graph[up][down]) if self.graph.has_edge(up, down) else []
+        return pipes
+
+    def _outlet_pipes(self, node):
+        """{downstream node: OBJECTIDs} of the pipes leaving ``node`` in ``subgraph``."""
+        return {down: self._edge_pipes(node, down) for down in self.subgraph.predecessors(node)}
+
+    def validate(self):
+        """Check the topology of ``subgraph`` before it is written to an .inp file.
+
+        Returns
+        ----------
+        TopologyReport
+            Flow splits, cycles, dead ends and parallel pipes. Splits and cycles are only allowed
+            with dynamic-wave routing; dead ends are never valid.
+        """
+        outfalls = set(self._outfalls())
+        report = TopologyReport()
+
+        for node in sorted(self.subgraph.nodes):
+            outlets = self._outlet_pipes(node)
+            pipes = sorted(p for down in outlets for p in outlets[down])
+            # An edge with no matching pipe still counts as one outlet link.
+            n_links = sum(len(p) or 1 for p in outlets.values())
+            if n_links > 1:
+                report.splits[node] = pipes
+            if n_links == 0 and node not in outfalls:
+                report.dead_ends.append(node)
+            for down in sorted(outlets):
+                if len(outlets[down]) > 1:
+                    report.parallel_pipes[(node, down)] = outlets[down]
+
+        # subgraph edges are (downstream, upstream), so reverse cycles into flow order.
+        for cycle in nx.simple_cycles(self.subgraph):
+            cycle = cycle[::-1]
+            i = cycle.index(min(cycle))
+            report.cycles.append(cycle[i:] + cycle[:i])
+        report.cycles.sort()
+
+        return report
 
     def create_sub_network(self, ignore_successors=False, ignore_predecessors=False):
         """Create subnetwork, generate node colouring, and generate node locations.
@@ -719,9 +818,19 @@ class SubNetwork(Network):
             raise ValueError("Invalid direction. Use 'successors' or 'predecessors'.")
 
     def write_nodes_pyswmm(
-        self, pyswmm_file, max_depth, init_depth, surcharge_depth, ponding_area, height_correction
+        self,
+        pyswmm_file,
+        max_depth,
+        init_depth,
+        surcharge_depth,
+        ponding_area,
+        height_correction,
+        extra_outfalls=(),
     ):
         """Add subnetwork data into the Nodes section of a .inp file.
+
+        Each outfall is written once, with the lowest downstream invert of the subnetwork pipes
+        entering it. Every other node is a junction.
 
         Parameters
         ----------
@@ -743,34 +852,38 @@ class SubNetwork(Network):
         height_correction : dict
             User defined height correction in the case that the inv. elev. is not correct in geojson file.
 
+        extra_outfalls : iterable of str
+            Further nodes to write as FREE outfalls, e.g. dead ends.
+
         """
 
         with open(pyswmm_file) as file:
             content = file.read()
+
+        outfall_types = dict(zip(self._outfalls(), self._outfall_types(), strict=True))
+        outfall_types.update({node: "FREE" for node in extra_outfalls})
 
         nodes_content = ""
         outfall_content = ""
         # Iterate through the nodes in the graph and build the content
         for node in self.subgraph.nodes:
             if height_correction is not None and node in height_correction:
-                upstream_invert = height_correction[node]
+                invert = height_correction[node]
+                print(f"Node {node}: Updating upstream_invert value to: {invert}")
+            elif node in outfall_types:
+                invert = self._outfall_invert(node)
+            else:
+                invert = self.get_upstream_invert(node)
+
+            if node in outfall_types:
+                outfall_content += (
+                    f"{node:<16} {invert:<11}  {outfall_types[node]:<28} {'NO':<10}\n"
+                )
+            else:
                 nodes_content += (
-                    f"{node:<16} {upstream_invert:<11} {max_depth:<11} {init_depth:<11}"
+                    f"{node:<16} {invert:<11} {max_depth:<11} {init_depth:<11}"
                     f"{surcharge_depth:<11} {ponding_area:<11}\n"
                 )
-                print(f"Node {node}: Updating upstream_invert value to: {upstream_invert}")
-            else:
-                if node in self.outfall_node:
-                    for idx, outfall_node in enumerate(self.outfall_node):
-                        upstream_invert = self.get_upstream_invert(outfall_node)
-                        outfall_node_type = self.outfall_node_type[idx]
-                        outfall_content += f"{node:<16} {upstream_invert:<11}  {outfall_node_type:<28} {'NO':<10}\n"
-                else:
-                    upstream_invert = self.get_upstream_invert(node)
-                    nodes_content += (
-                        f"{node:<16} {upstream_invert:<11} {max_depth:<11} {init_depth:<11}"
-                        f"{surcharge_depth:<11} {ponding_area:<11}\n"
-                    )
 
         # Replace {nodes} placeholder with the built nodes content
         modified_content = content.replace("{nodes}", nodes_content).replace(
@@ -876,8 +989,12 @@ class SubNetwork(Network):
         template_path=None,
         output_folder=None,
         height_correction=None,
+        dead_ends="raise",
     ):
         """Generate a PySWMM input file based on a networkx digraph and GeoPandas DataFrame.
+
+        The subnetwork is checked with :meth:`validate` first. Flow splits (including parallel
+        pipes) and cycles are refused unless the template uses ``FLOW_ROUTING DYNWAVE``.
 
         Parameters
         ----------
@@ -922,6 +1039,16 @@ class SubNetwork(Network):
 
         height_correction : dict
             If heights are not correct in geojson file, this overwrites it with a user defined value.
+
+        dead_ends : {'raise', 'outfall'}
+            What to do with nodes that have no outlet pipe and are not outfalls: raise a
+            ``ValueError`` (default) or write them as FREE outfalls.
+
+        Raises
+        ----------
+        ValueError
+            If the topology is invalid for the template's flow routing, or there are dead ends
+            and ``dead_ends`` is 'raise'.
         """
 
         if output_file is None:
@@ -936,6 +1063,11 @@ class SubNetwork(Network):
             raise FileNotFoundError(
                 f"The template file does not exist at the specified path: {template_path}"
             )
+
+        if dead_ends not in ("raise", "outfall"):
+            raise ValueError("dead_ends must be 'raise' or 'outfall'.")
+        report = self.validate()
+        self._check_topology(report, self._template_routing(template_path), dead_ends)
 
         # Always create a copy of the template file
         if output_folder is not None:
@@ -955,12 +1087,45 @@ class SubNetwork(Network):
             surcharge_depth,
             ponding_area,
             height_correction,
+            extra_outfalls=report.dead_ends if dead_ends == "outfall" else (),
         )
 
         # Write conduits to pyswmm inp file
         self.write_conduits_pyswmm(
             output_file_path, manning_n, inlet_offset, outlet_offset, init_flow, max_flow, barrels
         )
+
+    @staticmethod
+    def _template_routing(template_path):
+        """FLOW_ROUTING of an .inp template; SWMM's default, KINWAVE, if it is not set."""
+        text = Path(template_path).read_text()
+        match = re.search(r"^\s*FLOW_ROUTING\s+(\w+)", text, flags=re.MULTILINE | re.IGNORECASE)
+        return match.group(1).upper() if match else "KINWAVE"
+
+    @staticmethod
+    def _check_topology(report, routing, dead_ends):
+        problems = []
+        if routing != "DYNWAVE":
+            for node, pipes in report.splits.items():
+                problems.append(
+                    f"node {node} has more than one outlet pipe ({', '.join(map(str, pipes))})"
+                )
+            for cycle in report.cycles:
+                problems.append(f"cycle {' -> '.join(cycle + cycle[:1])}")
+        if dead_ends == "raise" and report.dead_ends:
+            problems.append(
+                f"dead ends with no outlet that are not outfalls: {', '.join(report.dead_ends)} "
+                "(pass dead_ends='outfall' to write them as outfalls)"
+            )
+        if not problems:
+            return
+        message = "Invalid subnetwork topology:\n  " + "\n  ".join(problems)
+        if routing != "DYNWAVE" and not report.is_dendritic:
+            message += (
+                f"\n{routing} routing requires a dendritic network; use a template with "
+                "FLOW_ROUTING DYNWAVE for flow splits, parallel pipes and loops."
+            )
+        raise ValueError(message)
 
     def generate_gmap(self, file_name, scale=1, origin=None):
         """Generate an hmtl file to show the sewer network overlaid on Google Maps.
