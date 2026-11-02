@@ -1,6 +1,6 @@
 [TITLE]
 ;;swmmbuilder template. SI units: FLOW_UNITS LPS (flow in L/s; lengths, elevations
-;;and sizes in m). The placeholders in braces are filled by SubNetwork.write_pyswmm.
+;;and sizes in m). The placeholders in braces are filled by swmmbuilder.swmm.
 
 [OPTIONS]
 ;;Options            Value
@@ -56,11 +56,23 @@ DRY_ONLY     NO
 ;;-------------- ---------- ------------ ---------------- ---- ----------------
 {outfalls}
 
+[STORAGE]
+;;               Invert   Max.     Init.    Storage    Curve                      Ponded   Evap.
+;;Name           Elev.    Depth    Depth    Curve      Params                     Area     Frac.
+;;-------------- -------- -------- -------- ---------- -------- -------- -------- -------- --------
+{storage}
+
 [CONDUITS]
 ;;               Inlet            Outlet                      Manning    Inlet      Outlet     Init.      Max.
 ;;Name           Node             Node             Length     N          Offset     Offset     Flow       Flow
 ;;-------------- ---------------- ---------------- ---------- ---------- ---------- ---------- ---------- ----------
 {conduits}
+
+[PUMPS]
+;;               Inlet            Outlet           Pump             Init.  Startup    Shutoff
+;;Name           Node             Node             Curve            Status Depth      Depth
+;;-------------- ---------------- ---------------- ---------------- ------ ---------- ----------
+{pumps}
 
 [XSECTIONS]
 ;;Link           Shape        Geom1            Geom2      Geom3      Geom4      Barrels
@@ -76,6 +88,11 @@ DRY_ONLY     NO
 ;;Node           Parameter        Time Series      Type     Factor   Factor   Value    Pattern
 ;;-------------- ---------------- ---------------- -------- -------- -------- -------- --------
 
+
+[CURVES]
+;;Name           Type      X-Value     Y-Value
+;;-------------- --------- ----------- -----------
+{curves}
 
 [TIMESERIES]
 ;;Name           Date       Time       Value

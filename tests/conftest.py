@@ -1,13 +1,12 @@
-import contextlib
-import io
 import re
 import shutil
 from pathlib import Path
 
-import networkx as nx
+import geopandas as gpd
+import pandas as pd
 import pytest
 
-from swmmbuilder import Network, SubNetwork
+from swmmbuilder import Network
 
 TESTS = Path(__file__).resolve().parent
 REPO = TESTS.parent
@@ -28,36 +27,36 @@ DENDRITIC = [
 OVERFLOW = [("J2", "OV1"), ("OV1", "OV2")]
 
 
-def quiet(fn, *args, **kwargs):
-    """Call fn with the library's print output suppressed."""
-    with contextlib.redirect_stdout(io.StringIO()):
-        return fn(*args, **kwargs)
-
-
 @pytest.fixture
 def network():
-    return quiet(Network, str(FIXTURE))
+    return Network(FIXTURE)
 
 
-def subnetwork_with_edges(network, edges, outfalls=("OUT",), start="J1"):
-    """A SubNetwork whose subgraph is set directly, bypassing extraction, so the .inp writer can be
-    tested on a known network. swmmbuilder stores edges as (downstream, upstream)."""
-    sub = quiet(
-        SubNetwork,
-        {
-            "network_data": network,
-            "starting_node": start,
-            "outfall_node": list(outfalls),
-            "depth": 1,
-            "outfall_node_type": ["FREE"] * len(outfalls),
-            "scale": 1.0,
-        },
-    )
-    sub.subgraph = nx.DiGraph([(down, up) for up, down in edges])
+def nodes_of(edges):
+    return {n for edge in edges for n in edge}
+
+
+def subnetwork(network, edges):
+    """The subnetwork of the nodes of ``edges`` (upstream, downstream), checking that its pipes
+    join exactly those node pairs."""
+    sub = network.subnetwork(nodes_of(edges))
+    assert set(sub.graph.edges()) == set(edges)
     return sub
 
 
-def write_inp(sub, tmp_path, name="model.inp", routing=None, **kwargs):
+def with_pipes(*pairs):
+    """The fixture network plus a copy of pipe 1000 (A1 -> A2) for each (upstream, downstream)
+    pair, with pipe IDs from 2000; e.g. to close a cycle."""
+    data = gpd.read_file(FIXTURE)
+    template = data[data["OBJECTID"] == 1000]
+    extra = [
+        template.assign(OBJECTID=2000 + i, UpstreamID=up, DownstreamID=down)
+        for i, (up, down) in enumerate(pairs)
+    ]
+    return Network(gpd.GeoDataFrame(pd.concat([data, *extra], ignore_index=True)))
+
+
+def write_inp(sub, tmp_path, name="model.inp", routing=None, outfalls=("OUT",), **kwargs):
     """Write sub to tmp_path/name from the shipped template, or from a copy of it with FLOW_ROUTING
     set to routing. The fixture's J1 -> J2 parallel pipes are a split that KINWAVE (the shipped
     template's routing) rejects, so tests that write them use routing="DYNWAVE"."""
@@ -68,13 +67,7 @@ def write_inp(sub, tmp_path, name="model.inp", routing=None, **kwargs):
             r"(?m)^FLOW_ROUTING\s+\w+", f"FLOW_ROUTING         {routing}", TEMPLATE.read_text()
         )
         template.write_text(text)
-    quiet(
-        sub.write_pyswmm,
-        output_file=name,
-        template_path=str(template),
-        output_folder=str(tmp_path),
-        **kwargs,
-    )
+    sub.to_inp(tmp_path / name, outfalls, template_path=template, **kwargs)
     return tmp_path / name
 
 

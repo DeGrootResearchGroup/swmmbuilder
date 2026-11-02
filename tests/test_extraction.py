@@ -4,7 +4,9 @@ import sys
 
 import networkx as nx
 import pytest
-from conftest import FIXTURE, REPO, quiet, read_sections, subnetwork_with_edges, write_inp
+from conftest import FIXTURE, REPO, read_sections, write_inp
+
+from swmmbuilder import Subnetwork
 
 # Every node that drains to OUT (flow direction in tests/data/make_fixture.py). Not OV1/OV2 (the
 # overflow leaves J2), S1/S2 (storm), 'Abandoned' (abandoned by ID) or X1 (Abandoned flag).
@@ -14,15 +16,10 @@ OUT_CATCHMENT = {
 }  # fmt: skip
 
 PROBE = """
-import contextlib, io, warnings
-from swmmbuilder import Network, SubNetwork
-warnings.simplefilter("ignore", DeprecationWarning)
-with contextlib.redirect_stdout(io.StringIO()):
-    n = Network({fixture!r})
-    s = SubNetwork({{"network_data": n, "starting_node": "J1", "outfall_node": ["OUT"], "depth": 2,
-                    "outfall_node_type": ["FREE"], "scale": 1.0}})
-    {call}
-print(",".join(sorted(s.subgraph.nodes)) + ";" + ",".join(map(str, s.subgraph.edges)))
+from swmmbuilder import Network
+n = Network({fixture!r})
+s = {call}
+print(",".join(s.nodes) + ";" + ",".join(map(str, s.graph.edges(keys=True))))
 """
 
 
@@ -41,11 +38,10 @@ def extract_with_seed(seed, call):
 @pytest.mark.parametrize(
     "call",
     [
-        's.catchment("OUT")',
-        's.catchment("J1", max_hops=2)',
-        's.catchment("J1", max_length=100)',
-        's.from_nodes(["OUT", "J2", "J1", "A2"])',
-        "s.create_sub_network()",  # deprecated, but made deterministic
+        'n.catchment("OUT")',
+        'n.catchment("J1", max_hops=2, outlet="OUT")',
+        'n.catchment("J1", max_length=100, outlet="OUT")',
+        'n.subnetwork(["OUT", "J2", "J1", "A2"])',
     ],
 )
 def test_extraction_is_deterministic_across_hash_seeds(call):
@@ -53,14 +49,8 @@ def test_extraction_is_deterministic_across_hash_seeds(call):
     assert len(results) == 1, f"{len(results)} different results: {sorted(results)}"
 
 
-@pytest.fixture
-def sub(network):
-    return subnetwork_with_edges(network, [])
-
-
-def flow_edges(subgraph):
-    """Subgraph edges as (upstream, downstream); the subgraph stores (downstream, upstream)."""
-    return {(up, down) for down, up in subgraph.edges}
+def flow_edges(sub):
+    return set(sub.graph.edges())
 
 
 def test_graph_keeps_parallel_pipes(network):
@@ -71,23 +61,24 @@ def test_graph_keeps_parallel_pipes(network):
     assert "Abandoned" not in G and "S1" not in G
 
 
-def test_catchment_of_outlet(sub):
-    subgraph = sub.catchment("OUT")
-    assert set(subgraph.nodes) == OUT_CATCHMENT
-    assert flow_edges(subgraph) == {
-        (up, down) for up, down in sub.graph.edges() if down in OUT_CATCHMENT
+def test_catchment_of_outlet(network):
+    sub = network.catchment("OUT")
+    assert set(sub.nodes) == OUT_CATCHMENT
+    assert flow_edges(sub) == {
+        (up, down) for up, down in network.graph.edges() if down in OUT_CATCHMENT
     }
-    assert subgraph is sub.subgraph
 
 
-def test_catchment_keeps_parallel_pipes_on_edge(sub):
-    subgraph = sub.catchment("OUT")
-    assert subgraph.edges["J2", "J1"]["pipes"] == [1006, 1007]
-    assert subgraph.edges["J1", "A2"]["pipes"] == [1001]
+def test_catchment_keeps_parallel_pipes(network):
+    sub = network.catchment("OUT")
+    assert sorted(sub.graph["J1"]["J2"]) == [1006, 1007]
+    assert sorted(sub.graph["A2"]["J1"]) == [1001]
 
 
-def test_catchment_max_hops(sub):
-    one = sub.catchment("J1", max_hops=1)
+def test_catchment_max_hops(network):
+    one = network.catchment("J1", max_hops=1)
+    assert set(one.nodes) == {"A2", "B2", "C1", "J1"}
+    one = network.catchment("J1", max_hops=1, outlet="OUT")
     assert set(one.nodes) == {"A2", "B2", "C1", "J1", "J2", "OUT"}
     assert flow_edges(one) == {
         ("A2", "J1"),
@@ -96,73 +87,59 @@ def test_catchment_max_hops(sub):
         ("J1", "J2"),
         ("J2", "OUT"),
     }
-    two = sub.catchment("J1", max_hops=2)
+    two = network.catchment("J1", max_hops=2, outlet="OUT")
     assert set(two.nodes) == set(one.nodes) | {"A1", "B1"}
 
 
-def test_catchment_max_length(sub):
+def test_catchment_max_length(network):
     # Upstream path lengths to J1: A2 60, B2 50, C1 40, A1 140, B1 120.
-    assert set(sub.catchment("J1", max_length=100).nodes) == {
+    assert set(network.catchment("J1", max_length=100, outlet="OUT").nodes) == {
         "A2", "B2", "C1", "J1", "J2", "OUT",
     }  # fmt: skip
-    both = sub.catchment("J1", max_hops=1, max_length=55)
+    both = network.catchment("J1", max_hops=1, max_length=55, outlet="OUT")
     assert set(both.nodes) == {"B2", "C1", "J1", "J2", "OUT"}
 
 
-def test_catchment_path_to_every_listed_outlet(sub):
-    subgraph = sub.catchment("J1", max_hops=0, outlet=["OUT", "OV2"])
-    assert set(subgraph.nodes) == {"J1", "J2", "OUT", "OV1", "OV2"}
+def test_catchment_path_to_every_listed_outlet(network):
+    sub = network.catchment("J1", max_hops=0, outlet=["OUT", "OV2"])
+    assert set(sub.nodes) == {"J1", "J2", "OUT", "OV1", "OV2"}
 
 
-def test_catchment_rejects_unreachable_outlet_and_unknown_node(sub):
+def test_catchment_rejects_unreachable_outlet_and_unknown_node(network):
     with pytest.raises(ValueError, match="OV1"):
-        sub.catchment("OV1", max_hops=1, outlet="OUT")
+        network.catchment("OV1", max_hops=1, outlet="OUT")
     with pytest.raises(ValueError, match="NOPE"):
-        sub.catchment("NOPE")
+        network.catchment("NOPE")
 
 
-def test_from_nodes_is_induced(sub):
-    subgraph = sub.from_nodes(["OUT", "J2", "J1", "OV1"])
-    assert set(subgraph.nodes) == {"J1", "J2", "OUT", "OV1"}
-    assert flow_edges(subgraph) == {("J1", "J2"), ("J2", "OUT"), ("J2", "OV1")}
-    assert subgraph.edges["J2", "J1"]["pipes"] == [1006, 1007]
+def test_subnetwork_is_induced(network):
+    sub = network.subnetwork(["OUT", "J2", "J1", "OV1"])
+    assert sub.nodes == ["J1", "J2", "OUT", "OV1"]
+    assert flow_edges(sub) == {("J1", "J2"), ("J2", "OUT"), ("J2", "OV1")}
+    assert sorted(sub.graph["J1"]["J2"]) == [1006, 1007]
     with pytest.raises(ValueError, match="Abandoned"):
-        sub.from_nodes(["J1", "Abandoned"])
+        network.subnetwork(["J1", "Abandoned"])
 
 
-def test_node_list_round_trip(network, sub, tmp_path):
-    original = sub.catchment("J1", max_hops=2)
+def test_node_list_round_trip(network, tmp_path):
+    original = network.catchment("J1", max_hops=2, outlet="OUT")
     path = tmp_path / "nodes.txt"
-    sub.to_node_list(path)
+    original.to_node_list(path)
     nodes = [line for line in path.read_text().splitlines() if not line.startswith("#")]
-    assert nodes == sorted(original.nodes)
+    assert nodes == original.nodes
 
-    rebuilt = subnetwork_with_edges(network, []).from_node_list(path)
-    assert list(rebuilt.nodes) == list(original.nodes)
-    assert list(rebuilt.edges(data=True)) == list(original.edges(data=True))
+    rebuilt = Subnetwork.from_node_list(network, path)
+    assert rebuilt.nodes == original.nodes
+    assert list(rebuilt.graph.edges(keys=True, data=True)) == list(
+        original.graph.edges(keys=True, data=True)
+    )
 
 
-def test_writer_consumes_catchment(sub, tmp_path):
-    sub.catchment("J1", max_hops=1)
+def test_writer_consumes_catchment(network, tmp_path):
+    sub = network.catchment("J1", max_hops=1, outlet="OUT")
     sections = read_sections(write_inp(sub, tmp_path, routing="DYNWAVE"))
     nodes = {row[0] for row in sections["JUNCTIONS"] + sections["OUTFALLS"]}
     assert nodes == {"A2", "B2", "C1", "J1", "J2", "OUT"}
     conduits = {row[0]: (row[1], row[2]) for row in sections["CONDUITS"]}
     assert conduits["1006"] == conduits["1007"] == ("J1", "J2")  # parallel pipes both written
-    assert set(conduits.values()) == flow_edges(sub.subgraph)
-
-
-def test_deprecated_methods_warn(sub):
-    with pytest.warns(DeprecationWarning, match="create_sub_network"):
-        quiet(sub.create_sub_network)
-    with pytest.warns(DeprecationWarning, match="explore_nodes"):
-        quiet(sub.explore_nodes, sub._initialize_digraph(), "successors")
-    with pytest.warns(DeprecationWarning, match="explore_branch"):
-        quiet(
-            sub.explore_branch,
-            {"A2"},
-            set(),
-            sub._initialize_digraph(),
-            "predecessors",
-            "successors",
-        )
+    assert set(conduits.values()) == flow_edges(sub)
