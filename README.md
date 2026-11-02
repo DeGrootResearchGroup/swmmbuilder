@@ -1,6 +1,17 @@
 # SewerNetworkx
  Python module used take GeoJSON data of a sewer network and create subnetworks and .inp files for pyswmm
 
+## SWMM template
+
+`SubNetwork.write_pyswmm` fills the template shipped in the package,
+`sewernetworkx/templates/template.inp` (`examples/pyswmm_template/template.inp` is a copy kept in
+sync by a test). It uses SI units, `FLOW_UNITS LPS`, because the GIS lengths, inverts and sizes are
+in metres. A custom template (`template_path=`) must use `CMS`, `LPS` or `MLD`, and may only
+contain the `{nodes}`, `{outfalls}`, `{conduits}`, `{xsections}`, `{coordinates}` and `{vertices}`
+placeholders; anything else (including US units or `{pumps}`, since pumps are not supported yet)
+raises `ValueError`. Node `[COORDINATES]` and pipe `[VERTICES]` are written in the units of the GIS
+geometry.
+
 ## Tests
 
 ```bash

@@ -38,14 +38,10 @@ def test_every_node_and_pipe_is_written(dendritic_inp):
     assert set(conduits_by_pair(s)) == set(DENDRITIC)
 
 
-@pytest.mark.xfail(strict=True, reason="#5: the {pumps} template placeholder is never filled")
 def test_template_placeholders_filled(dendritic_inp):
     assert "{" not in dendritic_inp.read_text()
 
 
-@pytest.mark.xfail(
-    strict=True, reason="#5: template uses FLOW_UNITS MGD (US units) while geometry is metric"
-)
 def test_flow_units_are_si(dendritic_inp):
     opts = {row[0]: row[1] for row in read_sections(dendritic_inp)["OPTIONS"] if len(row) > 1}
     assert opts["FLOW_UNITS"] in {"CMS", "LPS", "MLD"}
@@ -109,10 +105,20 @@ def test_no_adverse_conduits_in_dendritic_network(dendritic_inp):
 
 @pytest.mark.xfail(
     strict=True,
-    reason="#4, #5: written .inp fails in SWMM (ERROR 203 {pumps}; ERROR 115 adverse slope)",
+    reason="#3, #4: written .inp fails in SWMM (ERROR 133 parallel J1->J2 pipes under KINWAVE; "
+    "ERROR 115 adverse slope)",
 )
 def test_written_inp_runs_in_swmm(dendritic_inp, tmp_path):
     assert run_swmm(dendritic_inp, tmp_path) == []
+
+
+def test_swmm_errors_are_only_known_topology_and_invert_errors(dendritic_inp, tmp_path):
+    """The template, units and placeholders (#5) are no longer a source of SWMM errors. What is
+    left is ERROR 115 (adverse slope, #4) and ERROR 133 at J1, whose two parallel pipes to J2 are
+    two outlet links under KINWAVE (#3)."""
+    errors = run_swmm(dendritic_inp, tmp_path)
+    allowed = ("ERROR 115: adverse slope", "ERROR 133: Node J1 has more than one outlet link")
+    assert all(e.startswith(allowed) for e in errors), errors
 
 
 @pytest.mark.xfail(
