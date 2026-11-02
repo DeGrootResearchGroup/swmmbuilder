@@ -1,6 +1,6 @@
-"""Mapping from a city's GIS sewer schema to the canonical columns used by SewerNetworkx.
+"""Mapping from a city's GIS sewer schema to the canonical columns used by swmmbuilder.
 
-:class:`~sewernetworkx.Network` reads a GeoJSON file and passes it through
+:class:`~swmmbuilder.Network` reads a GeoJSON file and passes it through
 :meth:`Schema.normalize`, which renames, recodes and converts the columns. Everything downstream
 reads only the canonical columns:
 
@@ -25,7 +25,7 @@ reads only the canonical columns:
 Columns that are not mapped keep their source names.
 
 Schemas can be written in TOML (see :meth:`Schema.from_toml`); the presets :data:`LONDON_ON` and
-:data:`TORONTO_ON` are loaded from ``sewernetworkx/schemas``.
+:data:`TORONTO_ON` are loaded from ``swmmbuilder/schemas``.
 """
 
 import tomllib
@@ -136,7 +136,7 @@ class Schema:
         """Read a schema from a TOML file.
 
         The top-level keys are the parameters of :class:`Schema`, and ``columns``, ``shapes`` and
-        ``flow_types`` are tables; see ``sewernetworkx/schemas/*.toml`` for examples.
+        ``flow_types`` are tables; see ``swmmbuilder/schemas/*.toml`` for examples.
 
         Parameters
         ----------
@@ -267,7 +267,7 @@ class Schema:
 
 
 def _preset(name):
-    return Schema.from_toml(resources.files("sewernetworkx") / "schemas" / f"{name}.toml")
+    return Schema.from_toml(resources.files("swmmbuilder") / "schemas" / f"{name}.toml")
 
 
 def as_schema(schema):
@@ -275,8 +275,8 @@ def as_schema(schema):
     return schema if isinstance(schema, Schema) else Schema.from_toml(schema)
 
 
-# London, ON (the default). See sewernetworkx/schemas/london_on.toml.
+# London, ON (the default). See swmmbuilder/schemas/london_on.toml.
 LONDON_ON = _preset("london_on")
 
-# Toronto, ON, Sewer Gravity Mains. See sewernetworkx/schemas/toronto_on.toml.
+# Toronto, ON, Sewer Gravity Mains. See swmmbuilder/schemas/toronto_on.toml.
 TORONTO_ON = _preset("toronto_on")

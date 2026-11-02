@@ -32,7 +32,7 @@ TEMPLATE_PLACEHOLDERS = ("nodes", "outfalls", "conduits", "xsections", "coordina
 
 def default_template_path():
     """Path-like (Traversable) to the SI template shipped with the package."""
-    return resources.files("sewernetworkx") / "templates" / "template.inp"
+    return resources.files("swmmbuilder") / "templates" / "template.inp"
 
 
 def check_template(content):
@@ -89,7 +89,7 @@ def xsection(pipe):
     Parameters
     ----------
     pipe : mapping
-        A row of the canonical data (see :mod:`sewernetworkx.schema`).
+        A row of the canonical data (see :mod:`swmmbuilder.schema`).
 
     Returns
     ----------
@@ -172,7 +172,7 @@ class Network:
     ----------
     full_data : geopandas.GeoDataFrame
         Pipe data read from the GeoJSON file, with the canonical columns of
-        :mod:`sewernetworkx.schema`.
+        :mod:`swmmbuilder.schema`.
 
     schema : Schema
         The schema the data were loaded with.
@@ -502,7 +502,7 @@ class SubNetwork(Network):
         path : str, Path
             File to write.
         """
-        lines = ["# SewerNetworkx node list: one node ID per line"]
+        lines = ["# swmmbuilder node list: one node ID per line"]
         lines += sorted(self.subgraph.nodes)
         Path(path).write_text("\n".join(lines) + "\n")
 
@@ -1297,7 +1297,7 @@ class SubNetwork(Network):
 
         template_path : str
             Path to the pyswmm model template file. The default is the template shipped with the
-            package (``sewernetworkx/templates/template.inp``), which uses SI units (FLOW_UNITS
+            package (``swmmbuilder/templates/template.inp``), which uses SI units (FLOW_UNITS
             LPS). A custom template must use an SI FLOW_UNITS (CMS, LPS or MLD), since the GIS
             lengths, inverts and sizes are in metres, and may only contain the placeholders
             {nodes}, {outfalls}, {conduits}, {xsections}, {coordinates} and {vertices}.

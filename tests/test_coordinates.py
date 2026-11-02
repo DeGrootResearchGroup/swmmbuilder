@@ -6,7 +6,7 @@ import json
 import pytest
 from conftest import DENDRITIC, FIXTURE, OVERFLOW, read_sections, subnetwork_with_edges, write_inp
 
-from sewernetworkx import sewers
+from swmmbuilder import sewers
 
 
 def fixture_geometry():

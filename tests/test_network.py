@@ -5,7 +5,7 @@ import geopandas as gpd
 import pytest
 from conftest import FIXTURE, REPO, quiet, subnetwork_with_edges
 
-from sewernetworkx import Network
+from swmmbuilder import Network
 
 
 def pipe_pairs(sub):

@@ -15,7 +15,7 @@ OUT_CATCHMENT = {
 
 PROBE = """
 import contextlib, io, warnings
-from sewernetworkx import Network, SubNetwork
+from swmmbuilder import Network, SubNetwork
 warnings.simplefilter("ignore", DeprecationWarning)
 with contextlib.redirect_stdout(io.StringIO()):
     n = Network({fixture!r})

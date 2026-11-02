@@ -7,7 +7,7 @@ from pathlib import Path
 import networkx as nx
 import pytest
 
-from sewernetworkx import Network, SubNetwork
+from swmmbuilder import Network, SubNetwork
 
 TESTS = Path(__file__).resolve().parent
 REPO = TESTS.parent
@@ -41,7 +41,7 @@ def network():
 
 def subnetwork_with_edges(network, edges, outfalls=("OUT",), start="J1"):
     """A SubNetwork whose subgraph is set directly, bypassing extraction, so the .inp writer can be
-    tested on a known network. SewerNetworkx stores edges as (downstream, upstream)."""
+    tested on a known network. swmmbuilder stores edges as (downstream, upstream)."""
     sub = quiet(
         SubNetwork,
         {

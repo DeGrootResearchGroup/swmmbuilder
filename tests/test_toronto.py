@@ -4,7 +4,7 @@
 import pytest
 from conftest import TESTS, quiet, read_sections, run_swmm, write_inp
 
-from sewernetworkx import TORONTO_ON, Network, SubNetwork
+from swmmbuilder import TORONTO_ON, Network, SubNetwork
 
 TORONTO = TESTS / "data" / "toronto_catchment.geojson"
 # The catchment drains to MH5130118747, and pipe SL963 takes it on to OUTFALL.

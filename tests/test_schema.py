@@ -6,9 +6,9 @@ import pytest
 from conftest import DENDRITIC, FIXTURE, quiet, read_sections, subnetwork_with_edges, write_inp
 from shapely.geometry import LineString
 
-from sewernetworkx import LONDON_ON, Network, Schema
-from sewernetworkx.schema import CANONICAL_COLUMNS, as_schema
-from sewernetworkx.sewers import xsection
+from swmmbuilder import LONDON_ON, Network, Schema
+from swmmbuilder.schema import CANONICAL_COLUMNS, as_schema
+from swmmbuilder.sewers import xsection
 
 
 def london_rows(*rows):
