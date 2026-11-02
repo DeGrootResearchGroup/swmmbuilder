@@ -10,8 +10,8 @@ import geopandas as gpd
 import pytest
 from conftest import TESTS, read_sections, run_swmm, write_inp
 
-import sewernetworkx
-from sewernetworkx import Network, maps
+import swmmbuilder
+from swmmbuilder import Network, maps
 
 
 @dataclass
@@ -26,7 +26,7 @@ class City:
 
     @property
     def schema(self):
-        return getattr(sewernetworkx, f"{self.name.upper()}_ON")
+        return getattr(swmmbuilder, f"{self.name.upper()}_ON")
 
     @property
     def path(self):

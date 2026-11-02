@@ -6,7 +6,7 @@ import geopandas as gpd
 import pandas as pd
 import pytest
 
-from sewernetworkx import Network
+from swmmbuilder import Network
 
 TESTS = Path(__file__).resolve().parent
 REPO = TESTS.parent

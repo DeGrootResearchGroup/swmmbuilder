@@ -36,10 +36,10 @@ jobs:
           pip install ".[lint]"
 
       - name: Run ruff check
-        run: ruff check sewernetworkx tests
+        run: ruff check swmmbuilder tests
 
       - name: Run ruff format --check
-        run: ruff format --check sewernetworkx tests
+        run: ruff format --check swmmbuilder tests
 
   # ---- Tests: one unsharded job per Python version -----------------------------------------
   tests:
@@ -71,7 +71,7 @@ jobs:
         # hangs (e.g. a SWMM run) instead of letting the job time out silently.
         run: >-
           pytest -q -rsxX
-          --cov=sewernetworkx --cov-report=term-missing
+          --cov=swmmbuilder --cov-report=term-missing
           --durations=10 --timeout=300 --timeout-method=thread
 
   # ---- Aggregator: the single required status check -----------------------------------------

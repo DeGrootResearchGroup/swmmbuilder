@@ -1,6 +1,6 @@
-"""Mapping from a city's GIS sewer schema to the canonical columns used by SewerNetworkx.
+"""Mapping from a city's GIS sewer schema to the canonical columns used by swmmbuilder.
 
-:class:`~sewernetworkx.Network` reads a GeoJSON file and passes it through
+:class:`~swmmbuilder.Network` reads a GeoJSON file and passes it through
 :meth:`Schema.normalize`, which renames, recodes and converts the columns. Everything downstream
 reads only the canonical columns:
 
@@ -27,7 +27,7 @@ Columns that are not mapped keep their source names.
 Schemas can be written in TOML (see :meth:`Schema.from_toml`); the presets (:data:`LONDON_ON`,
 :data:`TORONTO_ON`, :data:`BARRIE_ON`, :data:`KITCHENER_ON`, :data:`PETERBOROUGH_ON`,
 :data:`SARNIA_ON`, :data:`WATERLOO_ON` and :data:`WINDSOR_ON`) are loaded from
-``sewernetworkx/schemas``.
+``swmmbuilder/schemas``.
 """
 
 import tomllib
@@ -144,7 +144,7 @@ class Schema:
         """Read a schema from a TOML file.
 
         The top-level keys are the parameters of :class:`Schema`, and ``columns``, ``shapes`` and
-        ``flow_types`` are tables; see ``sewernetworkx/schemas/*.toml`` for examples.
+        ``flow_types`` are tables; see ``swmmbuilder/schemas/*.toml`` for examples.
 
         Parameters
         ----------
@@ -277,7 +277,7 @@ class Schema:
 
 
 def _preset(name):
-    return Schema.from_toml(resources.files("sewernetworkx") / "schemas" / f"{name}.toml")
+    return Schema.from_toml(resources.files("swmmbuilder") / "schemas" / f"{name}.toml")
 
 
 def as_schema(schema):
@@ -285,26 +285,26 @@ def as_schema(schema):
     return schema if isinstance(schema, Schema) else Schema.from_toml(schema)
 
 
-# London, ON (the default). See sewernetworkx/schemas/london_on.toml.
+# London, ON (the default). See swmmbuilder/schemas/london_on.toml.
 LONDON_ON = _preset("london_on")
 
-# Toronto, ON, Sewer Gravity Mains. See sewernetworkx/schemas/toronto_on.toml.
+# Toronto, ON, Sewer Gravity Mains. See swmmbuilder/schemas/toronto_on.toml.
 TORONTO_ON = _preset("toronto_on")
 
-# Barrie, ON, Sanitary Pipes. See sewernetworkx/schemas/barrie_on.toml.
+# Barrie, ON, Sanitary Pipes. See swmmbuilder/schemas/barrie_on.toml.
 BARRIE_ON = _preset("barrie_on")
 
-# Kitchener, ON, Sanitary Pipes. See sewernetworkx/schemas/kitchener_on.toml.
+# Kitchener, ON, Sanitary Pipes. See swmmbuilder/schemas/kitchener_on.toml.
 KITCHENER_ON = _preset("kitchener_on")
 
-# Peterborough, ON, Sanitary and Storm Sewer Pipes. See sewernetworkx/schemas/peterborough_on.toml.
+# Peterborough, ON, Sanitary and Storm Sewer Pipes. See swmmbuilder/schemas/peterborough_on.toml.
 PETERBOROUGH_ON = _preset("peterborough_on")
 
-# Sarnia, ON, Sanitary and Storm Sewers. See sewernetworkx/schemas/sarnia_on.toml.
+# Sarnia, ON, Sanitary and Storm Sewers. See swmmbuilder/schemas/sarnia_on.toml.
 SARNIA_ON = _preset("sarnia_on")
 
-# Waterloo, ON, Sanitary Sewer Gravity Mains. See sewernetworkx/schemas/waterloo_on.toml.
+# Waterloo, ON, Sanitary Sewer Gravity Mains. See swmmbuilder/schemas/waterloo_on.toml.
 WATERLOO_ON = _preset("waterloo_on")
 
-# Windsor, ON, Sanitary, Storm and Combined Sewers. See sewernetworkx/schemas/windsor_on.toml.
+# Windsor, ON, Sanitary, Storm and Combined Sewers. See swmmbuilder/schemas/windsor_on.toml.
 WINDSOR_ON = _preset("windsor_on")
