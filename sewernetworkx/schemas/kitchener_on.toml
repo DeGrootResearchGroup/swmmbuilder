@@ -1,0 +1,36 @@
+# Kitchener, ON: the Sanitary Pipes dataset of the City of Kitchener GeoHub
+# (https://services1.arcgis.com/qAo1OsXi67t7XgmS/arcgis/rest/services/Sanitary_Pipes/FeatureServer/0;
+# Open Government Licence - The Corporation of the City of Kitchener). The Storm Pipes dataset
+# names its columns differently (STMPIPEID, UP_STMMANHOLEID, ...). A node ID of -1 and an invert
+# of 0 mean none. Round pipes have WIDTH = HEIGHT = the diameter; the two ELLIPTICAL pipes have no
+# height, so they get no cross-section. CATEGORY is used as the flow type, so that force mains
+# (FORCEMAIN, SLUDGE FORCEMAIN) are dropped by the default flow-type filter. The service stores the
+# geometry in Web Mercator, which is why LENGTH (not Shape__Length) is the length; the geometry is
+# reprojected to UTM zone 17N (EPSG:26917, metres).
+name = "Kitchener, ON"
+null_nodes = [-1]
+nonpositive_inverts_missing = true
+size_unit = "mm"
+crs = "EPSG:26917"
+
+[columns]
+pipe_id = "SANPIPEID"
+from_node = "UP_SANMANHOLEID"
+to_node = "DN_SANMANHOLEID"
+length = "LENGTH"
+us_invert = "UP_INVERT"
+ds_invert = "DN_INVERT"
+shape = "PIPE_SHAPE"
+diameter = "WIDTH"
+height = "HEIGHT"
+width = "WIDTH"
+flow_type = "CATEGORY"
+material = "MATERIAL"
+
+[shapes]
+ROUND = "CIRCULAR"
+
+[flow_types]
+GRAVITY = "sanitary"
+SYPHON = "sanitary"
+STUB = "sanitary"

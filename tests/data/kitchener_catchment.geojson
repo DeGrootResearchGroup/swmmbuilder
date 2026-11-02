@@ -1,0 +1,898 @@
+{
+ "type": "FeatureCollection",
+ "features": [
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -80.510294634093,
+      43.4363643748037
+     ],
+     [
+      -80.5099971335793,
+      43.4365274952152
+     ]
+    ]
+   },
+   "properties": {
+    "OBJECTID": 103798,
+    "SANPIPEID": 106526,
+    "STATUS": "ACTIVE",
+    "SAN_SUB_DRAINAGE_AREA": "UPPER SCHNEIDER - HENRY STURM DIRECT",
+    "CONSULTANT": null,
+    "INSTALLATION_YEAR": 1958,
+    "MATERIAL": "VCP",
+    "SLOPE": 4.08,
+    "DN_INVERT": 333.146,
+    "UP_INVERT": 334.36600000000004,
+    "WIDTH": 250,
+    "PIPE_SHAPE": "ROUND",
+    "LENGTH": 29.900000000000002,
+    "CATEGORY": "GRAVITY",
+    "OWNERSHIP": "KITCHENER",
+    "HEIGHT": 250,
+    "DN_SANMANHOLEID": 305930,
+    "UP_SANMANHOLEID": 305929,
+    "INSTALLATION_DATE": -352425600000,
+    "MAP_LABEL": "30.1m 250mm 4.08% VCP",
+    "ROADSEGMENTID": 6513,
+    "SOURCE": null,
+    "SOURCE_DATE": -352425600000,
+    "CREATE_DATE": 1093350029000,
+    "CREATE_BY": "SDE",
+    "UPDATE_BY": "GIS_DATA",
+    "UPDATE_DATE": 1745493499000,
+    "PUMPING_STATION_DESTINATION": "TREATMENT PLANT (368 MILL PARK DR)",
+    "Shape__Length": 41.49847232232005
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -80.5099971335793,
+      43.4365274952152
+     ],
+     [
+      -80.5093264995686,
+      43.4362709373177
+     ]
+    ]
+   },
+   "properties": {
+    "OBJECTID": 103799,
+    "SANPIPEID": 106527,
+    "STATUS": "ACTIVE",
+    "SAN_SUB_DRAINAGE_AREA": "UPPER SCHNEIDER - HENRY STURM DIRECT",
+    "CONSULTANT": null,
+    "INSTALLATION_YEAR": 1958,
+    "MATERIAL": "VCP",
+    "SLOPE": 3.46,
+    "DN_INVERT": 331.01300000000003,
+    "UP_INVERT": 333.146,
+    "WIDTH": 250,
+    "PIPE_SHAPE": "ROUND",
+    "LENGTH": 61.6,
+    "CATEGORY": "GRAVITY",
+    "OWNERSHIP": "KITCHENER",
+    "HEIGHT": 250,
+    "DN_SANMANHOLEID": 305928,
+    "UP_SANMANHOLEID": 305930,
+    "INSTALLATION_DATE": -352425600000,
+    "MAP_LABEL": "61.3m 250mm 3.46% VCP",
+    "ROADSEGMENTID": 6513,
+    "SOURCE": null,
+    "SOURCE_DATE": -352425600000,
+    "CREATE_DATE": 1093350029000,
+    "CREATE_BY": "SDE",
+    "UPDATE_BY": "GIS_DATA",
+    "UPDATE_DATE": 1745493499000,
+    "PUMPING_STATION_DESTINATION": "TREATMENT PLANT (368 MILL PARK DR)",
+    "Shape__Length": 84.3816308824152
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -80.5093264995686,
+      43.4362709373177
+     ],
+     [
+      -80.5086760884941,
+      43.4360257106443
+     ]
+    ]
+   },
+   "properties": {
+    "OBJECTID": 103800,
+    "SANPIPEID": 106528,
+    "STATUS": "ACTIVE",
+    "SAN_SUB_DRAINAGE_AREA": "UPPER SCHNEIDER - HENRY STURM DIRECT",
+    "CONSULTANT": null,
+    "INSTALLATION_YEAR": 1958,
+    "MATERIAL": "VCP",
+    "SLOPE": 0.52,
+    "DN_INVERT": 330.708,
+    "UP_INVERT": 331.01300000000003,
+    "WIDTH": 250,
+    "PIPE_SHAPE": "ROUND",
+    "LENGTH": 59.1,
+    "CATEGORY": "GRAVITY",
+    "OWNERSHIP": "KITCHENER",
+    "HEIGHT": 250,
+    "DN_SANMANHOLEID": 305927,
+    "UP_SANMANHOLEID": 305928,
+    "INSTALLATION_DATE": -352425600000,
+    "MAP_LABEL": "59.3m 250mm .52% VCP",
+    "ROADSEGMENTID": 6513,
+    "SOURCE": null,
+    "SOURCE_DATE": -352425600000,
+    "CREATE_DATE": 1093350031000,
+    "CREATE_BY": "SDE",
+    "UPDATE_BY": "GIS_DATA",
+    "UPDATE_DATE": 1745493509000,
+    "PUMPING_STATION_DESTINATION": "TREATMENT PLANT (368 MILL PARK DR)",
+    "Shape__Length": 81.58162505373672
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -80.5080725473939,
+      43.4358043274099
+     ],
+     [
+      -80.5086760884941,
+      43.4360257106443
+     ]
+    ]
+   },
+   "properties": {
+    "OBJECTID": 103801,
+    "SANPIPEID": 106529,
+    "STATUS": "ACTIVE",
+    "SAN_SUB_DRAINAGE_AREA": "UPPER SCHNEIDER - HENRY STURM DIRECT",
+    "CONSULTANT": null,
+    "INSTALLATION_YEAR": 1958,
+    "MATERIAL": "VCP",
+    "SLOPE": 2.65,
+    "DN_INVERT": 330.708,
+    "UP_INVERT": 331.897,
+    "WIDTH": 250,
+    "PIPE_SHAPE": "ROUND",
+    "LENGTH": 54.68430956,
+    "CATEGORY": "GRAVITY",
+    "OWNERSHIP": "KITCHENER",
+    "HEIGHT": 250,
+    "DN_SANMANHOLEID": 305927,
+    "UP_SANMANHOLEID": 305925,
+    "INSTALLATION_DATE": -352425600000,
+    "MAP_LABEL": "54.7m 250mm 2.65% VCP",
+    "ROADSEGMENTID": 6513,
+    "SOURCE": null,
+    "SOURCE_DATE": -352425600000,
+    "CREATE_DATE": 1093350033000,
+    "CREATE_BY": "SDE",
+    "UPDATE_BY": "GIS_DATA",
+    "UPDATE_DATE": 1745493529000,
+    "PUMPING_STATION_DESTINATION": "TREATMENT PLANT (368 MILL PARK DR)",
+    "Shape__Length": 75.27130073133736
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -80.50827255861,
+      43.4355538753022
+     ],
+     [
+      -80.5080725473939,
+      43.4358043274099
+     ]
+    ]
+   },
+   "properties": {
+    "OBJECTID": 103802,
+    "SANPIPEID": 106530,
+    "STATUS": "ACTIVE",
+    "SAN_SUB_DRAINAGE_AREA": "UPPER SCHNEIDER - HENRY STURM DIRECT",
+    "CONSULTANT": null,
+    "INSTALLATION_YEAR": 1958,
+    "MATERIAL": "VCP",
+    "SLOPE": 5.36,
+    "DN_INVERT": 331.897,
+    "UP_INVERT": 333.451,
+    "WIDTH": 250,
+    "PIPE_SHAPE": "ROUND",
+    "LENGTH": 32.182,
+    "CATEGORY": "GRAVITY",
+    "OWNERSHIP": "KITCHENER",
+    "HEIGHT": 250,
+    "DN_SANMANHOLEID": 305925,
+    "UP_SANMANHOLEID": 305926,
+    "INSTALLATION_DATE": -352425600000,
+    "MAP_LABEL": "32.2m 250mm 5.36% VCP",
+    "ROADSEGMENTID": 6513,
+    "SOURCE": null,
+    "SOURCE_DATE": -352425600000,
+    "CREATE_DATE": 1093350033000,
+    "CREATE_BY": "SDE",
+    "UPDATE_BY": "GIS_DATA",
+    "UPDATE_DATE": 1745493525000,
+    "PUMPING_STATION_DESTINATION": "TREATMENT PLANT (368 MILL PARK DR)",
+    "Shape__Length": 44.383460969311244
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -80.5089332921826,
+      43.4353255072241
+     ],
+     [
+      -80.50827255861,
+      43.4355538753022
+     ]
+    ]
+   },
+   "properties": {
+    "OBJECTID": 103803,
+    "SANPIPEID": 106531,
+    "STATUS": "ACTIVE",
+    "SAN_SUB_DRAINAGE_AREA": "UPPER SCHNEIDER - HENRY STURM DIRECT",
+    "CONSULTANT": null,
+    "INSTALLATION_YEAR": 1958,
+    "MATERIAL": "VCP",
+    "SLOPE": 6.94,
+    "DN_INVERT": 333.451,
+    "UP_INVERT": 338.023,
+    "WIDTH": 200,
+    "PIPE_SHAPE": "ROUND",
+    "LENGTH": 59.184000000000005,
+    "CATEGORY": "GRAVITY",
+    "OWNERSHIP": "KITCHENER",
+    "HEIGHT": 200,
+    "DN_SANMANHOLEID": 305926,
+    "UP_SANMANHOLEID": 305924,
+    "INSTALLATION_DATE": -352425600000,
+    "MAP_LABEL": "59.2m 200mm 6.94% VCP",
+    "ROADSEGMENTID": 6513,
+    "SOURCE": null,
+    "SOURCE_DATE": -352425600000,
+    "CREATE_DATE": 1093350033000,
+    "CREATE_BY": "SDE",
+    "UPDATE_BY": "GIS_DATA",
+    "UPDATE_DATE": 1745493517000,
+    "PUMPING_STATION_DESTINATION": "TREATMENT PLANT (368 MILL PARK DR)",
+    "Shape__Length": 81.45924567653383
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -80.5101385738804,
+      43.4357924935377
+     ],
+     [
+      -80.510294634093,
+      43.4363643748037
+     ]
+    ]
+   },
+   "properties": {
+    "OBJECTID": 108826,
+    "SANPIPEID": 106525,
+    "STATUS": "ACTIVE",
+    "SAN_SUB_DRAINAGE_AREA": "UPPER SCHNEIDER - HENRY STURM DIRECT",
+    "CONSULTANT": null,
+    "INSTALLATION_YEAR": 1958,
+    "MATERIAL": "VCP",
+    "SLOPE": 6.0200000000000005,
+    "DN_INVERT": 334.36600000000004,
+    "UP_INVERT": 338.32800000000003,
+    "WIDTH": 200,
+    "PIPE_SHAPE": "ROUND",
+    "LENGTH": 64.756,
+    "CATEGORY": "GRAVITY",
+    "OWNERSHIP": "KITCHENER",
+    "HEIGHT": 200,
+    "DN_SANMANHOLEID": 305929,
+    "UP_SANMANHOLEID": 305922,
+    "INSTALLATION_DATE": -352425600000,
+    "MAP_LABEL": "64.8m 200mm 6.02% VCP",
+    "ROADSEGMENTID": 6513,
+    "SOURCE": null,
+    "SOURCE_DATE": -352425600000,
+    "CREATE_DATE": 1093350029000,
+    "CREATE_BY": "SDE",
+    "UPDATE_BY": "GIS_DATA",
+    "UPDATE_DATE": 1745493501000,
+    "PUMPING_STATION_DESTINATION": "TREATMENT PLANT (368 MILL PARK DR)",
+    "Shape__Length": 89.37559329493818
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -80.5092702880334,
+      43.4348935080265
+     ],
+     [
+      -80.509444260249,
+      43.4351538508773
+     ]
+    ]
+   },
+   "properties": {
+    "OBJECTID": 109752,
+    "SANPIPEID": 106535,
+    "STATUS": "ACTIVE",
+    "SAN_SUB_DRAINAGE_AREA": "UPPER SCHNEIDER - HENRY STURM DIRECT",
+    "CONSULTANT": null,
+    "INSTALLATION_YEAR": 1959,
+    "MATERIAL": "VCP",
+    "SLOPE": 0.18,
+    "DN_INVERT": 339.242,
+    "UP_INVERT": 339.303,
+    "WIDTH": 250,
+    "PIPE_SHAPE": "ROUND",
+    "LENGTH": 32.159,
+    "CATEGORY": "GRAVITY",
+    "OWNERSHIP": "KITCHENER",
+    "HEIGHT": 250,
+    "DN_SANMANHOLEID": 305923,
+    "UP_SANMANHOLEID": 305920,
+    "INSTALLATION_DATE": -347155200000,
+    "MAP_LABEL": "32.2m 250mm .18% VCP",
+    "ROADSEGMENTID": 21016,
+    "SOURCE": null,
+    "SOURCE_DATE": -347155200000,
+    "CREATE_DATE": 1093350033000,
+    "CREATE_BY": "SDE",
+    "UPDATE_BY": "GIS_DATA",
+    "UPDATE_DATE": 1745493508000,
+    "PUMPING_STATION_DESTINATION": "TREATMENT PLANT (368 MILL PARK DR)",
+    "Shape__Length": 44.361176799758454
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -80.5086760884941,
+      43.4360257106443
+     ],
+     [
+      -80.5081416715005,
+      43.4367589776481
+     ]
+    ]
+   },
+   "properties": {
+    "OBJECTID": 109753,
+    "SANPIPEID": 106536,
+    "STATUS": "ACTIVE",
+    "SAN_SUB_DRAINAGE_AREA": "UPPER SCHNEIDER - HENRY STURM DIRECT",
+    "CONSULTANT": null,
+    "INSTALLATION_YEAR": 1958,
+    "MATERIAL": "VCP",
+    "SLOPE": 0.43,
+    "DN_INVERT": 330.312,
+    "UP_INVERT": 330.708,
+    "WIDTH": 200,
+    "PIPE_SHAPE": "ROUND",
+    "LENGTH": 91.843,
+    "CATEGORY": "GRAVITY",
+    "OWNERSHIP": "KITCHENER",
+    "HEIGHT": 200,
+    "DN_SANMANHOLEID": 2151732,
+    "UP_SANMANHOLEID": 305927,
+    "INSTALLATION_DATE": -352425600000,
+    "MAP_LABEL": "92.2m 200mm .43% VCP",
+    "ROADSEGMENTID": 20951,
+    "SOURCE": null,
+    "SOURCE_DATE": -352425600000,
+    "CREATE_DATE": 1093350033000,
+    "CREATE_BY": "SDE",
+    "UPDATE_BY": "GIS_DATA",
+    "UPDATE_DATE": 1777065095000,
+    "PUMPING_STATION_DESTINATION": "TREATMENT PLANT (368 MILL PARK DR)",
+    "Shape__Length": 127.1838213681629
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -80.509444260249,
+      43.4351538508773
+     ],
+     [
+      -80.5089332921826,
+      43.4353255072241
+     ]
+    ]
+   },
+   "properties": {
+    "OBJECTID": 110801,
+    "SANPIPEID": 106532,
+    "STATUS": "ACTIVE",
+    "SAN_SUB_DRAINAGE_AREA": "UPPER SCHNEIDER - HENRY STURM DIRECT",
+    "CONSULTANT": null,
+    "INSTALLATION_YEAR": 1958,
+    "MATERIAL": "VCP",
+    "SLOPE": 2.67,
+    "DN_INVERT": 338.023,
+    "UP_INVERT": 339.242,
+    "WIDTH": 200,
+    "PIPE_SHAPE": "ROUND",
+    "LENGTH": 45.7,
+    "CATEGORY": "GRAVITY",
+    "OWNERSHIP": "KITCHENER",
+    "HEIGHT": 200,
+    "DN_SANMANHOLEID": 305924,
+    "UP_SANMANHOLEID": 305923,
+    "INSTALLATION_DATE": -352425600000,
+    "MAP_LABEL": "45.5m 200mm 2.67% VCP",
+    "ROADSEGMENTID": 6513,
+    "SOURCE": null,
+    "SOURCE_DATE": -352425600000,
+    "CREATE_DATE": 1093350033000,
+    "CREATE_BY": "SDE",
+    "UPDATE_BY": "GIS_DATA",
+    "UPDATE_DATE": 1745493518000,
+    "PUMPING_STATION_DESTINATION": "TREATMENT PLANT (368 MILL PARK DR)",
+    "Shape__Length": 62.672916469341786
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -80.5099515772904,
+      43.4351335511056
+     ],
+     [
+      -80.509444260249,
+      43.4351538508773
+     ]
+    ]
+   },
+   "properties": {
+    "OBJECTID": 110802,
+    "SANPIPEID": 106533,
+    "STATUS": "ACTIVE",
+    "SAN_SUB_DRAINAGE_AREA": "UPPER SCHNEIDER - HENRY STURM DIRECT",
+    "CONSULTANT": null,
+    "INSTALLATION_YEAR": 1958,
+    "MATERIAL": "VCP",
+    "SLOPE": 2.23,
+    "DN_INVERT": 339.242,
+    "UP_INVERT": 340.15700000000004,
+    "WIDTH": 200,
+    "PIPE_SHAPE": "ROUND",
+    "LENGTH": 41.1,
+    "CATEGORY": "GRAVITY",
+    "OWNERSHIP": "KITCHENER",
+    "HEIGHT": 200,
+    "DN_SANMANHOLEID": 305923,
+    "UP_SANMANHOLEID": 305921,
+    "INSTALLATION_DATE": -352425600000,
+    "MAP_LABEL": "41.1m 200mm 2.23% VCP",
+    "ROADSEGMENTID": 21015,
+    "SOURCE": null,
+    "SOURCE_DATE": -352425600000,
+    "CREATE_DATE": 1093350033000,
+    "CREATE_BY": "SDE",
+    "UPDATE_BY": "GIS_DATA",
+    "UPDATE_DATE": 1745493528000,
+    "PUMPING_STATION_DESTINATION": "TREATMENT PLANT (368 MILL PARK DR)",
+    "Shape__Length": 56.55995055945298
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -80.5099515772904,
+      43.4351335511056
+     ],
+     [
+      -80.5101385738804,
+      43.4357924935377
+     ]
+    ]
+   },
+   "properties": {
+    "OBJECTID": 110803,
+    "SANPIPEID": 106534,
+    "STATUS": "ACTIVE",
+    "SAN_SUB_DRAINAGE_AREA": "UPPER SCHNEIDER - HENRY STURM DIRECT",
+    "CONSULTANT": null,
+    "INSTALLATION_YEAR": 1958,
+    "MATERIAL": "VCP",
+    "SLOPE": 1.8900000000000001,
+    "DN_INVERT": 338.63300000000004,
+    "UP_INVERT": 340.15700000000004,
+    "WIDTH": 200,
+    "PIPE_SHAPE": "ROUND",
+    "LENGTH": 74.72992448,
+    "CATEGORY": "GRAVITY",
+    "OWNERSHIP": "KITCHENER",
+    "HEIGHT": 200,
+    "DN_SANMANHOLEID": 305922,
+    "UP_SANMANHOLEID": 305921,
+    "INSTALLATION_DATE": -352425600000,
+    "MAP_LABEL": "74.7m 200mm 1.89% VCP",
+    "ROADSEGMENTID": 21015,
+    "SOURCE": null,
+    "SOURCE_DATE": -352425600000,
+    "CREATE_DATE": 1093350029000,
+    "CREATE_BY": "SDE",
+    "UPDATE_BY": "GIS_DATA",
+    "UPDATE_DATE": 1745493509000,
+    "PUMPING_STATION_DESTINATION": "TREATMENT PLANT (368 MILL PARK DR)",
+    "Shape__Length": 103.1391116350593
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -80.5086715989389,
+      43.4369629989277
+     ],
+     [
+      -80.5095332987999,
+      43.4372871369701
+     ]
+    ]
+   },
+   "properties": {
+    "OBJECTID": 271365,
+    "SANPIPEID": 2151688,
+    "STATUS": "ACTIVE",
+    "SAN_SUB_DRAINAGE_AREA": "UPPER SCHNEIDER - HENRY STURM DIRECT",
+    "CONSULTANT": "WALTERFEDY",
+    "INSTALLATION_YEAR": 2025,
+    "MATERIAL": "PVC",
+    "SLOPE": 0.35000000000000003,
+    "DN_INVERT": 329.31600000000003,
+    "UP_INVERT": 329.588,
+    "WIDTH": 300,
+    "PIPE_SHAPE": "ROUND",
+    "LENGTH": 78.48100000000001,
+    "CATEGORY": "GRAVITY",
+    "OWNERSHIP": "KITCHENER",
+    "HEIGHT": 300,
+    "DN_SANMANHOLEID": 2151734,
+    "UP_SANMANHOLEID": 2151733,
+    "INSTALLATION_DATE": 1756080000000,
+    "MAP_LABEL": "78.5m 300mm .35% PVC",
+    "ROADSEGMENTID": 20951,
+    "SOURCE": 3102343,
+    "SOURCE_DATE": 1771891200000,
+    "CREATE_DATE": 1777019499000,
+    "CREATE_BY": "SEANT",
+    "UPDATE_BY": "GIS_DATA",
+    "UPDATE_DATE": 1777069369000,
+    "PUMPING_STATION_DESTINATION": "TREATMENT PLANT (368 MILL PARK DR)",
+    "Shape__Length": 108.03108537382504
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -80.5081416715005,
+      43.4367589776481
+     ],
+     [
+      -80.5086715989389,
+      43.4369629989277
+     ]
+    ]
+   },
+   "properties": {
+    "OBJECTID": 271373,
+    "SANPIPEID": 2151696,
+    "STATUS": "ACTIVE",
+    "SAN_SUB_DRAINAGE_AREA": "UPPER SCHNEIDER - HENRY STURM DIRECT",
+    "CONSULTANT": "WALTERFEDY",
+    "INSTALLATION_YEAR": 2024,
+    "MATERIAL": "PVC",
+    "SLOPE": 0.28,
+    "DN_INVERT": 329.618,
+    "UP_INVERT": 329.75600000000003,
+    "WIDTH": 300,
+    "PIPE_SHAPE": "ROUND",
+    "LENGTH": 48.505,
+    "CATEGORY": "GRAVITY",
+    "OWNERSHIP": "KITCHENER",
+    "HEIGHT": 300,
+    "DN_SANMANHOLEID": 2151733,
+    "UP_SANMANHOLEID": 2151732,
+    "INSTALLATION_DATE": 1724630400000,
+    "MAP_LABEL": "48.5m 300mm .28% PVC",
+    "ROADSEGMENTID": 20951,
+    "SOURCE": 3102343,
+    "SOURCE_DATE": 1771891200000,
+    "CREATE_DATE": 1777019499000,
+    "CREATE_BY": "SEANT",
+    "UPDATE_BY": "GIS_DATA",
+    "UPDATE_DATE": 1777069369000,
+    "PUMPING_STATION_DESTINATION": "TREATMENT PLANT (368 MILL PARK DR)",
+    "Shape__Length": 66.7700860155323
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -80.507158815872,
+      43.4363819375142
+     ],
+     [
+      -80.5081416715005,
+      43.4367589776481
+     ]
+    ]
+   },
+   "properties": {
+    "OBJECTID": 271374,
+    "SANPIPEID": 2151697,
+    "STATUS": "ACTIVE",
+    "SAN_SUB_DRAINAGE_AREA": "UPPER SCHNEIDER - HENRY STURM DIRECT",
+    "CONSULTANT": "WALTERFEDY",
+    "INSTALLATION_YEAR": 2025,
+    "MATERIAL": "PVC",
+    "SLOPE": 0.36,
+    "DN_INVERT": 329.788,
+    "UP_INVERT": 330.115,
+    "WIDTH": 300,
+    "PIPE_SHAPE": "ROUND",
+    "LENGTH": 89.89200000000001,
+    "CATEGORY": "GRAVITY",
+    "OWNERSHIP": "KITCHENER",
+    "HEIGHT": 300,
+    "DN_SANMANHOLEID": 2151732,
+    "UP_SANMANHOLEID": 2151738,
+    "INSTALLATION_DATE": 1758758400000,
+    "MAP_LABEL": "89.9m 300mm .36% PVC",
+    "ROADSEGMENTID": 20951,
+    "SOURCE": 3102362,
+    "SOURCE_DATE": 1771891200000,
+    "CREATE_DATE": 1777019499000,
+    "CREATE_BY": "SEANT",
+    "UPDATE_BY": "GIS_DATA",
+    "UPDATE_DATE": 1777069370000,
+    "PUMPING_STATION_DESTINATION": "TREATMENT PLANT (368 MILL PARK DR)",
+    "Shape__Length": 123.74087584155303
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -80.506844174168,
+      43.4362598232615
+     ],
+     [
+      -80.507158815872,
+      43.4363819375142
+     ]
+    ]
+   },
+   "properties": {
+    "OBJECTID": 271376,
+    "SANPIPEID": 2151699,
+    "STATUS": "ACTIVE",
+    "SAN_SUB_DRAINAGE_AREA": "UPPER SCHNEIDER - HENRY STURM DIRECT",
+    "CONSULTANT": "WALTERFEDY",
+    "INSTALLATION_YEAR": 2025,
+    "MATERIAL": "PVC",
+    "SLOPE": 0.5700000000000001,
+    "DN_INVERT": 330.13,
+    "UP_INVERT": 330.295,
+    "WIDTH": 300,
+    "PIPE_SHAPE": "ROUND",
+    "LENGTH": 28.851000000000003,
+    "CATEGORY": "GRAVITY",
+    "OWNERSHIP": "KITCHENER",
+    "HEIGHT": 300,
+    "DN_SANMANHOLEID": 2151738,
+    "UP_SANMANHOLEID": 2151730,
+    "INSTALLATION_DATE": 1758758400000,
+    "MAP_LABEL": "28.9m 300mm .57% PVC",
+    "ROADSEGMENTID": 20951,
+    "SOURCE": 3102362,
+    "SOURCE_DATE": 1771891200000,
+    "CREATE_DATE": 1777019499000,
+    "CREATE_BY": "SEANT",
+    "UPDATE_BY": "GIS_DATA",
+    "UPDATE_DATE": 1777069370000,
+    "PUMPING_STATION_DESTINATION": "TREATMENT PLANT (368 MILL PARK DR)",
+    "Shape__Length": 39.714747833680846
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -80.5065877091839,
+      43.4362196469363
+     ],
+     [
+      -80.506844174168,
+      43.4362598232615
+     ]
+    ]
+   },
+   "properties": {
+    "OBJECTID": 271377,
+    "SANPIPEID": 2151700,
+    "STATUS": "ACTIVE",
+    "SAN_SUB_DRAINAGE_AREA": "UPPER SCHNEIDER - HENRY STURM DIRECT",
+    "CONSULTANT": "WALTERFEDY",
+    "INSTALLATION_YEAR": 2025,
+    "MATERIAL": "PVC",
+    "SLOPE": 0.9400000000000001,
+    "DN_INVERT": 330.343,
+    "UP_INVERT": 330.54200000000003,
+    "WIDTH": 300,
+    "PIPE_SHAPE": "ROUND",
+    "LENGTH": 21.213,
+    "CATEGORY": "GRAVITY",
+    "OWNERSHIP": "KITCHENER",
+    "HEIGHT": 300,
+    "DN_SANMANHOLEID": 2151730,
+    "UP_SANMANHOLEID": 2151710,
+    "INSTALLATION_DATE": 1758844800000,
+    "MAP_LABEL": "21.2m 300mm .94% PVC",
+    "ROADSEGMENTID": 20951,
+    "SOURCE": 3102362,
+    "SOURCE_DATE": 1771891200000,
+    "CREATE_DATE": 1777019499000,
+    "CREATE_BY": "SEANT",
+    "UPDATE_BY": "GIS_DATA",
+    "UPDATE_DATE": 1777069370000,
+    "PUMPING_STATION_DESTINATION": "TREATMENT PLANT (368 MILL PARK DR)",
+    "Shape__Length": 29.206370390547477
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -80.5095332987999,
+      43.4372871369701
+     ],
+     [
+      -80.5095616367998,
+      43.4373631114159
+     ]
+    ]
+   },
+   "properties": {
+    "OBJECTID": 271380,
+    "SANPIPEID": 2151703,
+    "STATUS": "ACTIVE",
+    "SAN_SUB_DRAINAGE_AREA": "UPPER SCHNEIDER - HENRY STURM DIRECT",
+    "CONSULTANT": "WALTERFEDY",
+    "INSTALLATION_YEAR": 2025,
+    "MATERIAL": "PVC",
+    "SLOPE": 0.72,
+    "DN_INVERT": 329.19300000000004,
+    "UP_INVERT": 329.25600000000003,
+    "WIDTH": 300,
+    "PIPE_SHAPE": "ROUND",
+    "LENGTH": 8.744,
+    "CATEGORY": "GRAVITY",
+    "OWNERSHIP": "KITCHENER",
+    "HEIGHT": 300,
+    "DN_SANMANHOLEID": 2151735,
+    "UP_SANMANHOLEID": 2151734,
+    "INSTALLATION_DATE": 1747353600000,
+    "MAP_LABEL": "8.7m 300mm .72% PVC",
+    "ROADSEGMENTID": 20951,
+    "SOURCE": 3102339,
+    "SOURCE_DATE": 1771891200000,
+    "CREATE_DATE": 1777019499000,
+    "CREATE_BY": "SEANT",
+    "UPDATE_BY": "GIS_DATA",
+    "UPDATE_DATE": 1787261181000,
+    "PUMPING_STATION_DESTINATION": "TREATMENT PLANT (368 MILL PARK DR)",
+    "Shape__Length": 12.066959688623843
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -80.5064407013262,
+      43.4362443958857
+     ],
+     [
+      -80.5065877091839,
+      43.4362196469363
+     ]
+    ]
+   },
+   "properties": {
+    "OBJECTID": 271386,
+    "SANPIPEID": 2151709,
+    "STATUS": "ACTIVE",
+    "SAN_SUB_DRAINAGE_AREA": "UPPER SCHNEIDER - HENRY STURM DIRECT",
+    "CONSULTANT": "WALTERFEDY",
+    "INSTALLATION_YEAR": 2025,
+    "MATERIAL": "PVC",
+    "SLOPE": 0.5700000000000001,
+    "DN_INVERT": 330.572,
+    "UP_INVERT": 330.642,
+    "WIDTH": 300,
+    "PIPE_SHAPE": "ROUND",
+    "LENGTH": 12.211,
+    "CATEGORY": "GRAVITY",
+    "OWNERSHIP": "KITCHENER",
+    "HEIGHT": 300,
+    "DN_SANMANHOLEID": 2151710,
+    "UP_SANMANHOLEID": 2151711,
+    "INSTALLATION_DATE": 1758844800000,
+    "MAP_LABEL": "12.2m 300mm .57% PVC",
+    "ROADSEGMENTID": 20951,
+    "SOURCE": 3102363,
+    "SOURCE_DATE": 1771891200000,
+    "CREATE_DATE": 1777019499000,
+    "CREATE_BY": "SEANT",
+    "UPDATE_BY": "GIS_DATA",
+    "UPDATE_DATE": 1777069371000,
+    "PUMPING_STATION_DESTINATION": "TREATMENT PLANT (368 MILL PARK DR)",
+    "Shape__Length": 16.798901757971514
+   }
+  }
+ ]
+}

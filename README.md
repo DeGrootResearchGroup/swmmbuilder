@@ -36,7 +36,7 @@ logging.basicConfig(level=logging.INFO)
 `Network(path, schema=...)` reads the GeoJSON and converts it to canonical columns (`pipe_id`,
 `from_node`, `to_node`, `length`, `us_invert`, `ds_invert`, `drop_invert`, `shape`, `diameter`,
 `height`, `width`, `flow_type`, `material`, `abandoned`, in m); everything after loading reads only
-those (see `sewernetworkx/schema.py`). Two schemas ship with the package, as TOML files in
+those (see `sewernetworkx/schema.py`). These schemas ship with the package, as TOML files in
 `sewernetworkx/schemas/`:
 
 - `LONDON_ON` (the default): London, ON's GIS export.
@@ -46,6 +46,19 @@ those (see `sewernetworkx/schema.py`). Two schemas ship with the package, as TOM
   cross-section; the other shapes are reported on loading. Flow types other than `SAN`, `Storm`
   and `Combined` (`CSO`, `SCSO`, `FD`, `EO`) pass through unchanged, so e.g.
   `flow_types={"sanitary", "combined"}` keeps sanitary and combined sewers.
+- Six more Ontario cities' open data, each reprojected to its UTM zone 17N CRS:
+  - `WINDSOR_ON`: the SanitarySewer, StormSewer and CombinedSewer layers.
+  - `KITCHENER_ON`: Sanitary Pipes. Force mains are dropped by the default flow-type filter.
+  - `WATERLOO_ON`: Sanitary Sewer Gravity Mains. All pipes are taken as circular, and an invert
+    of 111.111 means none.
+  - `PETERBOROUGH_ON`: Sanitary (and Storm) Sewer Pipes. Only circular pipes get a cross-section.
+  - `BARRIE_ON`: Sanitary Pipes. Force mains are dropped by the default flow-type filter.
+  - `SARNIA_ON`: Sanitary and Storm Sewers. All pipes are taken as circular; non-circular sizes
+    (`"W x H"`) are rejected if written.
+
+  Each TOML file's header gives the dataset's URL and its quirks. The layers are ArcGIS services
+  that return at most 1,000–2,000 pipes per query, so download them from the portal (GeoJSON) or
+  page through the REST query.
 
 ```python
 from sewernetworkx import TORONTO_ON, Network
@@ -55,7 +68,8 @@ network = Network("sewer-gravity-main-4326.geojson", schema=TORONTO_ON)
 
 For another city, write a schema file and pass its path as `schema=` (or build a `Schema` in
 Python). The top-level keys are the parameters of `Schema`; `columns` maps canonical columns to
-source columns, and `shapes` and `flow_types` map source codes:
+source columns, and `shapes` and `flow_types` map source codes (or set `default_shape`, e.g.
+`"CIRCULAR"`, where there is no shape column):
 
 ```toml
 name = "My city"
@@ -164,7 +178,10 @@ The tests use a small synthetic network (`tests/data/fixture_network.geojson`, r
 
 `tests/test_toronto.py` also loads a 31-pipe sanitary catchment from the Toronto dataset
 (`tests/data/toronto_catchment.geojson`, fetched by `tests/data/make_toronto_fixture.py`; contains
-information licensed under the Open Government Licence - Toronto).
+information licensed under the Open Government Licence - Toronto). `tests/test_ontario.py` does
+the same for Barrie, Kitchener, Peterborough, Sarnia, Waterloo and Windsor, with a 14–46 pipe
+sanitary catchment each (`tests/data/<city>_catchment.geojson`, fetched by
+`tests/data/make_ontario_fixtures.py`, whose docstring gives each city's licence).
 
 On macOS, swmm-toolkit's wheel ships `libomp.dylib` and `libswmm-output.dylib` with invalid code
 signatures, and `import pyswmm` is killed (exit 137). Re-sign them ad hoc:

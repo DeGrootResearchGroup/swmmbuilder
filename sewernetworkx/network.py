@@ -50,7 +50,8 @@ class Network:
 
     schema : Schema, str or Path
         How the GIS columns map to the canonical columns: a :class:`Schema` (default
-        :data:`LONDON_ON`; see also :data:`TORONTO_ON`) or the path to a schema TOML file.
+        :data:`LONDON_ON`; see :mod:`sewernetworkx.schema` for the other presets) or the path to a
+        schema TOML file.
 
     Attributes
     ----------

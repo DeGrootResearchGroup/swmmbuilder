@@ -1,0 +1,941 @@
+{
+ "type": "FeatureCollection",
+ "features": [
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -79.7208072126444,
+      44.318640406711964
+     ],
+     [
+      -79.72095121468007,
+      44.31870133181655
+     ]
+    ]
+   },
+   "properties": {
+    "OBJECTID": 8155,
+    "ASSETID": "120287771",
+    "TYPE": "LOCAL",
+    "MATERIAL": "POLYVINYL CHLORIDE",
+    "WIDTH": 250,
+    "HEIGHT": 250,
+    "PIPESHP": "CIRCULAR",
+    "INV_UP_ELV": 301.15,
+    "INV_DN_ELV": 300.99,
+    "ENCASED": null,
+    "DATEINST": 1564358400000,
+    "DATEASSUM": null,
+    "OWNEDBY": 1,
+    "STATUS": "ACTIVE",
+    "RECSOURCE": "2019-301-026",
+    "LABELID": null,
+    "LOCATION": "FRANKLIN TRAIL",
+    "CCTVID": null,
+    "LASTCCTVYR": null,
+    "FROM_ID": "120264428",
+    "TO_ID": "120264429",
+    "LEGACYID": null,
+    "SHAPE_Length": 13.330628822683616,
+    "LASTUPDATE": 1689085784000
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -79.72095121468007,
+      44.31870133181655
+     ],
+     [
+      -79.72097185709,
+      44.31873485769869
+     ],
+     [
+      -79.72102476421185,
+      44.318820781043236
+     ]
+    ]
+   },
+   "properties": {
+    "OBJECTID": 8156,
+    "ASSETID": "120287772",
+    "TYPE": "LOCAL",
+    "MATERIAL": "POLYVINYL CHLORIDE",
+    "WIDTH": 300,
+    "HEIGHT": 300,
+    "PIPESHP": "CIRCULAR",
+    "INV_UP_ELV": 300.9,
+    "INV_DN_ELV": 300.86,
+    "ENCASED": null,
+    "DATEINST": 1564358400000,
+    "DATEASSUM": null,
+    "OWNEDBY": 1,
+    "STATUS": "ACTIVE",
+    "RECSOURCE": "2019-301-026",
+    "LABELID": null,
+    "LOCATION": "FRANKLIN TRAIL",
+    "CCTVID": null,
+    "LASTCCTVYR": null,
+    "FROM_ID": "120264429",
+    "TO_ID": "120264430",
+    "LEGACYID": null,
+    "SHAPE_Length": 14.508110839093721,
+    "LASTUPDATE": 1689085784000
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -79.72102476421185,
+      44.318820781043236
+     ],
+     [
+      -79.72104503032371,
+      44.31882649438619
+     ],
+     [
+      -79.72120306129739,
+      44.31887104415264
+     ],
+     [
+      -79.72136389311879,
+      44.31891638400545
+     ],
+     [
+      -79.72140283634533,
+      44.31892736243734
+     ],
+     [
+      -79.7215240608742,
+      44.31896153613894
+     ],
+     [
+      -79.72152873856561,
+      44.318962854315565
+     ],
+     [
+      -79.72165771077118,
+      44.31899921228916
+     ],
+     [
+      -79.72168351719309,
+      44.319006487421596
+     ],
+     [
+      -79.72178663079565,
+      44.31903555512824
+     ],
+     [
+      -79.72184268708665,
+      44.31905135785055
+     ],
+     [
+      -79.72191587628615,
+      44.31907198969265
+     ],
+     [
+      -79.72205845707005,
+      44.319112183506796
+     ],
+     [
+      -79.72207211876062,
+      44.31911603478241
+     ],
+     [
+      -79.72217881114594,
+      44.31914611089553
+     ],
+     [
+      -79.7222302522617,
+      44.31916061218218
+     ]
+    ]
+   },
+   "properties": {
+    "OBJECTID": 8157,
+    "ASSETID": "120287773",
+    "TYPE": "LOCAL",
+    "MATERIAL": "POLYVINYL CHLORIDE",
+    "WIDTH": 300,
+    "HEIGHT": 300,
+    "PIPESHP": "CIRCULAR",
+    "INV_UP_ELV": 300.83,
+    "INV_DN_ELV": 300.44,
+    "ENCASED": null,
+    "DATEINST": 1564358400000,
+    "DATEASSUM": null,
+    "OWNEDBY": 1,
+    "STATUS": "ACTIVE",
+    "RECSOURCE": "2019-301-026",
+    "LABELID": null,
+    "LOCATION": "FRANKLIN TRAIL",
+    "CCTVID": null,
+    "LASTCCTVYR": null,
+    "FROM_ID": "120264430",
+    "TO_ID": "120264431",
+    "LEGACYID": null,
+    "SHAPE_Length": 103.2880302112399,
+    "LASTUPDATE": 1689085784000
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -79.7222302522617,
+      44.31916061218218
+     ],
+     [
+      -79.72224708368367,
+      44.3191669107893
+     ],
+     [
+      -79.72230115546706,
+      44.3191871457437
+     ],
+     [
+      -79.72241088513326,
+      44.31922820950677
+     ],
+     [
+      -79.7224203575643,
+      44.31923175459369
+     ],
+     [
+      -79.72254862431392,
+      44.31927975438529
+     ],
+     [
+      -79.72259283697484,
+      44.31929630025413
+     ],
+     [
+      -79.72267058830874,
+      44.31932539589365
+     ],
+     [
+      -79.72271571907727,
+      44.319342284191684
+     ],
+     [
+      -79.72283991369893,
+      44.31938875983026
+     ],
+     [
+      -79.72289648618981,
+      44.319409929963506
+     ],
+     [
+      -79.72302121100724,
+      44.31945660399624
+     ],
+     [
+      -79.72318408736544,
+      44.31951755454874
+     ],
+     [
+      -79.7232814013669,
+      44.319553969995795
+     ]
+    ]
+   },
+   "properties": {
+    "OBJECTID": 8158,
+    "ASSETID": "120287774",
+    "TYPE": "LOCAL",
+    "MATERIAL": "POLYVINYL CHLORIDE",
+    "WIDTH": 300,
+    "HEIGHT": 300,
+    "PIPESHP": "CIRCULAR",
+    "INV_UP_ELV": 300.41,
+    "INV_DN_ELV": 300.07,
+    "ENCASED": null,
+    "DATEINST": 1564358400000,
+    "DATEASSUM": null,
+    "OWNEDBY": 1,
+    "STATUS": "ACTIVE",
+    "RECSOURCE": "2019-301-026",
+    "LABELID": null,
+    "LOCATION": "FRANKLIN TRAIL",
+    "CCTVID": null,
+    "LASTCCTVYR": null,
+    "FROM_ID": "120264431",
+    "TO_ID": "120264432",
+    "LEGACYID": null,
+    "SHAPE_Length": 94.53736410816039,
+    "LASTUPDATE": 1689085784000
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -79.7232814013669,
+      44.319553969995795
+     ],
+     [
+      -79.72330423696076,
+      44.31955745101998
+     ],
+     [
+      -79.72345795414114,
+      44.31958088614138
+     ],
+     [
+      -79.72350092182424,
+      44.31958743707368
+     ]
+    ]
+   },
+   "properties": {
+    "OBJECTID": 8159,
+    "ASSETID": "120287775",
+    "TYPE": "LOCAL",
+    "MATERIAL": "POLYVINYL CHLORIDE",
+    "WIDTH": 300,
+    "HEIGHT": 300,
+    "PIPESHP": "CIRCULAR",
+    "INV_UP_ELV": 300.03,
+    "INV_DN_ELV": 299.97,
+    "ENCASED": null,
+    "DATEINST": 1564358400000,
+    "DATEASSUM": null,
+    "OWNEDBY": 1,
+    "STATUS": "ACTIVE",
+    "RECSOURCE": "2019-301-026",
+    "LABELID": null,
+    "LOCATION": "FRANKLIN TRAIL",
+    "CCTVID": null,
+    "LASTCCTVYR": null,
+    "FROM_ID": "120264432",
+    "TO_ID": "120264433",
+    "LEGACYID": null,
+    "SHAPE_Length": 17.897740881914274,
+    "LASTUPDATE": 1689085784000
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -79.72350092182424,
+      44.31958743707368
+     ],
+     [
+      -79.72360671028619,
+      44.31958692323213
+     ],
+     [
+      -79.72367811090251,
+      44.31958657689018
+     ],
+     [
+      -79.72379002969961,
+      44.319586033253714
+     ],
+     [
+      -79.72384070029621,
+      44.31958578737684
+     ],
+     [
+      -79.72393024988925,
+      44.31958535197139
+     ],
+     [
+      -79.72397756812798,
+      44.31958512169553
+     ],
+     [
+      -79.72411613156245,
+      44.31958444868366
+     ],
+     [
+      -79.7241342980714,
+      44.3195843608302
+     ],
+     [
+      -79.72427027668185,
+      44.31958370016941
+     ],
+     [
+      -79.72427508764899,
+      44.31958367648211
+     ],
+     [
+      -79.72444734912938,
+      44.3195828392899
+     ],
+     [
+      -79.72445976782659,
+      44.31958277902082
+     ],
+     [
+      -79.72453288289195,
+      44.319582423382585
+     ]
+    ]
+   },
+   "properties": {
+    "OBJECTID": 8160,
+    "ASSETID": "120287776",
+    "TYPE": "LOCAL",
+    "MATERIAL": "POLYVINYL CHLORIDE",
+    "WIDTH": 300,
+    "HEIGHT": 300,
+    "PIPESHP": "CIRCULAR",
+    "INV_UP_ELV": 299.96,
+    "INV_DN_ELV": 299.94,
+    "ENCASED": null,
+    "DATEINST": 1564358400000,
+    "DATEASSUM": null,
+    "OWNEDBY": 1,
+    "STATUS": "ACTIVE",
+    "RECSOURCE": "2019-301-026",
+    "LABELID": null,
+    "LOCATION": "FRANKLIN TRAIL",
+    "CCTVID": null,
+    "LASTCCTVYR": null,
+    "FROM_ID": "120264433",
+    "TO_ID": "120264434",
+    "LEGACYID": null,
+    "SHAPE_Length": 82.30351447985318,
+    "LASTUPDATE": 1689085784000
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -79.72453288289195,
+      44.319582423382585
+     ],
+     [
+      -79.7245809830641,
+      44.31955229649314
+     ],
+     [
+      -79.72463923689034,
+      44.31951580984613
+     ],
+     [
+      -79.72466347379964,
+      44.31950062962859
+     ]
+    ]
+   },
+   "properties": {
+    "OBJECTID": 8161,
+    "ASSETID": "120287777",
+    "TYPE": "LOCAL",
+    "MATERIAL": "POLYVINYL CHLORIDE",
+    "WIDTH": 300,
+    "HEIGHT": 300,
+    "PIPESHP": "CIRCULAR",
+    "INV_UP_ELV": 299.56,
+    "INV_DN_ELV": 299.48,
+    "ENCASED": null,
+    "DATEINST": 1564358400000,
+    "DATEASSUM": null,
+    "OWNEDBY": 1,
+    "STATUS": "ACTIVE",
+    "RECSOURCE": "2019-301-025",
+    "LABELID": null,
+    "LOCATION": "FRANKLIN TRAIL",
+    "CCTVID": null,
+    "LASTCCTVYR": null,
+    "FROM_ID": "120264434",
+    "TO_ID": "120264435",
+    "LEGACYID": null,
+    "SHAPE_Length": 13.82146553699679,
+    "LASTUPDATE": 1689085784000
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -79.72359185847266,
+      44.318311635247454
+     ],
+     [
+      -79.72358915015954,
+      44.31836691010648
+     ],
+     [
+      -79.72358375893678,
+      44.3184769235308
+     ],
+     [
+      -79.72357876737266,
+      44.318578798250755
+     ],
+     [
+      -79.72357479542171,
+      44.3186598470355
+     ]
+    ]
+   },
+   "properties": {
+    "OBJECTID": 8196,
+    "ASSETID": "120287826",
+    "TYPE": "LOCAL",
+    "MATERIAL": "POLYVINYL CHLORIDE",
+    "WIDTH": 200,
+    "HEIGHT": 200,
+    "PIPESHP": "CIRCULAR",
+    "INV_UP_ELV": 303.87,
+    "INV_DN_ELV": 302.6,
+    "ENCASED": null,
+    "DATEINST": 1564358400000,
+    "DATEASSUM": null,
+    "OWNEDBY": 1,
+    "STATUS": "ACTIVE",
+    "RECSOURCE": "2019-301-028",
+    "LABELID": null,
+    "LOCATION": "PADDINGTON GROVE",
+    "CCTVID": null,
+    "LASTCCTVYR": null,
+    "FROM_ID": "120264456",
+    "TO_ID": "120264455",
+    "LEGACYID": null,
+    "SHAPE_Length": 38.70613459947526,
+    "LASTUPDATE": 1689086198000
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -79.72357479542171,
+      44.3186598470355
+     ],
+     [
+      -79.7235729185099,
+      44.318679726180434
+     ],
+     [
+      -79.72356351950405,
+      44.31877926668968
+     ],
+     [
+      -79.72356289441862,
+      44.318785886775274
+     ],
+     [
+      -79.72355412707782,
+      44.31887873344585
+     ],
+     [
+      -79.72355322850306,
+      44.31888825032489
+     ],
+     [
+      -79.723544734616,
+      44.318978200199176
+     ],
+     [
+      -79.72354416335018,
+      44.31898424649773
+     ],
+     [
+      -79.72353534695324,
+      44.31907761748744
+     ],
+     [
+      -79.72353449252708,
+      44.31908665950368
+     ],
+     [
+      -79.72352510304485,
+      44.31918610107693
+     ],
+     [
+      -79.72352408907763,
+      44.31919683296404
+     ],
+     [
+      -79.7235099953566,
+      44.31934608299152
+     ]
+    ]
+   },
+   "properties": {
+    "OBJECTID": 8197,
+    "ASSETID": "120287828",
+    "TYPE": "LOCAL",
+    "MATERIAL": "POLYVINYL CHLORIDE",
+    "WIDTH": 200,
+    "HEIGHT": 200,
+    "PIPESHP": "CIRCULAR",
+    "INV_UP_ELV": 302.49,
+    "INV_DN_ELV": 301.47,
+    "ENCASED": null,
+    "DATEINST": 1564358400000,
+    "DATEASSUM": null,
+    "OWNEDBY": 1,
+    "STATUS": "ACTIVE",
+    "RECSOURCE": "2019-301-028",
+    "LABELID": null,
+    "LOCATION": "PADDINGTON GROVE",
+    "CCTVID": null,
+    "LASTCCTVYR": null,
+    "FROM_ID": "120264455",
+    "TO_ID": "120264461",
+    "LEGACYID": null,
+    "SHAPE_Length": 76.40766927815116,
+    "LASTUPDATE": 1689086214000
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -79.7235099953566,
+      44.31934608299152
+     ],
+     [
+      -79.72350902890295,
+      44.31937179901768
+     ],
+     [
+      -79.72350092182424,
+      44.31958743707368
+     ]
+    ]
+   },
+   "properties": {
+    "OBJECTID": 8198,
+    "ASSETID": "120287829",
+    "TYPE": "LOCAL",
+    "MATERIAL": "POLYVINYL CHLORIDE",
+    "WIDTH": 200,
+    "HEIGHT": 200,
+    "PIPESHP": "CIRCULAR",
+    "INV_UP_ELV": 301.37,
+    "INV_DN_ELV": 300.1,
+    "ENCASED": null,
+    "DATEINST": 1564358400000,
+    "DATEASSUM": null,
+    "OWNEDBY": 1,
+    "STATUS": "ACTIVE",
+    "RECSOURCE": "2019-301-028",
+    "LABELID": null,
+    "LOCATION": "PADDINGTON GROVE",
+    "CCTVID": null,
+    "LASTCCTVYR": null,
+    "FROM_ID": "120264461",
+    "TO_ID": "120264433",
+    "LEGACYID": null,
+    "SHAPE_Length": 26.821347888566635,
+    "LASTUPDATE": 1689086232000
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -79.72122298209209,
+      44.318235947005164
+     ],
+     [
+      -79.72119215308705,
+      44.318288739936506
+     ],
+     [
+      -79.72112581777544,
+      44.318402335541045
+     ],
+     [
+      -79.7210593636389,
+      44.318516135941664
+     ],
+     [
+      -79.72099284938065,
+      44.318630036461094
+     ],
+     [
+      -79.72095121468007,
+      44.31870133181655
+     ]
+    ]
+   },
+   "properties": {
+    "OBJECTID": 8199,
+    "ASSETID": "120287830",
+    "TYPE": "LOCAL",
+    "MATERIAL": "POLYVINYL CHLORIDE",
+    "WIDTH": 200,
+    "HEIGHT": 200,
+    "PIPESHP": "CIRCULAR",
+    "INV_UP_ELV": 304.37,
+    "INV_DN_ELV": 303.08,
+    "ENCASED": null,
+    "DATEINST": 1564358400000,
+    "DATEASSUM": null,
+    "OWNEDBY": 1,
+    "STATUS": "ACTIVE",
+    "RECSOURCE": "2019-301-027",
+    "LABELID": null,
+    "LOCATION": "FRANKLIN TRAIL",
+    "CCTVID": null,
+    "LASTCCTVYR": null,
+    "FROM_ID": "120264460",
+    "TO_ID": "120264429",
+    "LEGACYID": null,
+    "SHAPE_Length": 56.05845490924917,
+    "LASTUPDATE": 1689085880000
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -79.72139574222007,
+      44.31819286104717
+     ],
+     [
+      -79.72141408336168,
+      44.31819810802907
+     ],
+     [
+      -79.72157031406194,
+      44.3182428027914
+     ],
+     [
+      -79.72173367238395,
+      44.318289535255076
+     ],
+     [
+      -79.72176192258783,
+      44.31829761737715
+     ],
+     [
+      -79.72188929415472,
+      44.3183340553104
+     ],
+     [
+      -79.72189046688794,
+      44.31833439073983
+     ],
+     [
+      -79.72201810532543,
+      44.31837090443962
+     ],
+     [
+      -79.72203345305583,
+      44.31837529495699
+     ],
+     [
+      -79.72215120132194,
+      44.31840897895012
+     ],
+     [
+      -79.72216893442933,
+      44.31841405155279
+     ],
+     [
+      -79.72227421768089,
+      44.31844417033284
+     ],
+     [
+      -79.72230495059831,
+      44.31845296251918
+     ],
+     [
+      -79.7224022504085,
+      44.31848079694961
+     ],
+     [
+      -79.7224316685629,
+      44.31848921247584
+     ],
+     [
+      -79.72244580124449,
+      44.31849325533668
+     ]
+    ]
+   },
+   "properties": {
+    "OBJECTID": 8200,
+    "ASSETID": "120287831",
+    "TYPE": "LOCAL",
+    "MATERIAL": "POLYVINYL CHLORIDE",
+    "WIDTH": 200,
+    "HEIGHT": 200,
+    "PIPESHP": "CIRCULAR",
+    "INV_UP_ELV": 305.79,
+    "INV_DN_ELV": 304.02,
+    "ENCASED": null,
+    "DATEINST": 1564358400000,
+    "DATEASSUM": null,
+    "OWNEDBY": 1,
+    "STATUS": "ACTIVE",
+    "RECSOURCE": "2019-301-027",
+    "LABELID": null,
+    "LOCATION": "FRANKLIN TRAIL",
+    "CCTVID": null,
+    "LASTCCTVYR": null,
+    "FROM_ID": "120264459",
+    "TO_ID": "120264458",
+    "LEGACYID": null,
+    "SHAPE_Length": 90.15042549131338,
+    "LASTUPDATE": 1689085986000
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -79.72244580124449,
+      44.31849325533668
+     ],
+     [
+      -79.72252430003189,
+      44.31850842737418
+     ],
+     [
+      -79.72260121418289,
+      44.31852329263956
+     ],
+     [
+      -79.72266042457716,
+      44.31853473589865
+     ],
+     [
+      -79.72274736266309,
+      44.318551538971434
+     ],
+     [
+      -79.72279118576337,
+      44.3185600083633
+     ],
+     [
+      -79.72289373858278,
+      44.31857982817265
+     ],
+     [
+      -79.722917286658,
+      44.31858437958965
+     ],
+     [
+      -79.72295222853842,
+      44.31859113268165
+     ]
+    ]
+   },
+   "properties": {
+    "OBJECTID": 8201,
+    "ASSETID": "120287832",
+    "TYPE": "LOCAL",
+    "MATERIAL": "POLYVINYL CHLORIDE",
+    "WIDTH": 200,
+    "HEIGHT": 200,
+    "PIPESHP": "CIRCULAR",
+    "INV_UP_ELV": 303.98,
+    "INV_DN_ELV": 303.3,
+    "ENCASED": null,
+    "DATEINST": 1564358400000,
+    "DATEASSUM": null,
+    "OWNEDBY": 1,
+    "STATUS": "ACTIVE",
+    "RECSOURCE": "2019-301-027",
+    "LABELID": null,
+    "LOCATION": "FRANKLIN TRAIL",
+    "CCTVID": null,
+    "LASTCCTVYR": null,
+    "FROM_ID": "120264458",
+    "TO_ID": "120264457",
+    "LEGACYID": null,
+    "SHAPE_Length": 41.8275732219899,
+    "LASTUPDATE": 1689086005000
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -79.72295222853842,
+      44.31859113268165
+     ],
+     [
+      -79.72304275928127,
+      44.318601125355606
+     ],
+     [
+      -79.72305239208379,
+      44.3186021882695
+     ],
+     [
+      -79.72319464975513,
+      44.3186178899305
+     ],
+     [
+      -79.72335927313814,
+      44.31863605974521
+     ],
+     [
+      -79.72357479542171,
+      44.3186598470355
+     ]
+    ]
+   },
+   "properties": {
+    "OBJECTID": 8202,
+    "ASSETID": "120287833",
+    "TYPE": "LOCAL",
+    "MATERIAL": "POLYVINYL CHLORIDE",
+    "WIDTH": 200,
+    "HEIGHT": 200,
+    "PIPESHP": "CIRCULAR",
+    "INV_UP_ELV": 303.27,
+    "INV_DN_ELV": 302.58,
+    "ENCASED": null,
+    "DATEINST": 1564358400000,
+    "DATEASSUM": null,
+    "OWNEDBY": 1,
+    "STATUS": "ACTIVE",
+    "RECSOURCE": "2019-301-027",
+    "LABELID": null,
+    "LOCATION": "FRANKLIN TRAIL",
+    "CCTVID": null,
+    "LASTCCTVYR": null,
+    "FROM_ID": "120264457",
+    "TO_ID": "120264455",
+    "LEGACYID": null,
+    "SHAPE_Length": 50.235511279191655,
+    "LASTUPDATE": 1689086026000
+   }
+  }
+ ]
+}
