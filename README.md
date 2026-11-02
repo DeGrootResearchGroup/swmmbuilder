@@ -192,9 +192,9 @@ The default template is the one shipped in the package,
 sync by a test). It uses SI units, `FLOW_UNITS LPS`, because the GIS lengths, inverts and sizes are
 in metres. A custom template (`template_path=`) must use `CMS`, `LPS` or `MLD`, and may only
 contain the `{nodes}`, `{outfalls}`, `{storage}`, `{conduits}`, `{pumps}`, `{xsections}`,
-`{curves}`, `{coordinates}` and `{vertices}` placeholders; anything else (including US units)
-raises `ValueError`. Node `[COORDINATES]` and pipe `[VERTICES]` are written in the units of the GIS
-geometry.
+`{curves}`, `{dwf}`, `{patterns}`, `{coordinates}` and `{vertices}` placeholders; anything else
+(including US units) raises `ValueError`. Node `[COORDINATES]` and pipe `[VERTICES]` are written in
+the units of the GIS geometry.
 
 ## Pumps
 
@@ -268,6 +268,37 @@ station, such as overflows, stay conduits (`include_overflows=False` drops them)
   C by diameter (Design Specifications & Requirements Manual, s. 4.8).
 - A pipe in both `pumps` and a station's force main, a station with no force-main outlet, and a
   wet well given both in `wet_wells` and a station are errors.
+
+## Dry-weather flow
+
+`dwf={node: base_flow}` loads nodes with a dry-weather flow in the template's `FLOW_UNITS` (L/s
+with the shipped template), written to `[DWF]`. This also covers point loads at nodes with no
+upstream pipes, such as a pumping station fed by a system that is not in the data. Time patterns
+go in `patterns={name: multipliers}` (`[PATTERNS]`); the type comes from the number of multipliers
+(24 → `HOURLY`, 7 → `DAILY`, 12 → `MONTHLY`) or is given as `(type, multipliers)`, e.g.
+`("WEEKEND", [...])`. `dwf_patterns` applies them: one name (or list of names) for every loaded
+node, or `{node: [names]}`, up to four per node, one of each type.
+
+```python
+from swmmbuilder import dwf_from_population
+
+dwf = dwf_from_population({"A1": 1200, "B1": 800}, per_capita=250, unit="L/d")  # -> L/s
+sub.to_inp(
+    "model.inp",
+    outfalls=["OUT"],
+    dwf={**dwf, "D1": 3.5},
+    patterns={"diurnal": [0.5, 0.4, 0.35, ..., 0.8]},  # 24 hourly multipliers, mean 1
+    dwf_patterns="diurnal",
+)
+```
+
+Nodes must be in the subnetwork and not outfalls, flows non-negative and finite, and patterns
+defined, of the right length and positive; otherwise `ValueError` is raised before anything is
+written. An hourly pattern whose mean is not 1 gives a warning, since it scales the base flows.
+The total base flow and the number of loaded nodes are logged, for comparison with the plant's
+measured dry-weather flow. How population is allocated to nodes is left to the study.
+`dwf_from_population` converts a per-capita flow (`unit` `L/d`, `m3/d`, `L/s` or `m3/s`) to the
+template's `flow_units` (default `LPS`).
 
 ## Conduit geometry
 
