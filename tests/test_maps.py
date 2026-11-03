@@ -101,6 +101,41 @@ def test_plot_crs_without_crs_is_utm():
     assert maps.plot_crs(Network(data, schema=LONLAT_SCHEMA)) == CRS.from_epsg(32617)
 
 
+FEET = "EPSG:2263"  # NAD83 / New York Long Island, US survey feet
+
+
+def _scale_label(ax):
+    (bar,) = [a for a in ax.artists if isinstance(a, AnchoredSizeBar)]
+    return bar.txt_label.get_text()
+
+
+def test_plot_crs_in_feet_is_reprojected_to_metres(network):
+    feet = Network(gpd.read_file(FIXTURE).to_crs(FEET), schema=LONLAT_SCHEMA)
+    assert feet.full_data.crs == CRS.from_user_input(FEET)
+    assert maps.plot_crs(feet) == CRS.from_epsg(32617)
+    metric, imperial = subnetwork(network, DENDRITIC), subnetwork(feet, DENDRITIC)
+    assert maps.network_extent(imperial) == pytest.approx(maps.network_extent(metric), rel=0.01)
+    labels = []
+    for net in (metric, imperial):
+        fig, ax = plt.subplots()
+        maps.plot_pipes(ax, net)
+        labels.append(_scale_label(ax))
+        plt.close(fig)
+    assert labels[0] == labels[1] and labels[0].endswith(" m")
+
+
+@pytest.mark.parametrize("crs", ["EPSG:4326", FEET])
+def test_plot_crs_must_be_metres(network, crs):
+    with pytest.raises(ValueError, match="projected in metres"):
+        maps.plot_crs(network, crs)
+
+
+def test_plot_crs_without_crs_needs_lonlat():
+    data = gpd.read_file(FIXTURE).to_crs("EPSG:2958").set_crs(None, allow_override=True)
+    with pytest.raises(ValueError, match="no CRS, and its coordinates are not longitude"):
+        maps.plot_crs(Network(data, schema=LONLAT_SCHEMA))
+
+
 # ---- Scaling and colours --------------------------------------------------------------------
 
 
