@@ -50,7 +50,7 @@ def xsection(pipe):
         A row of the canonical data (see :mod:`swmmbuilder.schema`).
 
     Returns
-    ----------
+    -------
     tuple or None
         (shape, geom1, geom2), or None if the shape is unknown or missing, or a size it needs is
         missing or not positive.
@@ -109,7 +109,7 @@ def force_main_discharge_rule(rule):
         table, e.g. ``LONDON_ON.design['force_main_discharge']``. A callable is used as is.
 
     Raises
-    ----------
+    ------
     ValueError
         If the dict has unknown keys, no ``max_height_above_receiving_invert``, or a height
         outside ``[0, h_max]``.
@@ -256,11 +256,11 @@ def fill_gaps(
         node's invert must be known or filled.
 
     Returns
-    ----------
+    -------
     FilledData
 
     Raises
-    ----------
+    ------
     ValueError
         If an option is invalid or names a pipe that is not in the subnetwork.
     """

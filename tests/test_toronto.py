@@ -116,7 +116,7 @@ def test_toronto_gmap(catchment, tmp_path, monkeypatch):
         def draw(self, file_name):
             pass
 
-    monkeypatch.setattr(maps.gmplot, "GoogleMapPlotter", FakePlotter)
+    monkeypatch.setattr("gmplot.GoogleMapPlotter", FakePlotter)
     maps.generate_gmap(catchment, str(tmp_path / "map.html"))
     assert len(markers) == len(catchment.nodes)
     for lat, lng in markers.values():

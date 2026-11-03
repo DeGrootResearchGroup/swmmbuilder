@@ -30,3 +30,9 @@ var/
 
 # Map gallery images (examples/maps_gallery.py)
 maps_gallery/
+
+# Coverage data (pytest --cov)
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml

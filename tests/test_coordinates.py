@@ -81,7 +81,7 @@ def test_generate_gmap(network, tmp_path, monkeypatch):
         def draw(self, file_name):
             pass
 
-    monkeypatch.setattr(maps.gmplot, "GoogleMapPlotter", FakePlotter)
+    monkeypatch.setattr("gmplot.GoogleMapPlotter", FakePlotter)
     sub = subnetwork(network, DENDRITIC)
     with pytest.warns(DeprecationWarning, match="to_leaflet"):
         maps.generate_gmap(sub, str(tmp_path / "map.html"))

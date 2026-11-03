@@ -99,7 +99,7 @@ def check_template(content):
         Text of the .inp template.
 
     Raises
-    ----------
+    ------
     ValueError
         If FLOW_UNITS is missing or not an SI unit (the GIS data are metric), or if the template
         contains a placeholder the writer does not fill (see :data:`TEMPLATE_PLACEHOLDERS`).
@@ -280,7 +280,7 @@ def resolve_pumps(subnetwork, pumps):
     the same pipe; the result is keyed by the pipe IDs of the data.
 
     Raises
-    ----------
+    ------
     ValueError
         If a pipe is not in the subnetwork or a pump is invalid.
     """
@@ -297,7 +297,7 @@ def resolve_wet_wells(subnetwork, wet_wells, outfalls=()):
     """{node: WetWell} from the ``wet_wells`` option of :func:`build_model`.
 
     Raises
-    ----------
+    ------
     ValueError
         If a node is not in the subnetwork or is an outfall, or a wet well is invalid.
     """
@@ -403,7 +403,7 @@ def resolve_pump_stations(subnetwork, pump_stations, outfalls=(), default_pump=N
     :func:`build_model`.
 
     Raises
-    ----------
+    ------
     ValueError
         If a station node is not in the subnetwork, is an outfall or has no force-main outlet, a
         chosen force main does not leave it, it has several force mains and no ``discharge``,
@@ -482,7 +482,7 @@ def force_main_roughness_rule(rule):
     ``force_main_roughness`` option of :func:`build_model`.
 
     Raises
-    ----------
+    ------
     ValueError
         If the rule is not one of the accepted forms.
     """
@@ -520,7 +520,7 @@ def force_main_roughnesses(pipes, sections, rule, by_pipe=None):
     and ``force_main_roughness_by_pipe`` options of :func:`build_model`).
 
     Raises
-    ----------
+    ------
     ValueError
         If a force main is not circular or has no roughness; every such pipe is listed.
     """
@@ -687,12 +687,12 @@ def apply_wet_well_defaults(
     :class:`Derived` rows.
 
     Returns
-    ----------
+    -------
     list of Derived
         Every value the rule gave.
 
     Raises
-    ----------
+    ------
     ValueError
         If the rule is invalid, or a station that needs it has no gravity inlet with an invert,
         a high water level not above its low water level, or (for its wet well) no
@@ -912,7 +912,7 @@ def resolve_patterns(patterns):
     pattern whose mean is not 1, since the mean then scales the base flows.
 
     Raises
-    ----------
+    ------
     ValueError
         If a pattern has an unknown type, the wrong number of multipliers for its type, or a
         multiplier that is not a positive finite number; the message lists every problem.
@@ -960,7 +960,7 @@ def resolve_dwf(subnetwork, dwf, outfalls=()):
     """{node: base flow} from the ``dwf`` option of :func:`build_model`.
 
     Raises
-    ----------
+    ------
     ValueError
         If a node is not in the subnetwork or is an outfall, or a flow is negative or not finite.
     """
@@ -988,7 +988,7 @@ def resolve_dwf_patterns(dwf_patterns, dwf, patterns):
     {node: name or list of names}.
 
     Raises
-    ----------
+    ------
     ValueError
         If a node has no dry-weather flow, a pattern is not defined, or a node has more than
         :data:`MAX_DWF_PATTERNS` patterns or two of the same type.
@@ -1041,7 +1041,7 @@ def dwf_from_population(population, per_capita, unit="L/d", flow_units="LPS"):
         template).
 
     Returns
-    ----------
+    -------
     dict
         {node: base flow}, to pass as ``dwf``.
     """
@@ -1075,12 +1075,12 @@ def node_inverts(subnetwork, height_correction=None):
         {node: invert} overriding the computed inverts.
 
     Returns
-    ----------
+    -------
     dict
         {node: invert}
 
     Raises
-    ----------
+    ------
     ValueError
         If a node has no pipe with an invert.
     """
@@ -1475,7 +1475,7 @@ def build_model(
         LPS, the shipped template's; :func:`write_inp` sets it from the template).
 
     Raises
-    ----------
+    ------
     ValueError
         If an outfall is not in the subnetwork, a gap that stops the model from being written
         remains after the fills (a conduit with no cross-section, a node with no invert; every
@@ -1802,7 +1802,7 @@ def write_inp(subnetwork, path, outfalls=None, template_path=None, dead_ends="ra
         Passed to :func:`build_model`.
 
     Returns
-    ----------
+    -------
     SwmmModel
         The model that was written.
     """

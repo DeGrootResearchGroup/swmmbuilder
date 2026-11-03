@@ -263,6 +263,21 @@ class Schema:
             if unit not in UNITS:
                 raise ValueError(f"Unknown unit {unit!r}; use one of {list(UNITS)}.")
 
+    def __hash__(self):
+        # The generated hash would hash the dict fields and fail. Hash the scalar fields only:
+        # equal schemas have equal scalars, so this stays consistent with the generated __eq__.
+        return hash(
+            (
+                self.name,
+                self.default_shape,
+                self.abandoned,
+                self.length_unit,
+                self.invert_unit,
+                self.size_unit,
+                self.crs,
+            )
+        )
+
     @classmethod
     def from_toml(cls, path):
         """Read a schema from a TOML file.
@@ -320,18 +335,18 @@ class Schema:
             Pipes as read from the GIS file.
 
         Returns
-        ----------
+        -------
         geopandas.GeoDataFrame
             The canonical columns, followed by the unmapped source columns and the geometry.
 
         Raises
-        ----------
+        ------
         ValueError
             If a required source column is missing, ``pipe_id`` is not unique, or lengths must be
             computed from a geometry that is not in a projected CRS.
 
         Warns
-        ----------
+        -----
         UserWarning
             For shape codes that are not in ``shapes`` (those pipes are rejected when written).
         """
@@ -423,12 +438,12 @@ class Schema:
             it is read from the ``node_type`` source column through ``node_types``.
 
         Returns
-        ----------
+        -------
         geopandas.GeoDataFrame
             The columns of :data:`NODE_COLUMNS` and the geometry.
 
         Raises
-        ----------
+        ------
         ValueError
             If the schema maps no ``node_id`` column or it is not in the data.
         """

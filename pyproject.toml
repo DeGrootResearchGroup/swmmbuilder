@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "swmmbuilder"
 version = "0.2.0"
-description = "A tool manipulating GIS data files to product sewer subnetworks and .inp files for pyswmm."
+description = "A tool manipulating GIS data files to produce sewer subnetworks and .inp files for pyswmm."
 license = "MIT"
 license-files = ["LICENCE"]
 authors = [{name = "Anthony Sherratt", email="asherra@uwo.ca"}, {name = "Christopher DeGroot", email="christopher.degroot@uwo.ca"},]
@@ -16,15 +16,17 @@ dependencies = [
   "geopandas",
   "networkx",
   "pyproj",
-  "pyswmm",
-  "gmplot",
   "matplotlib",
   "shapely>=2",
 ]
 
 [project.optional-dependencies]
-# Web-tile basemaps (maps.add_basemap) and interactive maps (maps.to_leaflet).
-maps = ["contextily", "xyzservices", "folium"]
+# Web-tile basemaps (maps.add_basemap), interactive maps (maps.to_leaflet) and the deprecated
+# Google Maps export (maps.generate_gmap).
+maps = ["contextily", "xyzservices", "folium", "gmplot"]
+# Running the written .inp files. swmmbuilder itself never imports pyswmm, and pyswmm pulls in
+# julian, an sdist-only package that fails to build on some Python 3.13 setups, so it is optional.
+simulate = ["pyswmm"]
 # `lint` pins the linter (same series as aquakin) so a new ruff release cannot turn the gate red
 # without a deliberate bump.
 lint = ["ruff>=0.15,<0.16"]
@@ -33,6 +35,8 @@ test = [
   "pytest-timeout>=2",
   "pytest-cov>=5",
   "folium",
+  "gmplot",
+  "pyswmm",
 ]
 
 [tool.setuptools]
