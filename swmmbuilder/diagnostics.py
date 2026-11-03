@@ -28,6 +28,8 @@ Each problem goes to one of four channels, chosen by what the user can do about 
     read and written.
 """
 
+import difflib
+
 
 class SwmmBuilderWarning(UserWarning):
     """Base class of the warnings of swmmbuilder."""
@@ -77,3 +79,31 @@ class Problems:
         """Raise ValueError with :meth:`message` if any problem was added."""
         if self.items:
             raise ValueError(self.message())
+
+
+def check_options(given, known, where):
+    """Raise TypeError if a keyword of ``given`` is not in ``known``, suggesting the closest
+    known names (e.g. ``size_overide`` -> ``size_overrides``), instead of the TypeError of a
+    function the keywords are passed on to.
+
+    Parameters
+    ----------
+    given : iterable of str
+        The keyword names passed.
+    known : iterable of str
+        The keyword names accepted.
+    where : str
+        What the keywords were passed to, for the message, e.g. ``'build_model'``.
+    """
+    known = sorted(set(known))
+    unknown = sorted(set(given) - set(known))
+    if not unknown:
+        return
+    hints = []
+    for name in unknown:
+        close = difflib.get_close_matches(name, known, n=2)
+        hints.append(f"{name} (did you mean {' or '.join(close)}?)" if close else name)
+    raise TypeError(
+        f"{where}: unknown option{'s' if len(unknown) > 1 else ''} {', '.join(hints)}. "
+        f"Options: {', '.join(known)}."
+    )

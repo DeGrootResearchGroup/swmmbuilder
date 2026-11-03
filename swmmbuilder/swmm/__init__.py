@@ -52,6 +52,8 @@ from ..units import (  # noqa: F401
     _is_real,
 )
 from .build import (  # noqa: F401
+    BUILD_OPTIONS,
+    FILL_OPTIONS,
     build_model,
     logger,
     node_inverts,
