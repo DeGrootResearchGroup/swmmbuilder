@@ -23,12 +23,14 @@ pipe keyed by pipe ID, so parallel pipes are kept.
 
 ## Install
 
-What changed between versions is in [CHANGELOG.md](CHANGELOG.md).
+What changed between versions is in
+[CHANGELOG.md](https://github.com/DeGrootResearchGroup/swmmbuilder/blob/main/CHANGELOG.md).
 
 ```bash
-pip install -e .                 # from a clone of this repository
-pip install -e ".[maps]"         # + web-tile basemaps and Leaflet maps (contextily, xyzservices, folium)
-pip install -e ".[simulate]"     # + pyswmm, to run the .inp files
+pip install swmmbuilder                 # from PyPI
+pip install "swmmbuilder[maps]"         # + web-tile basemaps and Leaflet maps (contextily, xyzservices, folium)
+pip install "swmmbuilder[simulate]"     # + pyswmm, to run the .inp files
+pip install -e .                        # from a clone of this repository (extras as above)
 ```
 
 swmmbuilder only writes `.inp` files and never imports pyswmm, so pyswmm is optional. pyswmm
@@ -534,3 +536,15 @@ mkdocs serve            # http://127.0.0.1:8000, rebuilt on save; or mkdocs buil
 `.github/workflows/ci.yml` runs ruff (`ruff check` and `ruff format --check`, rules in
 `pyproject.toml`) and the test suite on Python 3.11–3.13. The `CI gate` job is the single check
 to require in branch protection.
+
+## Releasing
+
+1. In a pull request, set `version` in `pyproject.toml` and turn the CHANGELOG's `[Unreleased]`
+   entries into the new version's section, dated, with its compare link at the bottom.
+2. After it merges, publish a GitHub release whose tag is `v` plus the version (e.g. `v0.2.0`).
+   `.github/workflows/publish.yml` then builds the tag and uploads it to PyPI, after checking that
+   the tag matches `pyproject.toml`; PyPI never accepts the same version twice.
+
+The upload uses PyPI's trusted publishing, so no token is stored: PyPI trusts this repository's
+`publish.yml` in the `pypi` environment. To publish a tag again by hand, run the workflow from the
+Actions tab and name the tag.
