@@ -23,9 +23,12 @@ The gap kinds (:data:`GAP_KINDS`):
 
 import heapq
 import logging
+import warnings
 from dataclasses import dataclass
 
 import pandas as pd
+
+from .diagnostics import OptionWarning
 
 logger = logging.getLogger(__name__)
 
@@ -101,13 +104,15 @@ def height_corrections(subnetwork, height_correction):
 
     Keys are matched with :meth:`Subnetwork.match_node`. Nodes of the network outside the
     subnetwork are skipped, so one mapping can serve several subnetworks; keys that name no node
-    of the network at all (likely typos) are skipped with a warning.
+    of the network at all (likely typos) are skipped with an :class:`OptionWarning`.
     """
     matched = subnetwork.match_nodes(height_correction or {}, "height_correction")
     unknown = sorted(str(n) for n in matched if not subnetwork.in_network(n))
     if unknown:
-        logger.warning(
-            "height_correction: nodes not in the network, ignored: %s", ", ".join(unknown)
+        warnings.warn(
+            f"height_correction: nodes not in the network, ignored: {', '.join(unknown)}",
+            OptionWarning,
+            stacklevel=3,
         )
     nodes = set(subnetwork.nodes)
     return {node: float(invert) for node, invert in matched.items() if node in nodes}

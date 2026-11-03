@@ -2,6 +2,7 @@
 
 import copy
 import logging
+import warnings
 from dataclasses import dataclass, fields
 
 import matplotlib as mpl
@@ -9,6 +10,8 @@ import matplotlib.cbook as cbook
 import numpy as np
 import pandas as pd
 from matplotlib.colors import LogNorm, Normalize, to_hex
+
+from ..diagnostics import OptionWarning
 
 logger = logging.getLogger(__name__)
 
@@ -103,7 +106,9 @@ def _aligned(values, index, what="values"):
     """``values`` (Series or dict) as floats in the order of ``index``, NaN where missing."""
     series = pd.Series(values, dtype=float) if isinstance(values, dict) else values.astype(float)
     if len(series) and not series.index.isin(index).any():
-        logger.warning("None of the IDs of the %s are in the network", what)
+        warnings.warn(
+            f"None of the IDs of the {what} are in the network.", OptionWarning, stacklevel=3
+        )
     return series.reindex(index).to_numpy()
 
 

@@ -1,3 +1,4 @@
+from .diagnostics import DataWarning, DesignWarning, OptionWarning, SwmmBuilderWarning
 from .network import Network, strip_leading_zeros
 from .schema import (
     BARRIE_ON,
@@ -22,12 +23,16 @@ __all__ = [
     "TORONTO_ON",
     "WATERLOO_ON",
     "WINDSOR_ON",
+    "DataWarning",
     "Derived",
+    "DesignWarning",
     "Network",
+    "OptionWarning",
     "Pump",
     "PumpStation",
     "Schema",
     "Subnetwork",
+    "SwmmBuilderWarning",
     "SwmmModel",
     "TopologyReport",
     "WetWell",

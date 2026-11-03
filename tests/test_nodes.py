@@ -9,7 +9,7 @@ import pytest
 from conftest import TESTS, read_sections, run_swmm, write_inp
 from pyproj import Transformer
 
-from swmmbuilder import Network, Schema, Subnetwork, strip_leading_zeros
+from swmmbuilder import Network, OptionWarning, Schema, Subnetwork, strip_leading_zeros
 from swmmbuilder.swmm import build_model
 
 DATA = TESTS / "data"
@@ -393,13 +393,13 @@ def test_options_resolve_snapped_aliases(snapped):
     assert {j.name: j.invert for j in model.junctions}["DUP1"] == 1.0
 
 
-def test_height_correction_outside_the_subnetwork(snapped, caplog):
+def test_height_correction_outside_the_subnetwork(snapped):
     sub = snapped.subnetwork(["M8", "DUP1", "M3"])
-    with caplog.at_level("WARNING", logger="swmmbuilder"):
+    # An OptionWarning (#79): a key that names no node is likely a typo the user should fix.
+    with pytest.warns(OptionWarning, match="nodes not in the network, ignored: NOPE") as caught:
         model = build_model(sub, outfalls=["M3"], height_correction={"M1": 1.0, "NOPE": 1.0})
     # M1 is in the network but not in the subnetwork: skipped quietly; NOPE is in neither.
-    assert "nodes not in the network, ignored: NOPE" in caplog.text
-    assert "M1" not in caplog.text
+    assert not any("M1" in str(w.message) for w in caught)
     assert "M1" not in {j.name for j in model.junctions}
 
 

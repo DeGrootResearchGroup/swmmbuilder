@@ -14,6 +14,7 @@ from ..design import (
     force_main_roughnesses,
     pump_level_problem,
 )
+from ..diagnostics import DataWarning, DesignWarning, Problems
 from ..gaps import _invert, fill_gaps, height_corrections, lowest_inverts, xsection
 from ..geometry import line_coords
 from ..units import _FLOW_UNIT_LPS
@@ -271,7 +272,7 @@ def _apply_design_rules(subnetwork, inputs, pipes, inverts, wet_well_defaults):
         if (problem := pump_level_problem(name, pump, wet_wells.get(inputs.inlets[name])))
     ]
     if problems:
-        raise ValueError("Invalid pumps:\n  " + "\n  ".join(problems))
+        raise ValueError(Problems("Invalid pumps", problems).message())
     return derived
 
 
@@ -301,12 +302,11 @@ def _add_nodes(model, subnetwork, inputs, pipes, inverts, defaults):
             if rim is not None and rim > invert:
                 depth = round(rim - invert, 4)
             elif rim is not None:
-                logger.warning(
-                    "Node %s: rim elevation %s is not above the invert %s; max depth %s is used",
-                    node,
-                    rim,
-                    invert,
-                    defaults.max_depth,
+                warnings.warn(
+                    f"Node {node}: rim elevation {rim} is not above the invert {invert}; max "
+                    f"depth {defaults.max_depth} is used.",
+                    DataWarning,
+                    stacklevel=3,  # the caller of build_model
                 )
             surcharge = defaults.surcharge_depth
             if node in pressurised:
@@ -385,6 +385,7 @@ def _add_links(model, inputs, pipes, inverts, discharge_of, sections, roughness_
                 warnings.warn(
                     f"Pipe {name}: invert {pipe_invert} is below the invert of node {node} "
                     f"({inverts[node]}); its offset there is set to 0.",
+                    DataWarning,
                     stacklevel=3,  # the caller of build_model
                 )
                 offset = 0.0
@@ -683,11 +684,12 @@ def build_model(
         for message in check_force_mains(
             inputs.station_pumps, inputs.stations, sections, force_main_checks, inputs.flow_units
         ):
-            warnings.warn(message, stacklevel=2)
+            warnings.warn(message, DesignWarning, stacklevel=2)
     if adverse:
         warnings.warn(
             f"Conduits with an adverse slope (outlet invert above inlet invert): "
             f"{', '.join(adverse)}.",
+            DataWarning,
             stacklevel=2,
         )
 

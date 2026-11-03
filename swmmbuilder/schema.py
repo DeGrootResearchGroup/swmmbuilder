@@ -71,6 +71,7 @@ import geopandas as gpd
 import pandas as pd
 
 from .design import check_design_rule
+from .diagnostics import DataWarning
 
 # Canonical columns, in the order they are written.
 CANONICAL_COLUMNS = (
@@ -417,6 +418,7 @@ class Schema:
             warnings.warn(
                 f"Shape codes not in schema {self.name!r} (pipes with them cannot be written to "
                 f".inp): {counts}. Known codes: {list(self.shapes)}.",
+                DataWarning,
                 stacklevel=3,
             )
 
