@@ -532,7 +532,7 @@ class Network:
             If a node is not in the network, or ``node`` drains to none of the outlets.
         """
         node = self.resolve(node)
-        self._check_nodes([node])
+        self.check_nodes([node])
         upstream = self.graph.reverse(copy=False)
 
         if max_hops is None:
@@ -550,7 +550,7 @@ class Network:
             single = isinstance(outlet, str) or not isinstance(outlet, Iterable)
             outlets = [outlet] if single else list(outlet)
             outlets = [self.resolve(o) for o in outlets]
-            self._check_nodes(outlets)
+            self.check_nodes(outlets)
             reachable = [o for o in sorted(outlets) if nx.has_path(self.graph, node, o)]
             if not reachable:
                 raise ValueError(f"Node {node} does not drain to any of the outlets {outlets}.")
@@ -575,10 +575,22 @@ class Network:
         """
         return to_geodataframe(self.full_data, self.nodes, kind, values)
 
-    def _check_nodes(self, nodes):
+    def check_nodes(self, nodes):
+        """Raise ValueError listing the ``nodes`` that are not in the network."""
         missing = sorted(n for n in nodes if n not in self.graph)
         if missing:
             raise ValueError(f"Nodes not in the network: {', '.join(map(str, missing))}")
+
+    _check_nodes = check_nodes  # the former name
+
+    def ids(self):
+        """Every node ID and pipe ID of the network, e.g. to check that a new name is free."""
+        return set(self.graph.nodes) | set(self.full_data["pipe_id"])
+
+    def lowest_inverts(self, nodes):
+        """{node: lowest invert of the network's pipes connected to it} for ``nodes`` (see
+        :func:`swmmbuilder.gaps.lowest_inverts`)."""
+        return lowest_inverts(self.full_data, nodes)
 
     @staticmethod
     def _pipe_length(u, v, pipes):

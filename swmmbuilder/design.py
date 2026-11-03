@@ -71,6 +71,7 @@ def force_main_roughnesses(pipes, sections, rule, by_pipe=None):
     """
     if pipes.empty:
         return {}
+    # Keyed by the pipe IDs of the data (see Subnetwork.match_pipes); text keys still match.
     overrides = {str(k): float(v) for k, v in (by_pipe or {}).items()}
     rule = (lambda pipe: None) if rule is None else force_main_roughness_rule(rule)
     found, not_round, missing = {}, [], []

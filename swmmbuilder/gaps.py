@@ -182,15 +182,6 @@ class FilledData:
         return report[report["gap"].isin(BLOCKING_GAPS) & report["filled_from"].isna()]
 
 
-def _match_ids(pipes, mapping, option):
-    """{pipe_id of the data: value} for a mapping keyed by pipe IDs matched as strings."""
-    ids = {str(p): p for p in pipes["pipe_id"]}
-    missing = sorted(str(k) for k in mapping if str(k) not in ids)
-    if missing:
-        raise ValueError(f"{option}: pipes not in the subnetwork: {', '.join(missing)}")
-    return {ids[str(k)]: v for k, v in mapping.items()}
-
-
 def _code_key(code):
     """A shape code as a key of ``shape_codes``: missing and blank codes are ''."""
     return "" if pd.isna(code) else str(code).strip()
@@ -315,7 +306,7 @@ def fill_gaps(
             f" ({source})" if source else "",
         )
 
-    for pipe_id, value in _match_ids(pipes, size_overrides or {}, "size_overrides").items():
+    for pipe_id, value in subnetwork.match_pipes(size_overrides or {}, "size_overrides").items():
         i = by_id[pipe_id]
         values = {"diameter": value} if not hasattr(value, "items") else dict(value)
         unknown = sorted(set(values) - set(SECTION_COLUMNS))
@@ -368,7 +359,7 @@ def fill_gaps(
     nodes = set(subnetwork.nodes)
     inverts = lowest_inverts(pipes, nodes)
     if nodes - set(inverts):
-        inverts.update(lowest_inverts(subnetwork.network.full_data, nodes - set(inverts)))
+        inverts.update(subnetwork.network.lowest_inverts(nodes - set(inverts)))
     for node in nodes - set(inverts):
         original[("node", node, "no_node_invert")] = "no invert from any pipe"
     for node, invert in height_corrections(subnetwork, height_correction).items():
