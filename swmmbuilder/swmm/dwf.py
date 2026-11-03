@@ -1,10 +1,18 @@
 """Dry-weather flow: the ``dwf``, ``patterns`` and ``dwf_patterns`` options of
 :func:`~swmmbuilder.swmm.build_model`."""
 
+from __future__ import annotations
+
 import warnings
+from typing import TYPE_CHECKING
 
 from ..diagnostics import DesignWarning, Problems
 from ..units import _FLOW_UNIT_LPS, _TIME_SECONDS, _VOLUME_LITRES, SI_FLOW_UNITS, _is_finite_number
+
+if TYPE_CHECKING:
+    from collections.abc import Mapping
+
+    from .._types import NodeId
 
 # SWMM time pattern types and their number of multipliers. A pattern given as a plain list of
 # multipliers takes its type from its length; WEEKEND (24 values) must be named explicitly.
@@ -138,7 +146,12 @@ def resolve_dwf_patterns(dwf_patterns, dwf, patterns, subnetwork=None):
     return resolved
 
 
-def dwf_from_population(population, per_capita, unit="L/d", flow_units="LPS"):
+def dwf_from_population(
+    population: Mapping[NodeId, float],
+    per_capita: float,
+    unit: str = "L/d",
+    flow_units: str = "LPS",
+) -> dict[NodeId, float]:
     """{node: base flow} in ``flow_units`` from {node: population} and a per-capita flow.
 
     How the population is allocated to nodes is left to the caller.

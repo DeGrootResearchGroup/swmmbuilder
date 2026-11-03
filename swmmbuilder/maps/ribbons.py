@@ -1,6 +1,10 @@
 """Ribbons: pipes drawn as bands of strands, one per share of the flow, along main
 stems with mitred joins."""
 
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 import numpy as np
 import pandas as pd
 import shapely
@@ -13,6 +17,12 @@ from .colours import NEUTRAL_COLOR, _aligned, category_colors
 from .crs import _geodata, network_extent
 from .polygons import _path
 from .style import DrawnLayer, _finish, add_legends
+
+if TYPE_CHECKING:
+    from matplotlib.axes import Axes
+
+    from ..network import Network
+    from ..subnetwork import Subnetwork
 
 # Name of the strand that lumps the categories dropped by plot_ribbons' top_k and min_share.
 OTHER = "other"
@@ -191,9 +201,9 @@ def _shares_table(shares, top_k, min_share):
 
 
 def plot_ribbons(
-    ax,
-    net,
-    shares,
+    ax: Axes,
+    net: Network | Subnetwork,
+    shares: pd.DataFrame,
     colors=None,
     *,
     width="total",
@@ -210,7 +220,7 @@ def plot_ribbons(
     style=True,
     crs=None,
     zorder=2,
-):
+) -> DrawnLayer:
     """Draw pipes as ribbons of parallel strands, one per category, each as wide as its share of
     the pipe's load (a mass-flow map).
 

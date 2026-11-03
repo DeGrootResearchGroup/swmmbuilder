@@ -1,11 +1,14 @@
 """Building the :class:`~swmmbuilder.swmm.SwmmModel` of a subnetwork and writing its .inp file."""
 
+from __future__ import annotations
+
 import logging
 import warnings
 from collections import Counter
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from ..design import (
     apply_wet_well_defaults,
@@ -41,10 +44,20 @@ from .template import (
     template_routing,
 )
 
+if TYPE_CHECKING:
+    from collections.abc import Callable, Sequence
+    from typing import Any
+
+    from .._types import Fields, NodeId, Outfalls, PipeId, StrPath
+    from ..pumps import Pump, PumpStation, WetWell
+    from ..subnetwork import Subnetwork
+
 logger = logging.getLogger(__name__)
 
 
-def node_inverts(subnetwork, height_correction=None):
+def node_inverts(
+    subnetwork: Subnetwork, height_correction: Mapping[NodeId, float] | None = None
+) -> dict[NodeId, float]:
     """Invert elevation of every node of a subnetwork.
 
     A node's invert is the lowest invert of the subnetwork pipes connected to it, including the
@@ -81,18 +94,25 @@ def node_inverts(subnetwork, height_correction=None):
     return inverts
 
 
-def outfall_types(outfalls, subnetwork=None):
+def outfall_types(
+    outfalls: Outfalls | None, subnetwork: Subnetwork | None = None
+) -> dict[NodeId, str]:
     """{node: outfall type} from a mapping, or from an iterable of nodes (all 'FREE'); None is
     the subnetwork's outfall nodes (:attr:`Subnetwork.outfalls`)."""
     if outfalls is None:
+        if subnetwork is None:
+            raise ValueError("outfall_types needs the outfalls or the subnetwork.")
         outfalls = subnetwork.outfalls
+    types: dict[NodeId, str]
     if isinstance(outfalls, str) or not isinstance(outfalls, Iterable):
-        outfalls = {outfalls: "FREE"}
-    elif not hasattr(outfalls, "items"):
-        outfalls = {node: "FREE" for node in outfalls}
+        types = {outfalls: "FREE"}
+    elif isinstance(outfalls, Mapping):
+        types = dict(outfalls)
+    else:
+        types = dict.fromkeys(outfalls, "FREE")
     if subnetwork is None:
-        return dict(outfalls)
-    return subnetwork.match_nodes(outfalls, "outfalls")
+        return types
+    return subnetwork.match_nodes(types, "outfalls")
 
 
 # ---- The phases of build_model ---------------------------------------------------------------
@@ -108,7 +128,7 @@ class _Defaults:
     ponding_area: float
     force_main_surcharge_depth: float
     manning_n: float
-    manning_n_by_material: dict
+    manning_n_by_material: Mapping[Any, float]
     init_flow: float
     max_flow: float
     barrels: float
@@ -451,33 +471,33 @@ def _check_ideal_pumps(model):
 
 
 def build_model(
-    subnetwork,
-    outfalls=None,
-    max_depth=0.0,
-    init_depth=0.0,
-    surcharge_depth=0.0,
-    ponding_area=0.0,
-    manning_n=0.01,
-    manning_n_by_material=None,
-    init_flow=0.0,
-    max_flow=0.0,
-    barrels=1.0,
-    height_correction=None,
-    pumps=None,
-    wet_wells=None,
-    pump_stations=None,
-    default_pump=None,
-    force_main_roughness=None,
-    force_main_roughness_by_pipe=None,
-    force_main_surcharge_depth=100.0,
-    dwf=None,
-    patterns=None,
-    dwf_patterns=None,
-    wet_well_defaults=None,
-    force_main_checks=None,
-    flow_units="LPS",
-    **fills,
-):
+    subnetwork: Subnetwork,
+    outfalls: Outfalls | None = None,
+    max_depth: float = 0.0,
+    init_depth: float = 0.0,
+    surcharge_depth: float = 0.0,
+    ponding_area: float = 0.0,
+    manning_n: float = 0.01,
+    manning_n_by_material: Mapping[Any, float] | None = None,
+    init_flow: float = 0.0,
+    max_flow: float = 0.0,
+    barrels: float = 1.0,
+    height_correction: Mapping[NodeId, float] | None = None,
+    pumps: Mapping[PipeId, Pump | Fields] | None = None,
+    wet_wells: Mapping[NodeId, WetWell | Fields] | None = None,
+    pump_stations: Mapping[NodeId, PumpStation | Fields] | None = None,
+    default_pump: Pump | Fields | None = None,
+    force_main_roughness: float | Mapping[str, Any] | Callable[..., float | None] | None = None,
+    force_main_roughness_by_pipe: Mapping[PipeId, float] | None = None,
+    force_main_surcharge_depth: float = 100.0,
+    dwf: Mapping[NodeId, float] | None = None,
+    patterns: Mapping[str, Any] | None = None,
+    dwf_patterns: str | Sequence[str] | Mapping[NodeId, str | Sequence[str]] | None = None,
+    wet_well_defaults: Mapping[str, float] | None = None,
+    force_main_checks: Mapping[str, Any] | None = None,
+    flow_units: str = "LPS",
+    **fills: Any,
+) -> SwmmModel:
     """The :class:`SwmmModel` of a subnetwork.
 
     Gaps in the data are found, and filled as the fill options say, by
@@ -703,7 +723,14 @@ def build_model(
     return model
 
 
-def write_inp(subnetwork, path, outfalls=None, template_path=None, dead_ends="raise", **options):
+def write_inp(
+    subnetwork: Subnetwork,
+    path: StrPath,
+    outfalls: Outfalls | None = None,
+    template_path: StrPath | None = None,
+    dead_ends: str = "raise",
+    **options: Any,
+) -> SwmmModel:
     """Write a subnetwork to a SWMM .inp file.
 
     The template is checked with :func:`check_template` and the subnetwork with

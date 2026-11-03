@@ -1,5 +1,7 @@
 """The SWMM records of a model and their rendering into an .inp template."""
 
+from __future__ import annotations
+
 import numbers
 from dataclasses import dataclass, field
 
@@ -158,13 +160,13 @@ class SwmmModel:
     data_gaps: pd.DataFrame | None = None
     derived: list = field(default_factory=list)
 
-    def derived_report(self):
+    def derived_report(self) -> pd.DataFrame:
         """DataFrame of :attr:`derived`, one row per value (element, id, attribute, value, rule,
         basis)."""
         columns = ["element", "id", "attribute", "value", "rule", "basis"]
         return pd.DataFrame([vars(d) for d in self.derived], columns=columns)
 
-    def sections(self):
+    def sections(self) -> dict[str, str]:
         """{placeholder: text} for every placeholder in :data:`TEMPLATE_PLACEHOLDERS`.
 
         Fields are padded into columns for readability, but always separated by at least one
@@ -287,7 +289,7 @@ class SwmmModel:
             ),
         }
 
-    def render(self, template):
+    def render(self, template: str) -> str:
         """The text of ``template`` with its placeholders filled."""
         for name, text in self.sections().items():
             template = template.replace(f"{{{name}}}", text)

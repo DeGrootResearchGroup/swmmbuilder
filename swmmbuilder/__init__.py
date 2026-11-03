@@ -1,3 +1,4 @@
+from ._types import NodeId, PipeId
 from .diagnostics import DataWarning, DesignWarning, OptionWarning, SwmmBuilderWarning
 from .network import Network, strip_leading_zeros
 from .schema import (
@@ -27,7 +28,9 @@ __all__ = [
     "Derived",
     "DesignWarning",
     "Network",
+    "NodeId",
     "OptionWarning",
+    "PipeId",
     "Pump",
     "PumpStation",
     "Schema",

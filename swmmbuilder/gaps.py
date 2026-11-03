@@ -21,14 +21,25 @@ The gap kinds (:data:`GAP_KINDS`):
 (:data:`BLOCKING_GAPS`); a pipe end with no invert is attached to its node with no offset.
 """
 
+from __future__ import annotations
+
 import heapq
 import logging
 import warnings
+from collections.abc import Mapping
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 import pandas as pd
 
 from .diagnostics import OptionWarning
+
+if TYPE_CHECKING:
+    from collections.abc import Callable, Iterable
+    from typing import Any
+
+    from ._types import NodeId, PipeId
+    from .subnetwork import Subnetwork
 
 logger = logging.getLogger(__name__)
 
@@ -181,7 +192,7 @@ class FilledData:
     report: pd.DataFrame
 
     @property
-    def remaining(self):
+    def remaining(self) -> pd.DataFrame:
         """The rows of ``report`` with a gap in :data:`BLOCKING_GAPS` that was not filled."""
         report = self.report
         return report[report["gap"].isin(BLOCKING_GAPS) & report["filled_from"].isna()]
@@ -213,16 +224,16 @@ def _pipe_gaps(pipe):
 
 
 def fill_gaps(
-    subnetwork,
-    pumps=(),
-    height_correction=None,
-    size_overrides=None,
-    shape_codes=None,
-    size_fill=None,
-    invert_fill=None,
-    headwater_slope=None,
-    force_main_discharge=None,
-):
+    subnetwork: Subnetwork,
+    pumps: Iterable[PipeId] = (),
+    height_correction: Mapping[NodeId, float] | None = None,
+    size_overrides: Mapping[PipeId, float | Mapping[str, Any]] | None = None,
+    shape_codes: Mapping[str, str] | None = None,
+    size_fill: str | None = None,
+    invert_fill: str | None = None,
+    headwater_slope: float | None = None,
+    force_main_discharge: Mapping[str, float] | Callable[..., float] | None = None,
+) -> FilledData:
     """Find every gap in a subnetwork's pipes and node inverts, and fill those the rules cover.
 
     The fills are made in this order, each logged and recorded in the report: overrides
@@ -297,7 +308,7 @@ def fill_gaps(
         for _, p in pipes.iterrows()
         for gap, detail in _pipe_gaps(p)
     }
-    fills = {}
+    fills: dict[tuple, tuple] = {}
 
     def record(element, element_id, gap, rule, value, source=""):
         fills[(element, element_id, gap)] = (rule, value, source, len(fills) + 1)
@@ -313,7 +324,7 @@ def fill_gaps(
 
     for pipe_id, value in subnetwork.match_pipes(size_overrides or {}, "size_overrides").items():
         i = by_id[pipe_id]
-        values = {"diameter": value} if not hasattr(value, "items") else dict(value)
+        values = dict(value) if isinstance(value, Mapping) else {"diameter": value}
         unknown = sorted(set(values) - set(SECTION_COLUMNS))
         if unknown:
             raise ValueError(
@@ -328,9 +339,10 @@ def fill_gaps(
         if not before - after:
             logger.info("Pipe %s: cross-section set by size_overrides: %s", pipe_id, values)
 
+    shape_codes = shape_codes or {}
     for i, pipe in pipes.iterrows():
         code = _code_key(pipe["shape_code"])
-        if pd.isna(pipe["shape"]) and code in (shape_codes or {}):
+        if pd.isna(pipe["shape"]) and code in shape_codes:
             pipes.at[i, "shape"] = shape_codes[code]
             record(
                 "pipe",

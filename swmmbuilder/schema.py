@@ -61,17 +61,23 @@ Schemas can be written in TOML (see :meth:`Schema.from_toml`); the presets (:dat
 ``swmmbuilder/schemas``.
 """
 
+from __future__ import annotations
+
 import tomllib
 import warnings
 from dataclasses import dataclass, field, fields
 from importlib import resources
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import geopandas as gpd
 import pandas as pd
 
 from .design import check_design_rule
 from .diagnostics import DataWarning
+
+if TYPE_CHECKING:
+    from ._types import StrPath
 
 # Canonical columns, in the order they are written.
 CANONICAL_COLUMNS = (
@@ -514,7 +520,7 @@ def _preset(name):
     return Schema.from_toml(resources.files("swmmbuilder") / "schemas" / f"{name}.toml")
 
 
-def as_schema(schema):
+def as_schema(schema: Schema | StrPath) -> Schema:
     """A :class:`Schema`, or one read from a TOML file path."""
     return schema if isinstance(schema, Schema) else Schema.from_toml(schema)
 

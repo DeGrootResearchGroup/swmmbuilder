@@ -1,14 +1,26 @@
 """Web-tile basemaps under a static plot."""
 
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 import geopandas as gpd
 
 from ._deps import _optional
 from .crs import plot_crs
 
+if TYPE_CHECKING:
+    from typing import Any
+
+    from matplotlib.axes import Axes
+
+    from ..network import Network
+    from ..subnetwork import Subnetwork
+
 
 def add_basemap(
-    ax,
-    net,
+    ax: Axes,
+    net: Network | Subnetwork,
     source=None,
     *,
     layer=None,
@@ -18,7 +30,7 @@ def add_basemap(
     crs=None,
     zorder=0,
     **kwargs,
-):
+) -> Any:
     """Draw a basemap beneath what is on ``ax``: web tiles, or a vector layer for offline and
     publication use. The extent of the axes is kept.
 

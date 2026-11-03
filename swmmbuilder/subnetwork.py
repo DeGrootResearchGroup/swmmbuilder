@@ -1,13 +1,30 @@
 """A subnetwork: a selection of nodes of a :class:`~swmmbuilder.Network` and the pipes between
 them."""
 
+from __future__ import annotations
+
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import networkx as nx
 
 from . import gaps, swmm
 from .geometry import node_positions, to_geodataframe
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable, Mapping
+    from typing import Any, TypeVar
+
+    import geopandas as gpd
+    import pandas as pd
+
+    from ._types import NodeId, Outfalls, PipeId, StrPath, Values
+    from .network import Network
+    from .schema import Schema
+    from .swmm.records import SwmmModel
+
+    V = TypeVar("V")
 
 
 @dataclass
@@ -72,7 +89,7 @@ class TopologyReport:
     data_gaps: dict = field(default_factory=dict)
 
     @property
-    def is_dendritic(self):
+    def is_dendritic(self) -> bool:
         """True when the network has no splits and no cycles, as kinematic-wave routing requires."""
         return not self.splits and not self.cycles
 
@@ -108,7 +125,7 @@ class Subnetwork:
         If a node is not in the network.
     """
 
-    def __init__(self, network, nodes):
+    def __init__(self, network: Network, nodes: Iterable[NodeId]) -> None:
         nodes = sorted({network.resolve(n) for n in nodes})
         network.check_nodes(nodes)
         self._network = network
@@ -123,11 +140,11 @@ class Subnetwork:
             if down in selected
         )
         self._ends = {pipe: (up, down) for up, down, pipe in self.graph.edges(keys=True)}
-        self._by_text = None
-        self._pipes_by_text = None
+        self._by_text: dict[str, NodeId] | None = None
+        self._pipes_by_text: dict[str, PipeId] | None = None
 
     @classmethod
-    def from_node_list(cls, network, path):
+    def from_node_list(cls, network: Network, path: StrPath) -> Subnetwork:
         """The subnetwork of ``network`` whose nodes are listed in a file written by
         :meth:`to_node_list`. Blank lines and lines starting with '#' are ignored."""
         lines = (line.strip() for line in Path(path).read_text().splitlines())
@@ -139,7 +156,7 @@ class Subnetwork:
             (known.get(line, line) for line in lines if line and not line.startswith("#")),
         )
 
-    def to_node_list(self, path):
+    def to_node_list(self, path: StrPath) -> None:
         """Write the nodes to a text file, one per line, in sorted order.
 
         :meth:`from_node_list` rebuilds the same subnetwork from this file.
@@ -148,7 +165,7 @@ class Subnetwork:
         Path(path).write_text("\n".join(lines) + "\n")
 
     @property
-    def network(self):
+    def network(self) -> Network:
         if self._network.version != self._version:
             raise RuntimeError(
                 "This subnetwork is out of date: its network changed since it was made (e.g. "
@@ -158,11 +175,11 @@ class Subnetwork:
         return self._network
 
     @property
-    def nodes(self):
+    def nodes(self) -> list[NodeId]:
         """The node IDs, sorted."""
         return list(self.graph.nodes)
 
-    def match_node(self, key):
+    def match_node(self, key: Any) -> Any:
         """The node ID that an option key names, tried in this order: ``key`` itself if it is a
         node; the node it resolves to through the network's ``normalize_ids`` and snap aliases
         (see :meth:`Network.resolve`); the node whose ID has the same text as either (so
@@ -175,19 +192,20 @@ class Subnetwork:
             return resolved
         if self._by_text is None:
             self._by_text = {str(n): n for n in self.graph}
+        by_text = self._by_text
         for candidate in (key, resolved):
-            if str(candidate) in self._by_text:
-                return self._by_text[str(candidate)]
+            if str(candidate) in by_text:
+                return by_text[str(candidate)]
         return key
 
-    def in_network(self, key):
+    def in_network(self, key: Any) -> bool:
         """True if ``key`` names a node of the whole network (see :meth:`match_node`)."""
         network = self.network
         if key in network.graph or network.resolve(key) in network.graph:
             return True
         return str(key) in {str(n) for n in network.graph}
 
-    def match_nodes(self, mapping, option):
+    def match_nodes(self, mapping: Mapping[Any, V], option: str) -> dict[Any, V]:
         """``mapping`` with its keys replaced by :meth:`match_node`.
 
         Raises
@@ -195,7 +213,8 @@ class Subnetwork:
         ValueError
             If two keys name the same node with different values.
         """
-        matched, clashes = {}, []
+        matched: dict[Any, V] = {}
+        clashes: list[str] = []
         for key, value in mapping.items():
             node = self.match_node(key)
             if node in matched and matched[node] != value:
@@ -205,7 +224,7 @@ class Subnetwork:
             raise ValueError(f"{option}: nodes given more than once: {', '.join(clashes)}")
         return matched
 
-    def match_pipe(self, key):
+    def match_pipe(self, key: Any) -> Any:
         """The pipe ID that an option key names: ``key`` itself if it is a pipe of the
         subnetwork, else the pipe whose ID has the same text (so ``1010`` and ``'1010'`` name the
         same pipe), else ``key`` unchanged."""
@@ -213,9 +232,12 @@ class Subnetwork:
             return key
         if self._pipes_by_text is None:
             self._pipes_by_text = {str(p): p for p in self._ends}
-        return self._pipes_by_text.get(str(key), key)
+        by_text = self._pipes_by_text
+        return by_text.get(str(key), key)
 
-    def match_pipes(self, mapping, option, unknown="raise"):
+    def match_pipes(
+        self, mapping: Mapping[Any, V], option: str, unknown: str = "raise"
+    ) -> dict[Any, V]:
         """``mapping`` with its keys replaced by :meth:`match_pipe`.
 
         Parameters
@@ -234,7 +256,9 @@ class Subnetwork:
             If a key names no pipe of the subnetwork (with ``unknown='raise'``), or two keys
             name the same pipe with different values.
         """
-        matched, clashes, missing = {}, [], []
+        matched: dict[Any, V] = {}
+        clashes: list[str] = []
+        missing: list[str] = []
         for key, value in mapping.items():
             pipe = self.match_pipe(key)
             if pipe not in self._ends:
@@ -250,22 +274,24 @@ class Subnetwork:
         return matched
 
     @property
-    def schema(self):
+    def schema(self) -> Schema:
         return self.network.schema
 
     @property
-    def outfalls(self):
+    def outfalls(self) -> list[NodeId]:
         """The nodes whose node type is ``'outfall'``, sorted: the default outfalls of
         :meth:`validate` and :meth:`to_inp`."""
         return [n for n, t in self.graph.nodes(data="node_type") if t == "outfall"]
 
-    def pipes(self):
+    def pipes(self) -> gpd.GeoDataFrame:
         """The rows of ``network.full_data`` of the pipes in the subnetwork, sorted by pipe_id."""
         data = self.network.full_data
         ids = {key for _, _, key in self.graph.edges(keys=True)}
         return data[data["pipe_id"].isin(ids)].sort_values("pipe_id")
 
-    def node_positions(self, nodes=None):
+    def node_positions(
+        self, nodes: Iterable[NodeId] | None = None
+    ) -> dict[NodeId, tuple[float, float]]:
         """Unscaled (x, y) position of each node (default: every node), from the pipe geometry.
 
         A node is placed at the upstream end of a pipe of the network leaving it or, if no pipe
@@ -273,7 +299,9 @@ class Subnetwork:
         """
         return node_positions(self.network.full_data, self.nodes if nodes is None else nodes)
 
-    def to_geodataframe(self, kind="pipes", values=None):
+    def to_geodataframe(
+        self, kind: str = "pipes", values: Values | None = None
+    ) -> gpd.GeoDataFrame:
         """The subnetwork's pipes or nodes as a GeoDataFrame; see
         :meth:`Network.to_geodataframe`."""
         return to_geodataframe(self.pipes(), self.network.nodes.loc[self.nodes], kind, values)
@@ -282,7 +310,7 @@ class Subnetwork:
         up, down = self._ends[pipe]
         return self.graph.edges[up, down, pipe].get("structure_type") == "force_main"
 
-    def force_main_outlets(self, node):
+    def force_main_outlets(self, node: NodeId) -> list[PipeId]:
         """Sorted pipe IDs of the force mains leaving ``node``."""
         return sorted(
             pipe
@@ -292,7 +320,13 @@ class Subnetwork:
             if structure == "force_main"
         )
 
-    def force_main_chain(self, pipe, outfalls=None, through_joins=False, stations=None):
+    def force_main_chain(
+        self,
+        pipe: PipeId,
+        outfalls: Iterable[NodeId] | None = None,
+        through_joins: bool = False,
+        stations: Iterable[NodeId] | None = None,
+    ) -> tuple[list[PipeId], NodeId, str | None]:
         """The force main that starts with ``pipe``, followed downstream.
 
         A force main is often a chain of several GIS pipes. The chain continues through every node
@@ -350,7 +384,7 @@ class Subnetwork:
             pipes.append(outlets[0])
             node = self._ends[outlets[0]][1]
 
-    def validate(self, outfalls=None):
+    def validate(self, outfalls: Iterable[NodeId] | None = None) -> TopologyReport:
         """Check the topology before the subnetwork is written to an .inp file.
 
         Parameters
@@ -371,7 +405,7 @@ class Subnetwork:
         report = TopologyReport()
 
         for node in self.nodes:
-            outlets = {}
+            outlets: dict[NodeId, list[PipeId]] = {}
             for _, down, pipe in self.graph.out_edges(node, keys=True):
                 outlets.setdefault(down, []).append(pipe)
             pipes = sorted(p for down in outlets for p in outlets[down])
@@ -430,7 +464,7 @@ class Subnetwork:
         report.data_gaps = {gap: int(counts[gap]) for gap in gaps.GAP_KINDS if gap in counts}
         return report
 
-    def data_gaps(self, **fills):
+    def data_gaps(self, **fills: Any) -> pd.DataFrame:
         """Every gap in the data of the subnetwork, and how the fill rules would fill it.
 
         A gap is a pipe with an unknown or missing shape code or a missing size, a pipe end with
@@ -457,7 +491,7 @@ class Subnetwork:
             fills["pumps"] = swmm.resolve_pumps(self, fills["pumps"])
         return gaps.fill_gaps(self, **fills).report
 
-    def to_inp(self, path, outfalls=None, **options):
+    def to_inp(self, path: StrPath, outfalls: Outfalls | None = None, **options: Any) -> SwmmModel:
         """Write the subnetwork to a SWMM .inp file; see :func:`swmmbuilder.swmm.write_inp`.
 
         Returns

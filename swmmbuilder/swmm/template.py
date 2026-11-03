@@ -1,12 +1,20 @@
 """.inp templates: reading and checking them, their options, and the topology they
 accept."""
 
+from __future__ import annotations
+
 import re
 from importlib import resources
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from ..diagnostics import Problems
 from ..units import SI_FLOW_UNITS
+
+if TYPE_CHECKING:
+    from importlib.resources.abc import Traversable
+
+    from .._types import StrPath
 
 # Placeholders that SwmmModel.render fills in the template.
 TEMPLATE_PLACEHOLDERS = (
@@ -24,12 +32,12 @@ TEMPLATE_PLACEHOLDERS = (
 )
 
 
-def default_template_path():
+def default_template_path() -> Traversable:
     """Path-like (Traversable) to the SI template shipped with the package."""
     return resources.files("swmmbuilder") / "templates" / "template.inp"
 
 
-def read_template(path=None):
+def read_template(path: StrPath | None = None) -> str:
     """Text of the .inp template at ``path`` (default: :func:`default_template_path`)."""
     if path is None:
         return default_template_path().read_text()
@@ -38,7 +46,7 @@ def read_template(path=None):
     return Path(path).read_text()
 
 
-def check_template(content):
+def check_template(content: str) -> None:
     """Check that a .inp template is one the writer can fill.
 
     Parameters
@@ -73,19 +81,19 @@ def check_template(content):
         )
 
 
-def template_flow_units(template):
+def template_flow_units(template: str) -> str | None:
     """FLOW_UNITS of the text of an .inp template, upper case; None if it is not set."""
     match = re.search(r"^\s*FLOW_UNITS\s+(\S+)", template, re.MULTILINE | re.IGNORECASE)
     return match.group(1).upper() if match else None
 
 
-def template_routing(template):
+def template_routing(template: str) -> str:
     """FLOW_ROUTING of the text of an .inp template; SWMM's default, KINWAVE, if it is not set."""
     match = re.search(r"^\s*FLOW_ROUTING\s+(\w+)", template, flags=re.MULTILINE | re.IGNORECASE)
     return match.group(1).upper() if match else "KINWAVE"
 
 
-def template_force_main_equation(template):
+def template_force_main_equation(template: str) -> str:
     """FORCE_MAIN_EQUATION of the text of an .inp template; SWMM's default, H-W, if it is not
     set."""
     match = re.search(

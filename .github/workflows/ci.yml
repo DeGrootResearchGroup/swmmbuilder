@@ -41,6 +41,29 @@ jobs:
       - name: Run ruff format --check
         run: ruff format --check swmmbuilder tests
 
+  # ---- Type check: mypy on the package (configuration in pyproject.toml) ---------------------
+  typecheck:
+    name: typecheck (mypy)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+
+      - name: Install package and mypy
+        run: |
+          python -m pip install --upgrade pip
+          pip install ".[typecheck]"
+
+      - name: Run mypy
+        run: mypy swmmbuilder
+
   # ---- Tests: one unsharded job per Python version -----------------------------------------
   tests:
     name: tests (py${{ matrix.python-version }})
@@ -110,15 +133,15 @@ jobs:
   # every test job passed.
   gate:
     name: CI gate
-    needs: [lint, tests, gallery]
+    needs: [lint, typecheck, tests, gallery]
     if: always()
     runs-on: ubuntu-latest
     steps:
-      - name: Require lint, all test jobs and the gallery to pass
+      - name: Require lint, the type check, all test jobs and the gallery to pass
         run: |
           status=0
-          for pair in "lint=${{ needs.lint.result }}" "tests=${{ needs.tests.result }}" \
-                      "gallery=${{ needs.gallery.result }}"; do
+          for pair in "lint=${{ needs.lint.result }}" "typecheck=${{ needs.typecheck.result }}" \
+                      "tests=${{ needs.tests.result }}" "gallery=${{ needs.gallery.result }}"; do
             job="${pair%%=*}"; result="${pair#*=}"
             echo "$job result: $result"
             if [ "$result" != "success" ]; then
