@@ -9,6 +9,11 @@ earlier history is in the git log.
 
 ## [Unreleased]
 
+### Added
+
+- Releases are published to PyPI from GitHub releases (`publish.yml`, trusted publishing), and the
+  README installs from PyPI.
+
 ## [0.1.0] - 2026-11-03
 
 ### Added
