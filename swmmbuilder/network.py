@@ -169,6 +169,10 @@ class Network:
 
     snap_report : pandas.DataFrame or None
         The report of :meth:`snap_nodes` if ``snap_tolerance`` was given.
+
+    version : int
+        Bumped each time the graph is rebuilt (by :meth:`snap_nodes`); subnetworks made from
+        an older version raise when used.
     """
 
     def __init__(
@@ -291,7 +295,12 @@ class Network:
         return pd.concat(frames, ignore_index=True)
 
     def _build(self):
-        """(Re)build ``graph`` and ``nodes`` from ``full_data`` and the node layers."""
+        """(Re)build ``graph`` and ``nodes`` from ``full_data`` and the node layers.
+
+        Each rebuild bumps ``version``, so that subnetworks made before it can tell they are
+        out of date (see :attr:`Subnetwork.network`).
+        """
+        self.version = getattr(self, "version", 0) + 1
         self.graph = self._build_graph(self.full_data)
         self.nodes = self._build_nodes()
         attrs = self.nodes.drop(columns="geometry").to_dict("index")
@@ -375,6 +384,10 @@ class Network:
         rules hold for each merged group as a whole: a pair is not merged if that would put two
         nodes joined by a pipe, or two inverts more than ``max_invert_difference`` apart, into
         one group. Merged IDs are kept in ``aliases``, so either ID can be used.
+
+        Snapping changes the network in place: subnetworks made before a snap that merges
+        nodes are out of date and raise when used (rebuild them with :meth:`subnetwork`). Prefer
+        ``snap_tolerance`` when loading, which snaps before any subnetwork exists.
 
         Parameters
         ----------
