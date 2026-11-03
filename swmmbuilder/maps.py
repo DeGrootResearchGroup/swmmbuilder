@@ -22,6 +22,7 @@ with ``pip install 'swmmbuilder[maps]'``.
 
 import importlib
 import logging
+import math
 import os
 import warnings
 import weakref
@@ -92,17 +93,43 @@ def lonlat_positions(subnetwork):
 
 
 def plot_crs(net, crs=None):
-    """The CRS the static plots of ``net`` are drawn in.
+    """The CRS the static plots of ``net`` are drawn in, always projected in metres, so that the
+    scale bar, buffers, footprints and ribbon widths are in metres.
 
-    ``crs`` if given; otherwise the network's CRS if it is projected, or else the UTM zone of the
-    whole network (a network with no CRS is taken to be in longitude/latitude).
+    ``crs`` if given; otherwise the network's CRS if it is projected in metres, or else (a
+    geographic CRS, or one in feet) the UTM zone of the whole network. A network with no CRS is
+    taken to be in longitude/latitude.
+
+    Raises
+    ------
+    ValueError
+        If ``crs`` is not projected in metres, or the network has no CRS and its coordinates
+        cannot be longitude/latitude.
     """
     if crs is not None:
-        return CRS.from_user_input(crs)
+        crs = CRS.from_user_input(crs)
+        if not _in_metres(crs):
+            raise ValueError(
+                f"The plot CRS must be projected in metres, not {crs.name} "
+                f"({'geographic' if crs.is_geographic else crs.axis_info[0].unit_name})."
+            )
+        return crs
     data = _network(net).full_data
-    if data.crs is not None and CRS.from_user_input(data.crs).is_projected:
+    if data.crs is not None and _in_metres(CRS.from_user_input(data.crs)):
         return CRS.from_user_input(data.crs)
+    if data.crs is None:
+        xmin, ymin, xmax, ymax = data.total_bounds
+        if not (-180 <= xmin <= xmax <= 180 and -90 <= ymin <= ymax <= 90):
+            raise ValueError(
+                "The network has no CRS, and its coordinates are not longitude/latitude; set "
+                "the schema's crs (or the GIS file's) to the CRS of the data."
+            )
     return _with_crs(data).estimate_utm_crs()
+
+
+def _in_metres(crs):
+    """True if ``crs`` is projected with axes in metres."""
+    return crs.is_projected and math.isclose(crs.axis_info[0].unit_conversion_factor, 1.0)
 
 
 def _network(net):
