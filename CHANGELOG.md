@@ -4,7 +4,10 @@ Notable changes to swmmbuilder. The format follows [Keep a Changelog](https://ke
 and the project uses [semantic versioning](https://semver.org/) (before 1.0, a minor version may
 change the API). Numbers in parentheses are pull requests.
 
-## [0.3.0] - Unreleased
+No version has been released yet. The changes below are those since the restructuring began
+(#24); when the first version is tagged, its number and date replace "Unreleased".
+
+## [Unreleased]
 
 ### Added
 
