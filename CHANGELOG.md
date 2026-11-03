@@ -80,5 +80,5 @@ earlier history is in the git log.
 
 - `maps.generate_gmap`; use `maps.to_leaflet` (#36).
 
-[Unreleased]: https://github.com/DeGrootResearchGroup/SewerNetworkx/compare/v0.1.0...HEAD
-[0.1.0]: https://github.com/DeGrootResearchGroup/SewerNetworkx/releases/tag/v0.1.0
+[Unreleased]: https://github.com/DeGrootResearchGroup/swmmbuilder/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/DeGrootResearchGroup/swmmbuilder/releases/tag/v0.1.0
