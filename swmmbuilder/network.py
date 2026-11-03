@@ -309,8 +309,10 @@ class Network:
         projected to the local UTM zone) is merged into one ID, preferring an ID in the
         maintenance-hole layer, then one in another node layer, then the smallest. Pairs whose
         inverts differ by more than ``max_invert_difference`` (pipes that cross rather than join)
-        and pairs already joined by a pipe are not merged. Merged IDs are kept in ``aliases``, so
-        either ID can be used.
+        and pairs already joined by a pipe are not merged. Since merging is transitive, both
+        rules hold for each merged group as a whole: a pair is not merged if that would put two
+        nodes joined by a pipe, or two inverts more than ``max_invert_difference`` apart, into
+        one group. Merged IDs are kept in ``aliases``, so either ID can be used.
 
         Parameters
         ----------
@@ -344,13 +346,22 @@ class Network:
         )
         ids = list(present.index)
         inverts = self.nodes["invert"]
-        pairs, parent = [], {}
+        pairs, parent, members = [], {}, {}
 
         def root(node):
             while parent.get(node, node) != node:
                 node = parent[node]
             return node
 
+        def group(node):
+            return members.get(root(node), {node})
+
+        def neighbours(node):
+            return set(self.graph.successors(node)) | set(self.graph.predecessors(node))
+
+        # The checks apply to the whole merged group, not only to the pair: merging is
+        # transitive, so A~B and B~C would otherwise merge A and C even if a pipe joins them (a
+        # self-loop) or their inverts differ by more than max_invert_difference.
         for i, j in sorted({(i, j) for i, j in zip(left, right, strict=True) if i < j}):
             a, b = sorted((ids[i], ids[j]))
             difference = abs(inverts[a] - inverts[b])
@@ -359,8 +370,23 @@ class Network:
                 reason = "joined by a pipe"
             elif max_invert_difference is not None and not difference <= max_invert_difference:
                 reason = f"inverts differ by more than {max_invert_difference} m"
-            else:
-                parent[root(b)] = root(a)
+            elif root(a) != root(b):
+                merged = group(a) | group(b)
+                spread = inverts[sorted(merged)]
+                if any(neighbours(n) & merged for n in group(a)):
+                    reason = "would merge nodes joined by a pipe"
+                elif max_invert_difference is not None and (
+                    spread.isna().any() or not spread.max() - spread.min() <= max_invert_difference
+                ):
+                    reason = (
+                        "would merge nodes whose inverts differ by more than "
+                        f"{max_invert_difference} m"
+                    )
+                else:
+                    ra, rb = root(a), root(b)
+                    parent[rb] = ra
+                    members[ra] = merged
+                    members.pop(rb, None)
             distance = present[a].distance(present[b]) * metres
             pairs.append((a, b, distance, inverts[a], inverts[b], reason is None, reason))
 

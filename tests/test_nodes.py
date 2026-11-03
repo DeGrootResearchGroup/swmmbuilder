@@ -193,6 +193,68 @@ def test_pairs_joined_by_a_pipe_are_not_merged():
     assert not joined.aliases
 
 
+def _chain(inverts, pipe_a_to_c):
+    """Three nodes A, B, C 0.4 m apart in a row (A~B and B~C within 0.5 m, A~C 0.8 m), each the
+    end of a pipe from far away, plus a pipe A -> C if ``pipe_a_to_c`` (#60)."""
+    from shapely.geometry import LineString
+
+    x0, y0 = 480000.0, 4760000.0
+    xs = {"A": x0, "B": x0 + 0.4, "C": x0 + 0.8}
+    rows = [
+        (
+            i,
+            f"U{n}",
+            n,
+            LineString([(x0 + 50 * i, y0 + 50), (xs[n], y0)]),
+            inverts[n] + 0.5,
+            inverts[n],
+        )
+        for i, n in enumerate("ABC", 1)
+    ]
+    if pipe_a_to_c:
+        rows.append((9, "A", "C", LineString([(xs["A"], y0), (xs["C"], y0)]), 10.0, 9.9))
+    ids, up, down, geometry, us, ds = zip(*rows, strict=True)
+    pipes = gpd.GeoDataFrame(
+        {
+            "OBJECTID": ids,
+            "UpstreamID": up,
+            "DownstreamID": down,
+            "UpstreamInvert": us,
+            "DownstreamInvert": ds,
+            "PipeShape": "R",
+            "Diameter": 300,
+            "FlowType": "SAN",
+        },
+        geometry=list(geometry),
+        crs="EPSG:2958",
+    )
+    return Network(pipes)
+
+
+def test_snapping_does_not_merge_nodes_joined_through_a_chain():
+    # A~B and B~C are each within tolerance and not joined by a pipe, but A -> C is: merging
+    # both pairs would turn pipe 9 into a self-loop A -> A.
+    net = _chain({"A": 10.0, "B": 10.0, "C": 9.9}, pipe_a_to_c=True)
+    report = net.snap_nodes(0.5)
+    assert net.graph.has_edge("A", "C", 9)
+    assert not any(u == v for u, v in net.graph.edges())
+    assert report["snapped"].tolist() == [True, False]
+    assert report.loc[1, "reason"] == "would merge nodes joined by a pipe"
+
+
+def test_snapping_limits_the_invert_spread_of_a_group():
+    # A~B and B~C differ by 0.3 m each, within the 0.5 m limit, but A and C by 0.6 m.
+    net = _chain({"A": 10.0, "B": 10.3, "C": 10.6}, pipe_a_to_c=False)
+    report = net.snap_nodes(0.5, max_invert_difference=0.5)
+    assert report["snapped"].tolist() == [True, False]
+    assert "would merge nodes whose inverts differ" in report.loc[1, "reason"]
+    assert net.aliases == {"B": "A"}
+    # Without the limit, all three merge.
+    net = _chain({"A": 10.0, "B": 10.3, "C": 10.6}, pipe_a_to_c=False)
+    assert net.snap_nodes(0.5)["snapped"].all()
+    assert net.aliases == {"B": "A", "C": "A"}
+
+
 def test_snapping_in_geographic_crs():
     pipes = gpd.read_file(PIPES).to_crs("EPSG:4326")
     net = Network(pipes, snap_tolerance=0.5, max_invert_difference=1.0)
