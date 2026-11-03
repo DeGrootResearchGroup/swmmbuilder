@@ -214,3 +214,55 @@ def test_height_correction_above_pipe_invert_warns(network, tmp_path):
             routing="DYNWAVE",
             height_correction={"J2": 103.55},
         )
+
+
+# ---- Field separation (#57) ----------------------------------------------------------------
+
+# Columns of each section as written: a field that ran into the next one would change the count.
+FIELD_COUNTS = {"JUNCTIONS": 6, "OUTFALLS": 4, "CONDUITS": 9, "XSECTIONS": 7, "COORDINATES": 3}
+
+
+def test_long_names_and_numbers_stay_separate_fields(tmp_path):
+    # Node IDs of 20+ characters (wider than the 16-character name columns) and sizes with a
+    # long float repr (wider than the 16-character geom1 column).
+    from conftest import FIXTURE
+
+    from swmmbuilder import Network
+
+    longer = lambda n: n if not isinstance(n, str) else f"MAINTENANCE_HOLE_{n}_X"  # noqa: E731
+    network = Network(FIXTURE, normalize_ids=longer)
+    sub = network.subnetwork([n for e in DENDRITIC for n in e])  # normalized on lookup
+    pipe = sub.pipes()["pipe_id"].iloc[0]
+    path = write_inp(
+        sub,
+        tmp_path,
+        routing="DYNWAVE",
+        outfalls=(longer("OUT"),),  # to_inp does not normalize node IDs yet (#59)
+        size_overrides={pipe: 0.1 + 0.2},  # 0.30000000000000004
+    )
+    sections = read_sections(path)
+    for section, count in FIELD_COUNTS.items():
+        assert sections[section], section
+        assert {len(row) for row in sections[section]} == {count}, section
+    xs = {row[0]: row for row in sections["XSECTIONS"]}
+    assert xs[str(pipe)][2:4] == ["0.3", "0.0"]
+    assert all(len(row[1]) > 16 for row in sections["CONDUITS"])
+    assert run_swmm(path, tmp_path) == []
+
+
+def test_numbers_are_rounded_and_shortest():
+    from swmmbuilder.swmm import _line
+
+    assert _line(("P1", 4), (0.1 + 0.2, 0), (12 / (1 / 0.0254), 0), (-0.0, 0), (3, 0)) == (
+        "P1   0.3 0.3048 0.0 3\n"
+    )
+    assert _line(("A", 0), (245.123456789, 0)) == "A 245.123457\n"
+
+
+@pytest.mark.parametrize("name", ["MH 12", "MH\t12", "MH;12", ""])
+def test_names_swmm_cannot_read_are_refused(name):
+    from swmmbuilder import swmm
+
+    model = swmm.SwmmModel(junctions=[swmm.Junction(name, 100.0, 0.0, 0.0, 0.0, 0.0)])
+    with pytest.raises(ValueError, match="whitespace or ';'"):
+        model.sections()
