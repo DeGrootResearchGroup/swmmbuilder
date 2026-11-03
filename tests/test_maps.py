@@ -700,13 +700,13 @@ def test_a_shared_normalize_is_not_changed(sub):
 def test_leaflet_degenerate_values(sub, tmp_path, monkeypatch, fill, norm, legend):
     pytest.importorskip("folium")
     legends = []
-    original = maps._colour_legend
+    original = maps.export._colour_legend
 
     def record(m, cmap, n, caption):
         legends.append((n.vmin, n.vmax))
         original(m, cmap, n, caption)
 
-    monkeypatch.setattr(maps, "_colour_legend", record)
+    monkeypatch.setattr(maps.export, "_colour_legend", record)  # where _add_pipes looks it up
     ids = sub.to_geodataframe("pipes").index
     layer = maps.PipeLayer(pd.Series(fill, index=ids), norm=norm, missing_color="#bbbbbb")
     maps.to_leaflet(sub, tmp_path / "map.html", [layer], tiles=None)
@@ -835,3 +835,25 @@ def test_to_geodataframe_nodes_is_a_copy(network):
     assert nodes is not network.nodes
     nodes["extra"] = 1
     assert "extra" not in network.nodes
+
+
+# ---- Package layout (#80) ------------------------------------------------------------------
+
+# Every top-level name of swmmbuilder/maps.py before it became a package.
+FORMER_MAPS_NAMES = """
+logger WGS84 OTHER NEUTRAL_CATEGORIES TABLEAU10 NEUTRAL_COLOR DEFAULT_HATCHES lonlat_positions
+plot_crs _in_metres _network _with_crs _geodata _check_nodes RIBBON_WIDTH MIN_RIBBON_WIDTH
+FOOTPRINT_PIPES FOOTPRINT_EXTENT CONTEXT_COLOR CONTEXT_WIDTH network_extent footprint_distance
+network_footprint _aligned SCALES _scaled _norm _fitted_norm _colour_by _hex_colours
+category_colors DrawnLayer _AXES_STATE _state _cleared _nice_length map_axes _finish _renderer
+add_legends _polygons _path _joined ribbon_strands _stems _merged _direction _half_plane
+mitred_strands _shares_table plot_pipes plot_ribbons node_group_polygons plot_groups
+plot_markers _optional add_basemap PipeLayer GroupLayer MarkerLayer _colour_legend
+_value_colours _add_pipes _add_groups _add_markers to_leaflet to_geojson generate_gmap
+line_coords
+""".split()
+
+
+@pytest.mark.parametrize("name", FORMER_MAPS_NAMES)
+def test_former_maps_names_are_importable(name):
+    assert hasattr(maps, name)
