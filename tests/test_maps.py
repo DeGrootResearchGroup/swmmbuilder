@@ -14,6 +14,7 @@ import pandas as pd
 import pytest
 from conftest import DENDRITIC, FIXTURE, nodes_of, subnetwork, with_pipes
 from matplotlib.collections import LineCollection, PatchCollection
+from matplotlib.colors import to_hex
 from mpl_toolkits.axes_grid1.anchored_artists import AnchoredSizeBar
 from pyproj import CRS
 from shapely import LineString, Point, Polygon
@@ -625,6 +626,96 @@ def test_add_basemap_without_contextily(ax, sub, monkeypatch):
     monkeypatch.setitem(sys.modules, "contextily", None)
     with pytest.raises(ImportError, match=r"\[maps\]"):
         maps.add_basemap(ax, sub)
+
+
+# ---- Degenerate values (#63) ------------------------------------------------------------------
+
+
+def test_scaled_all_zero_is_the_low_end():
+    zeros = np.zeros(3)
+    for scale in ("linear", "sqrt"):
+        assert maps._scaled(zeros, (0.5, 4), scale) == pytest.approx([0.5] * 3)
+    # Equal positive values are all the largest value: the high end.
+    assert maps._scaled(np.full(2, 3.0), (0.5, 4), "linear") == pytest.approx([4, 4])
+    assert maps._scaled(np.full(2, 3.0), (0.5, 4), "log") == pytest.approx([4, 4])
+
+
+def _pipe_colours(ax, layer):
+    ax.figure.canvas.draw()
+    return [to_hex(c) for c in layer.artist.get_colors()]
+
+
+@pytest.mark.parametrize(
+    "fill, norm",
+    [(np.nan, "linear"), (np.nan, "log"), (0.0, "log"), (-2.0, "log")],
+    ids=["all-nan", "all-nan-log", "all-zero-log", "all-negative-log"],
+)
+def test_no_colourable_value_draws_missing_and_no_colour_bar(ax, sub, fill, norm):
+    ids = sub.to_geodataframe("pipes").index
+    layer = maps.plot_pipes(
+        ax, sub, pd.Series(fill, index=ids), norm=norm, missing_color="#bbbbbb", legend=True
+    )
+    assert layer.mappable is None and layer.colorbar is None
+    assert set(_pipe_colours(ax, layer)) == {"#bbbbbb"}
+
+
+@pytest.mark.parametrize("norm", ["linear", "log"])
+def test_all_equal_values_get_a_colour_bar(ax, sub, norm):
+    ids = sub.to_geodataframe("pipes").index
+    layer = maps.plot_pipes(ax, sub, pd.Series(5.0, index=ids), norm=norm, legend=True)
+    assert layer.colorbar is not None
+    vmin, vmax = layer.mappable.norm.vmin, layer.mappable.norm.vmax
+    assert vmin < 5.0 < vmax
+    assert len(set(_pipe_colours(ax, layer))) == 1
+
+
+def test_zero_widths_and_sizes_are_the_smallest(ax, sub):
+    ids = sub.to_geodataframe("pipes").index
+    layer = maps.plot_pipes(ax, sub, width=pd.Series(0.0, index=ids), width_range=(0.5, 4))
+    assert set(layer.artist.get_linewidths()) == {0.5}
+    markers = maps.plot_markers(ax, sub, ["A1", "J1"], sizes={"A1": 0, "J1": 0})
+    assert set(markers.artist.get_sizes()) == {20.0}
+
+
+def test_a_shared_normalize_is_not_changed(sub):
+    ids = sub.to_geodataframe("pipes").index
+    shared = matplotlib.colors.Normalize()
+    small = pd.Series(np.arange(len(ids)), index=ids)
+    large = 100 * small
+    figs = [plt.subplots() for _ in range(2)]
+    first = maps.plot_pipes(figs[0][1], sub, small, norm=shared)
+    second = maps.plot_pipes(figs[1][1], sub, large, norm=shared)
+    for fig, _ in figs:
+        plt.close(fig)
+    assert shared.vmin is None and shared.vmax is None
+    assert first.mappable.norm.vmax == small.max()
+    assert second.mappable.norm.vmax == large.max()
+
+
+@pytest.mark.parametrize(
+    "fill, norm, legend",
+    [(np.nan, "linear", False), (0.0, "log", False), (5.0, "linear", True), (5.0, "log", True)],
+    ids=["all-nan", "all-zero-log", "all-equal", "all-equal-log"],
+)
+def test_leaflet_degenerate_values(sub, tmp_path, monkeypatch, fill, norm, legend):
+    pytest.importorskip("folium")
+    legends = []
+    original = maps._colour_legend
+
+    def record(m, cmap, n, caption):
+        legends.append((n.vmin, n.vmax))
+        original(m, cmap, n, caption)
+
+    monkeypatch.setattr(maps, "_colour_legend", record)
+    ids = sub.to_geodataframe("pipes").index
+    layer = maps.PipeLayer(pd.Series(fill, index=ids), norm=norm, missing_color="#bbbbbb")
+    maps.to_leaflet(sub, tmp_path / "map.html", [layer], tiles=None)
+    if legend:
+        ((vmin, vmax),) = legends
+        assert vmin < 5.0 < vmax
+    else:
+        assert legends == []
+        assert "#bbbbbb" in (tmp_path / "map.html").read_text()
 
 
 # ---- Interactive export ---------------------------------------------------------------------
