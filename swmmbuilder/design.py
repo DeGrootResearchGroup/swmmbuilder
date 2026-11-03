@@ -8,6 +8,7 @@ from dataclasses import dataclass
 
 import pandas as pd
 
+from .diagnostics import Problems
 from .pumps import Pump, WetWell
 from .units import _FLOW_UNIT_LPS, _is_real
 
@@ -97,7 +98,7 @@ def force_main_roughnesses(pipes, sections, rule, by_pipe=None):
             "Hazen-Williams C, or force_main_roughness_by_pipe)"
         )
     if problems:
-        raise ValueError("Invalid force mains:\n  " + "\n  ".join(problems))
+        raise ValueError(Problems("Invalid force mains", problems).message())
     return found
 
 
@@ -308,7 +309,7 @@ def apply_wet_well_defaults(
                     Derived(element, name, attribute, value, "wet_well_defaults", f"{how}; {basis}")
                 )
     if problems:
-        raise ValueError("wet_well_defaults cannot be applied:\n  " + "\n  ".join(problems))
+        raise ValueError(Problems("wet_well_defaults cannot be applied", problems).message())
     for d in derived:
         logger.info(
             "%s %s: %s = %s from rule %s, not data (%s)",

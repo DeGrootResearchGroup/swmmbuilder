@@ -5,6 +5,7 @@ import re
 from importlib import resources
 from pathlib import Path
 
+from ..diagnostics import Problems
 from ..units import SI_FLOW_UNITS
 
 # Placeholders that SwmmModel.render fills in the template.
@@ -115,7 +116,7 @@ def check_topology(report, routing, dead_ends):
         )
     if not problems:
         return
-    message = "Invalid subnetwork topology:\n  " + "\n  ".join(problems)
+    message = Problems("Invalid subnetwork topology", problems).message()
     if routing != "DYNWAVE" and not report.is_dendritic:
         message += (
             f"\n{routing} routing requires a dendritic network; use a template with "

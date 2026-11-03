@@ -3,6 +3,7 @@
 
 import warnings
 
+from ..diagnostics import OptionWarning, Problems
 from ..pumps import Pump, PumpStation, StationPump, WetWell
 
 
@@ -93,6 +94,7 @@ def resolve_pump_stations(subnetwork, pump_stations, outfalls=(), default_pump=N
                 warnings.warn(
                     f"Pump station {node}: force mains {', '.join(unused)} are not pumped and "
                     "are written as ordinary conduits from the station node.",
+                    OptionWarning,
                     stacklevel=3,
                 )
         if len(chosen) > 1 and station.discharge is None:
@@ -112,12 +114,13 @@ def resolve_pump_stations(subnetwork, pump_stations, outfalls=(), default_pump=N
             chains = {p: subnetwork.force_main_chain(p, outfalls, True, ends)[0] for p in mains}
             links.append(StationPump(name, node, discharge, chains))
     if problems:
-        raise ValueError("Invalid pump stations:\n  " + "\n  ".join(problems))
+        raise ValueError(Problems("Invalid pump stations", problems).message())
     undeclared = sorted(str(n) for n in typed - set(stations) if subnetwork.force_main_outlets(n))
     if undeclared:
         warnings.warn(
             f"Pump-station nodes with force mains not in pump_stations: {', '.join(undeclared)}; "
             "their force mains are written as ordinary conduits.",
+            OptionWarning,
             stacklevel=3,
         )
     return stations, links

@@ -3,6 +3,7 @@
 
 import warnings
 
+from ..diagnostics import DesignWarning, Problems
 from ..units import _FLOW_UNIT_LPS, _TIME_SECONDS, _VOLUME_LITRES, SI_FLOW_UNITS, _is_finite_number
 
 # SWMM time pattern types and their number of multipliers. A pattern given as a plain list of
@@ -61,11 +62,12 @@ def resolve_patterns(patterns):
             warnings.warn(
                 f"Pattern {name}: the mean of the {kind} multipliers is {mean:.3f}, not 1, so the "
                 "mean dry-weather flow is the base flow scaled by it.",
+                DesignWarning,
                 stacklevel=3,
             )
         resolved[name] = (kind, values)
     if problems:
-        raise ValueError("Invalid patterns:\n  " + "\n  ".join(problems))
+        raise ValueError(Problems("Invalid patterns", problems).message())
     return resolved
 
 
@@ -132,7 +134,7 @@ def resolve_dwf_patterns(dwf_patterns, dwf, patterns, subnetwork=None):
             continue
         resolved[node] = names
     if problems:
-        raise ValueError("Invalid dwf_patterns:\n  " + "\n  ".join(problems))
+        raise ValueError(Problems("Invalid dwf_patterns", problems).message())
     return resolved
 
 

@@ -157,10 +157,22 @@ uploads the images as the `maps-gallery` artifact. Web-tile basemaps and `to_lea
 optional `maps` extra (`pip install "swmmbuilder[maps]"`: contextily, xyzservices, folium).
 `generate_gmap` (Google Maps) is deprecated in favour of `to_leaflet`.
 
-## Logging
+## Diagnostics
 
-Progress and data problems (pipes dropped on loading, nodes with no position, height corrections)
-are reported through `logging`, on the `swmmbuilder` logger; nothing is printed. To see them:
+Problems are reported in four ways, by what you can do about them (see
+`swmmbuilder.diagnostics`):
+
+| Channel | When | Examples |
+|---|---|---|
+| `ValueError` | the output would be wrong, or SWMM would refuse it; every problem found by one check is listed in one error | gaps that stop a pipe being written, invalid pumps, flow splits under KINWAVE |
+| `warnings.warn` | the model is written as asked, but suspect data or an option you should act on affects it | `DataWarning`: adverse slopes, a pipe below its node, a rim not above the invert, unknown shape codes; `DesignWarning`: `force_main_checks`, a pattern whose mean is not 1; `OptionWarning`: force mains left unpumped, `height_correction` keys that name no node |
+| `logger.warning` | input dropped or repaired on loading, or problems that do not change the hydraulics | pipes with no ID or length, nodes left out of `[COORDINATES]`, colours repeating in a plot |
+| `logger.info` | an audit trail | values filled by the gap rules or derived by design rules, pipes removed by the filters |
+
+The warning categories derive from `swmmbuilder.SwmmBuilderWarning` (a `UserWarning`), so they
+can be filtered by kind, e.g. `warnings.filterwarnings("ignore", category=swmmbuilder.DataWarning)`
+or turned into errors with `"error"`. The log goes to the `swmmbuilder` logger; nothing is
+printed. To see it:
 
 ```python
 import logging
