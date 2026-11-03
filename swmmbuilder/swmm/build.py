@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import inspect
 import logging
 import warnings
 from collections import Counter
@@ -17,7 +18,7 @@ from ..design import (
     force_main_roughnesses,
     pump_level_problem,
 )
-from ..diagnostics import DataWarning, DesignWarning, Problems
+from ..diagnostics import DataWarning, DesignWarning, Problems, check_options
 from ..gaps import _invert, fill_gaps, height_corrections, lowest_inverts, xsection
 from ..geometry import line_coords
 from ..units import _FLOW_UNIT_LPS
@@ -648,6 +649,7 @@ def build_model(
         or not below its wet well's max depth, a PUMP1 station has no wet well, or an ideal pump
         is not the only outlet link of its inlet node (SWMM's ERROR 134).
     """
+    check_options(fills, BUILD_OPTIONS, "build_model")
     defaults = _Defaults(
         max_depth=max_depth,
         init_depth=init_depth,
@@ -723,6 +725,23 @@ def build_model(
     return model
 
 
+# The fill rules passed on to fill_gaps through **fills, and every option of build_model (so a
+# misspelt option, e.g. size_overide, is named with a suggestion).
+FILL_OPTIONS = tuple(
+    name
+    for name in inspect.signature(fill_gaps).parameters
+    if name not in ("subnetwork", "pumps", "height_correction")
+)
+BUILD_OPTIONS = (
+    *(
+        name
+        for name, parameter in inspect.signature(build_model).parameters.items()
+        if name not in ("subnetwork", "outfalls") and parameter.kind is not parameter.VAR_KEYWORD
+    ),
+    *FILL_OPTIONS,
+)
+
+
 def write_inp(
     subnetwork: Subnetwork,
     path: StrPath,
@@ -770,6 +789,7 @@ def write_inp(
     SwmmModel
         The model that was written.
     """
+    check_options(options, BUILD_OPTIONS, "write_inp")  # before any other work
     if dead_ends not in ("raise", "outfall"):
         raise ValueError("dead_ends must be 'raise' or 'outfall'.")
     template = read_template(template_path)

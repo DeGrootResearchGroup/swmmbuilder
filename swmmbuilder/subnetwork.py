@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING
 import networkx as nx
 
 from . import gaps, swmm
+from .diagnostics import check_options
 from .geometry import node_positions, to_geodataframe
 
 if TYPE_CHECKING:
@@ -487,6 +488,9 @@ class Subnetwork:
             ``filled_from`` (the rule that filled it; NaN if it is not filled), ``value``,
             ``source`` and ``order`` (the order of the fills).
         """
+        check_options(
+            fills, [*swmm.FILL_OPTIONS, "pumps", "height_correction"], "Subnetwork.data_gaps"
+        )
         if "pumps" in fills:
             fills["pumps"] = swmm.resolve_pumps(self, fills["pumps"])
         return gaps.fill_gaps(self, **fills).report

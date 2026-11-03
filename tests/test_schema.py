@@ -282,3 +282,31 @@ def test_schema_is_hashable():
     assert copy == LONDON_ON
     assert hash(copy) == hash(LONDON_ON)
     assert len({LONDON_ON, copy, dataclasses.replace(LONDON_ON, name="other")}) == 2
+
+
+def test_presets_other_than_london_are_read_on_first_use():
+    # Importing swmmbuilder reads only LONDON_ON (Network's default); the others load on first use
+    # and are cached, the same object through swmmbuilder and swmmbuilder.schema (#82).
+    import subprocess
+    import sys
+
+    code = (
+        "import swmmbuilder, swmmbuilder.schema as s\n"
+        "loaded = sorted(n for n in s.LAZY_PRESETS if n in vars(s))\n"
+        "kitchener = swmmbuilder.KITCHENER_ON\n"
+        "print(loaded, kitchener is s.KITCHENER_ON, kitchener.name, 'KITCHENER_ON' in dir(s))\n"
+    )
+    result = subprocess.run(
+        [sys.executable, "-c", code], capture_output=True, text=True, check=True
+    )
+    assert result.stdout.strip() == "[] True Kitchener, ON True"
+
+
+def test_unknown_module_attribute_still_raises():
+    import swmmbuilder
+    import swmmbuilder.schema
+
+    with pytest.raises(AttributeError, match="no attribute 'NOWHERE_ON'"):
+        swmmbuilder.NOWHERE_ON  # noqa: B018
+    with pytest.raises(AttributeError, match="no attribute 'NOWHERE_ON'"):
+        swmmbuilder.schema.NOWHERE_ON  # noqa: B018

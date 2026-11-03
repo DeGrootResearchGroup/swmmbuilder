@@ -528,23 +528,26 @@ def as_schema(schema: Schema | StrPath) -> Schema:
 # London, ON (the default). See swmmbuilder/schemas/london_on.toml.
 LONDON_ON = _preset("london_on")
 
-# Toronto, ON, Sewer Gravity Mains. See swmmbuilder/schemas/toronto_on.toml.
-TORONTO_ON = _preset("toronto_on")
+# The other presets are read on first use (module __getattr__), so that importing swmmbuilder does
+# not read and validate every city's schema: {name: (TOML file stem, description)}.
+LAZY_PRESETS = {
+    "TORONTO_ON": ("toronto_on", "Toronto, ON, Sewer Gravity Mains"),
+    "BARRIE_ON": ("barrie_on", "Barrie, ON, Sanitary Pipes"),
+    "KITCHENER_ON": ("kitchener_on", "Kitchener, ON, Sanitary Pipes"),
+    "PETERBOROUGH_ON": ("peterborough_on", "Peterborough, ON, Sanitary and Storm Sewer Pipes"),
+    "SARNIA_ON": ("sarnia_on", "Sarnia, ON, Sanitary and Storm Sewers"),
+    "WATERLOO_ON": ("waterloo_on", "Waterloo, ON, Sanitary Sewer Gravity Mains"),
+    "WINDSOR_ON": ("windsor_on", "Windsor, ON, Sanitary, Storm and Combined Sewers"),
+}
 
-# Barrie, ON, Sanitary Pipes. See swmmbuilder/schemas/barrie_on.toml.
-BARRIE_ON = _preset("barrie_on")
 
-# Kitchener, ON, Sanitary Pipes. See swmmbuilder/schemas/kitchener_on.toml.
-KITCHENER_ON = _preset("kitchener_on")
+def __getattr__(name: str) -> Schema:
+    """The schema presets other than LONDON_ON, read from swmmbuilder/schemas on first use."""
+    if name in LAZY_PRESETS:
+        schema = globals()[name] = _preset(LAZY_PRESETS[name][0])
+        return schema
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
-# Peterborough, ON, Sanitary and Storm Sewer Pipes. See swmmbuilder/schemas/peterborough_on.toml.
-PETERBOROUGH_ON = _preset("peterborough_on")
 
-# Sarnia, ON, Sanitary and Storm Sewers. See swmmbuilder/schemas/sarnia_on.toml.
-SARNIA_ON = _preset("sarnia_on")
-
-# Waterloo, ON, Sanitary Sewer Gravity Mains. See swmmbuilder/schemas/waterloo_on.toml.
-WATERLOO_ON = _preset("waterloo_on")
-
-# Windsor, ON, Sanitary, Storm and Combined Sewers. See swmmbuilder/schemas/windsor_on.toml.
-WINDSOR_ON = _preset("windsor_on")
+def __dir__() -> list[str]:
+    return sorted([*globals(), *LAZY_PRESETS])

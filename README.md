@@ -23,6 +23,8 @@ pipe keyed by pipe ID, so parallel pipes are kept.
 
 ## Install
 
+What changed between versions is in [CHANGELOG.md](CHANGELOG.md).
+
 ```bash
 pip install -e .                 # from a clone of this repository
 pip install -e ".[maps]"         # + web-tile basemaps and Leaflet maps (contextily, xyzservices, folium)

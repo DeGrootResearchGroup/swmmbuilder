@@ -87,3 +87,27 @@ def test_adverse_slope_is_a_data_warning(network):
         build_model(sub, ["OUT"], height_correction={"A2": 200.0})
     kinds = {type(w.message).__name__ for w in caught if "adverse slope" in str(w.message)}
     assert kinds == {"DataWarning"}
+
+
+# ---- Option names (#82) ---------------------------------------------------------------------
+
+
+def test_misspelt_option_is_named_with_a_suggestion(network, tmp_path):
+    sub = subnetwork(network, DENDRITIC)
+    # write_inp checks the names first, before the topology (which would fail here: J1 splits).
+    with pytest.raises(TypeError, match=r"write_inp: unknown option size_overide \(did you mean"):
+        sub.to_inp(tmp_path / "x.inp", ["OUT"], size_overide={1000: 0.3})
+    with pytest.raises(TypeError, match=r"build_model: unknown options colour, maning_n \(did"):
+        build_model(sub, ["OUT"], maning_n=0.013, colour=1)
+    with pytest.raises(TypeError, match=r"data_gaps: unknown option shape_code \(did you mean"):
+        sub.data_gaps(shape_code={"": "CIRCULAR"})
+
+
+def test_known_options_cover_build_model_and_the_fill_rules():
+    from swmmbuilder.swmm import BUILD_OPTIONS, FILL_OPTIONS
+
+    assert {"size_overrides", "shape_codes", "invert_fill", "force_main_discharge"} <= set(
+        FILL_OPTIONS
+    )
+    assert {"manning_n", "pumps", "dwf", "flow_units", *FILL_OPTIONS} <= set(BUILD_OPTIONS)
+    assert "subnetwork" not in BUILD_OPTIONS and "fills" not in BUILD_OPTIONS
