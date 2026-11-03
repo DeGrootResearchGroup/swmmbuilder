@@ -70,7 +70,7 @@ from pathlib import Path
 import geopandas as gpd
 import pandas as pd
 
-from .swmm import check_design_rule
+from .design import check_design_rule
 
 # Canonical columns, in the order they are written.
 CANONICAL_COLUMNS = (
