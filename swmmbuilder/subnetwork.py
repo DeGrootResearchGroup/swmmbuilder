@@ -120,26 +120,61 @@ class Subnetwork:
             if down in selected
         )
         self._ends = {pipe: (up, down) for up, down, pipe in self.graph.edges(keys=True)}
+        self._by_text = None
 
     @classmethod
     def from_node_list(cls, network, path):
         """The subnetwork of ``network`` whose nodes are listed in a file written by
         :meth:`to_node_list`. Blank lines and lines starting with '#' are ignored."""
         lines = (line.strip() for line in Path(path).read_text().splitlines())
-        return cls(network, (line for line in lines if line and not line.startswith("#")))
+        # The file holds text; map each line back to the node ID it was written from, so that
+        # numeric IDs (e.g. Kitchener's) round-trip.
+        known = {str(n): n for n in [*network.aliases, *network.graph]}
+        return cls(
+            network,
+            (known.get(line, line) for line in lines if line and not line.startswith("#")),
+        )
 
     def to_node_list(self, path):
         """Write the nodes to a text file, one per line, in sorted order.
 
         :meth:`from_node_list` rebuilds the same subnetwork from this file.
         """
-        lines = ["# swmmbuilder node list: one node ID per line", *self.nodes]
+        lines = ["# swmmbuilder node list: one node ID per line", *map(str, self.nodes)]
         Path(path).write_text("\n".join(lines) + "\n")
 
     @property
     def nodes(self):
         """The node IDs, sorted."""
         return list(self.graph.nodes)
+
+    def match_node(self, key):
+        """The node ID that an option key names: ``key`` itself if it is a node, else the node
+        whose ID has the same text (so ``2151735`` and ``'2151735'`` name the same node), else
+        ``key`` unchanged, for the caller to report as not in the subnetwork."""
+        if key in self.graph:
+            return key
+        if self._by_text is None:
+            self._by_text = {str(n): n for n in self.graph}
+        return self._by_text.get(str(key), key)
+
+    def match_nodes(self, mapping, option):
+        """``mapping`` with its keys replaced by :meth:`match_node`.
+
+        Raises
+        ------
+        ValueError
+            If two keys name the same node with different values.
+        """
+        matched, clashes = {}, []
+        for key, value in mapping.items():
+            node = self.match_node(key)
+            if node in matched and matched[node] != value:
+                clashes.append(str(node))
+            matched[node] = value
+        if clashes:
+            raise ValueError(f"{option}: nodes given more than once: {', '.join(clashes)}")
+        return matched
 
     @property
     def schema(self):

@@ -354,7 +354,8 @@ def fill_gaps(
         inverts.update(lowest_inverts(subnetwork.network.full_data, nodes - set(inverts)))
     for node in nodes - set(inverts):
         original[("node", node, "no_node_invert")] = "no invert from any pipe"
-    for node, invert in (height_correction or {}).items():
+    height_correction = subnetwork.match_nodes(height_correction or {}, "height_correction")
+    for node, invert in height_correction.items():
         if node in nodes:
             if node not in inverts:
                 record("node", node, "no_node_invert", "height_correction", float(invert))

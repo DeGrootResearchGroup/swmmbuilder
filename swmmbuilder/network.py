@@ -3,6 +3,7 @@
 
 import logging
 import re
+from collections.abc import Iterable
 from pathlib import Path
 
 import geopandas as gpd
@@ -421,7 +422,7 @@ class Network:
         max_length : float, optional
             Keep only nodes whose shortest upstream path to ``node`` is at most this long, in m.
 
-        outlet : str or list of str, optional
+        outlet : node ID or list of node IDs, optional
             Outlet(s) downstream of ``node``. A shortest path (by length) is added to every listed
             outlet that ``node`` drains to.
 
@@ -446,7 +447,8 @@ class Network:
         selected.add(node)
 
         if outlet is not None:
-            outlets = [outlet] if isinstance(outlet, str) else list(outlet)
+            single = isinstance(outlet, str) or not isinstance(outlet, Iterable)
+            outlets = [outlet] if single else list(outlet)
             outlets = [self.resolve(o) for o in outlets]
             self._check_nodes(outlets)
             reachable = [o for o in sorted(outlets) if nx.has_path(self.graph, node, o)]

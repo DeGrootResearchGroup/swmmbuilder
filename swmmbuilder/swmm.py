@@ -14,7 +14,7 @@ import numbers
 import re
 import warnings
 from collections import Counter
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field, replace
 from importlib import resources
 from numbers import Real
@@ -160,10 +160,11 @@ def check_topology(report, routing, dead_ends):
                 f"node {node} has more than one outlet pipe ({', '.join(map(str, pipes))})"
             )
         for cycle in report.cycles:
-            problems.append(f"cycle {' -> '.join(cycle + cycle[:1])}")
+            problems.append(f"cycle {' -> '.join(map(str, cycle + cycle[:1]))}")
     if dead_ends == "raise" and report.dead_ends:
         problems.append(
-            f"dead ends with no outlet that are not outfalls: {', '.join(report.dead_ends)} "
+            f"dead ends with no outlet that are not outfalls: "
+            f"{', '.join(map(str, report.dead_ends))} "
             "(pass dead_ends='outfall' to write them as outfalls)"
         )
     if not problems:
@@ -304,6 +305,7 @@ def resolve_wet_wells(subnetwork, wet_wells, outfalls=()):
     """
     if not wet_wells:
         return {}
+    wet_wells = subnetwork.match_nodes(wet_wells, "wet_wells")
     missing = sorted(str(n) for n in wet_wells if n not in set(subnetwork.nodes))
     if missing:
         raise ValueError(f"Wet wells not in the subnetwork: {', '.join(missing)}")
@@ -413,6 +415,7 @@ def resolve_pump_stations(subnetwork, pump_stations, outfalls=(), default_pump=N
     """
     if not pump_stations:
         return {}, []
+    pump_stations = subnetwork.match_nodes(pump_stations, "pump_stations")
     nodes = set(subnetwork.nodes)
     taken = {str(n) for n in subnetwork.network.graph.nodes} | {
         str(p) for p in subnetwork.network.full_data["pipe_id"]
@@ -967,6 +970,7 @@ def resolve_dwf(subnetwork, dwf, outfalls=()):
     """
     if not dwf:
         return {}
+    dwf = subnetwork.match_nodes(dwf, "dwf")
     nodes = set(subnetwork.nodes)
     missing = sorted(str(n) for n in dwf if n not in nodes)
     if missing:
@@ -982,7 +986,7 @@ def resolve_dwf(subnetwork, dwf, outfalls=()):
     return {node: float(flow) for node, flow in dwf.items()}
 
 
-def resolve_dwf_patterns(dwf_patterns, dwf, patterns):
+def resolve_dwf_patterns(dwf_patterns, dwf, patterns, subnetwork=None):
     """{node: [pattern names]} from the ``dwf_patterns`` option of :func:`build_model`.
 
     ``dwf_patterns`` is a pattern name or list of names for every node of ``dwf``, or a mapping
@@ -998,6 +1002,8 @@ def resolve_dwf_patterns(dwf_patterns, dwf, patterns):
         return {}
     if isinstance(dwf_patterns, str) or not hasattr(dwf_patterns, "items"):
         dwf_patterns = dict.fromkeys(dwf, dwf_patterns)
+    elif subnetwork is not None:
+        dwf_patterns = subnetwork.match_nodes(dwf_patterns, "dwf_patterns")
     unloaded = sorted(str(n) for n in dwf_patterns if n not in dwf)
     if unloaded:
         raise ValueError(f"dwf_patterns for nodes with no dry-weather flow: {', '.join(unloaded)}")
@@ -1086,6 +1092,7 @@ def node_inverts(subnetwork, height_correction=None):
         If a node has no pipe with an invert.
     """
     nodes = set(subnetwork.nodes)
+    height_correction = subnetwork.match_nodes(height_correction or {}, "height_correction")
     inverts = lowest_inverts(subnetwork.pipes(), nodes)
     if nodes - set(inverts):
         inverts.update(lowest_inverts(subnetwork.network.full_data, nodes - set(inverts)))
@@ -1392,11 +1399,13 @@ def outfall_types(outfalls, subnetwork=None):
     the subnetwork's outfall nodes (:attr:`Subnetwork.outfalls`)."""
     if outfalls is None:
         outfalls = subnetwork.outfalls
-    if isinstance(outfalls, str):
-        return {outfalls: "FREE"}
-    if hasattr(outfalls, "items"):
+    if isinstance(outfalls, str) or not isinstance(outfalls, Iterable):
+        outfalls = {outfalls: "FREE"}
+    elif not hasattr(outfalls, "items"):
+        outfalls = {node: "FREE" for node in outfalls}
+    if subnetwork is None:
         return dict(outfalls)
-    return {node: "FREE" for node in outfalls}
+    return subnetwork.match_nodes(outfalls, "outfalls")
 
 
 def build_model(
@@ -1445,6 +1454,10 @@ def build_model(
         {node: outfall type, e.g. 'FREE'}, or the outfall nodes, which are then FREE. Every other
         node is a junction. Default: the subnetwork's outfall nodes
         (:attr:`Subnetwork.outfalls`), FREE.
+
+        The node keys of this option and of ``height_correction``, ``wet_wells``,
+        ``pump_stations``, ``dwf`` and ``dwf_patterns`` match a node ID exactly or by its text,
+        so ``2151735`` and ``'2151735'`` are the same node (see :meth:`Subnetwork.match_node`).
 
     max_depth, init_depth, surcharge_depth, ponding_area : float
         Junction parameters (default 0.0). A junction whose rim elevation is known (see
@@ -1578,6 +1591,8 @@ def build_model(
     if unknown:
         raise ValueError(f"Outfalls not in the subnetwork: {', '.join(map(str, unknown))}")
     pumps = resolve_pumps(subnetwork, pumps)
+    if height_correction is not None:
+        height_correction = subnetwork.match_nodes(height_correction, "height_correction")
     wet_wells = resolve_wet_wells(subnetwork, wet_wells, outfalls)
     stations, station_pumps = resolve_pump_stations(
         subnetwork, pump_stations, outfalls, default_pump
@@ -1607,7 +1622,7 @@ def build_model(
         )
     dwf = resolve_dwf(subnetwork, dwf, outfalls)
     patterns = resolve_patterns(patterns)
-    dwf_patterns = resolve_dwf_patterns(dwf_patterns, dwf, patterns)
+    dwf_patterns = resolve_dwf_patterns(dwf_patterns, dwf, patterns, subnetwork)
     pipes = subnetwork.pipes()
     inlets = dict(zip(pipes["pipe_id"], pipes["from_node"], strict=True))
     dry = sorted(
