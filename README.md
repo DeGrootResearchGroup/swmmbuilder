@@ -309,12 +309,19 @@ given, else a junction) to it. The force-main pipes leaving the station (`Struct
 London), followed downstream through every node whose only outlet is a force main
 (`Subnetwork.force_main_chain`), start at `<node>_D` and stay conduits with their GIS lengths and a
 `FORCE_MAIN` cross-section; their interior nodes and `<node>_D` get `force_main_surcharge_depth`
-(default 100 m) so that the main can run pressurised under `DYNWAVE`. Other outlets of the
-station, such as overflows, stay conduits (`include_overflows=False` drops them).
+(default 100 m) so that the main can run pressurised under `DYNWAVE`. Where two stations' force
+mains join, the shared main downstream is a force main of both; a chain stops at the next pump
+station, whose own pump starts its force main. Other outlets of the station, such as overflows,
+stay conduits (`include_overflows=False` drops them). A pump-station node with force mains that
+is not in `pump_stations` gets a warning: its force mains are written as ordinary conduits.
 
-- **Pump operation.** There is no default pump. An ideal pump (`curve="*"`) approximates a
-  variable-speed station that delivers a near-uniform flow; a curve with `startup`/`shutoff`
-  depths (e.g. `PUMP2`) a fixed-speed station whose on/off cycling pulses the force-main flow.
+- **Pump operation.** There is no built-in default pump. An ideal pump (`curve="*"`) approximates
+  a variable-speed station that delivers a near-uniform flow; a curve with `startup`/`shutoff`
+  depths (e.g. `PUMP2`) a fixed-speed station whose on/off cycling pulses the force-main flow. A
+  station's curve needs its `curve_type`. `default_pump=` gives the pump of the stations given
+  without one; London's preset, an ideal pump for its variable-speed stations (s. 4.3.5), is
+  `LONDON_ON.design["default_pump"]`. A startup depth must be above the shutoff depth and below
+  the wet well's max depth, or the writer refuses.
 - **Twin force mains.** `force_mains=` picks the force mains to pump into (the others are written
   as ordinary conduits, with a warning). With more than one, `discharge="shared"` writes one pump
   feeding them all and `discharge="separate"` one pump each (`<node>_P1`, `<node>_D1`, ...);
@@ -323,7 +330,8 @@ station, such as overflows, stay conduits (`include_overflows=False` drops them)
   template's `FORCE_MAIN_EQUATION` (Hazen–Williams C for `H-W`, the shipped template; roughness
   height in mm for `D-W`). It is a constant, `{"by": "diameter", "table": [(upper_mm, value),
   ...]}`, `{"by": "material", "table": {material: value}}` or a callable `pipe -> value`; a dict
-  may declare `"equation"`, and a template with another equation is refused.
+  may declare `"equation"`, and a template with another equation is refused (a constant or a
+  callable has no declared unit, so it is not checked).
   `force_main_roughness_by_pipe={pipe_id: value}` overrides the rule. Schemas carry design-rule
   presets, never applied unless passed: `LONDON_ON.design["force_main_roughness"]` is London's
   C by diameter (Design Specifications & Requirements Manual, s. 4.8).
@@ -331,15 +339,19 @@ station, such as overflows, stay conduits (`include_overflows=False` drops them)
   `wet_well_defaults={"fill_time": minutes, "high_level_below_inlet": m, "low_level_above_pump": m}`
   derives one from the station's `design_flow` (design average flow, in the template's
   `FLOW_UNITS`: L/s with the shipped template; the GIS data do not carry it, so it is given per
-  station) and the invert of its inlet sewer (the lowest gravity pipe entering it). The station
+  station) and the invert of its inlet sewer (the lowest gravity pipe entering it, not a force
+  main or overflow). The station
   node invert is the wet-well floor, taken as the pump level: the shutoff depth is
-  `low_level_above_pump`, the startup depth is the inlet invert minus `high_level_below_inlet`,
+  `low_level_above_pump` (or, with `"low_level_suction_diameters": n` in the rule and a
+  station's `suction_diameter` in mm, n suction diameters if that is higher), the startup depth
+  is the inlet invert minus `high_level_below_inlet`,
   the plan area holds `design_flow` for `fill_time` between the two, and the well rises to the
   rim if known, else to the crown of the inlet sewer. On/off depths are derived only for a pump
   with a curve and no `startup`/`shutoff`. Explicit `WetWell` (or `wet_wells`) and pump values
   always win. Every derived value is logged and listed in `model.derived`
   (`model.derived_report()` as a table), so nothing derived looks like data. London's preset
-  (s. 4.3.10: 30 min fill, high water 300 mm below the inlet, low water 300 mm above the pump) is
+  (s. 4.3.10: 30 min fill, high water 300 mm below the inlet, low water 300 mm, or two suction
+  diameters, above the pump) is
   `LONDON_ON.design["wet_well_defaults"]`:
 
   ```python
@@ -357,11 +369,14 @@ station, such as overflows, stay conduits (`include_overflows=False` drops them)
 - **Force-main checks (warnings).** `force_main_checks={"min_diameter": mm, "velocity": (min,
   max)}` warns of force mains narrower than `min_diameter` and of those whose velocity, the
   pumped flow over the full pipe area, is outside `velocity` (m/s). The pumped flow is the pump
-  curve's largest flow, or the station's `design_flow` for an ideal pump (not checked without
-  one); a shared pump feeding several force mains is not checked, as the split is unknown.
+  curve's largest flow, or the station's `design_flow` for an ideal pump or a head-flow curve
+  (PUMP3, PUMP5, whose largest flow is at zero head; not checked without one), summed over the
+  stations feeding a shared main after a join; a shared pump feeding several force mains is not
+  checked, as the split is unknown.
   London's preset (100 mm, 0.6–3.0 m/s) is `LONDON_ON.design["force_main_checks"]`.
 - A pipe in both `pumps` and a station's force main, a station with no force-main outlet, and a
-  wet well given both in `wet_wells` and a station are errors.
+  wet well given both in `wet_wells` and a station are errors. A schema's design-rule presets are
+  checked when it is made, so a typo in a TOML preset is caught on loading.
 
 ## Dry-weather flow
 

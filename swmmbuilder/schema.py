@@ -70,6 +70,8 @@ from pathlib import Path
 import geopandas as gpd
 import pandas as pd
 
+from .swmm import check_design_rule
+
 # Canonical columns, in the order they are written.
 CANONICAL_COLUMNS = (
     "pipe_id",
@@ -129,6 +131,7 @@ DESIGN_RULES = (
     "force_main_roughness",
     "wet_well_defaults",
     "force_main_checks",
+    "default_pump",
 )
 SIZE_COLUMNS = ("diameter", "height", "width")
 
@@ -193,7 +196,7 @@ class Schema:
         only when passed to the .inp writer, e.g.
         ``to_inp(..., force_main_discharge=schema.design['force_main_discharge'])`` or
         ``to_inp(..., force_main_roughness=schema.design['force_main_roughness'])``; likewise
-        ``wet_well_defaults`` and ``force_main_checks``. So a schema can map the columns without
+        ``wet_well_defaults``, ``force_main_checks`` and ``default_pump``. So a schema can map the columns without
         adopting the standard.
     """
 
@@ -251,6 +254,11 @@ class Schema:
                 f"Schema {self.name!r} has unknown design rules: {sorted(unknown)}. "
                 f"Known rules: {list(DESIGN_RULES)}."
             )
+        for rule, params in self.design.items():
+            try:
+                check_design_rule(rule, params)
+            except (TypeError, ValueError) as error:
+                raise ValueError(f"Schema {self.name!r}: design rule {rule}: {error}") from None
         for unit in (self.length_unit, self.invert_unit, self.size_unit):
             if unit not in UNITS:
                 raise ValueError(f"Unknown unit {unit!r}; use one of {list(UNITS)}.")
