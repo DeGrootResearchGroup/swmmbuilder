@@ -4,10 +4,12 @@ Notable changes to swmmbuilder. The format follows [Keep a Changelog](https://ke
 and the project uses [semantic versioning](https://semver.org/) (before 1.0, a minor version may
 change the API). Numbers in parentheses are pull requests.
 
-No version has been released yet. The changes below are those since the restructuring began
-(#24); when the first version is tagged, its number and date replace "Unreleased".
+0.1.0 is the first release. Its entries are the changes since the restructuring began (#24);
+earlier history is in the git log.
 
 ## [Unreleased]
+
+## [0.1.0] - 2026-11-03
 
 ### Added
 
@@ -30,6 +32,8 @@ No version has been released yet. The changes below are those since the restruct
 - A misspelt option of `to_inp`, `write_inp`, `build_model` or `Subnetwork.data_gaps` raises a
   `TypeError` naming the closest options (e.g. `size_overide` -> `size_overrides`) (#91).
 - The `simulate` extra (pyswmm) (#66).
+- An **API reference** built with MkDocs from the docstrings (`docs` extra), built strictly in CI
+  (#92).
 
 ### Changed
 
@@ -75,3 +79,6 @@ No version has been released yet. The changes below are those since the restruct
 ### Deprecated
 
 - `maps.generate_gmap`; use `maps.to_leaflet` (#36).
+
+[Unreleased]: https://github.com/DeGrootResearchGroup/swmmbuilder/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/DeGrootResearchGroup/swmmbuilder/releases/tag/v0.1.0

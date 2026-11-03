@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "swmmbuilder"
-version = "0.2.0"
+version = "0.1.0"
 description = "A tool manipulating GIS data files to produce sewer subnetworks and .inp files for pyswmm."
 license = "MIT"
 license-files = ["LICENCE"]
@@ -19,6 +19,11 @@ dependencies = [
   "matplotlib",
   "shapely>=2",
 ]
+
+[project.urls]
+Repository = "https://github.com/DeGrootResearchGroup/swmmbuilder"
+Changelog = "https://github.com/DeGrootResearchGroup/swmmbuilder/blob/main/CHANGELOG.md"
+Issues = "https://github.com/DeGrootResearchGroup/swmmbuilder/issues"
 
 [project.optional-dependencies]
 # Web-tile basemaps (maps.add_basemap), interactive maps (maps.to_leaflet) and the deprecated
