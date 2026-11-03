@@ -763,3 +763,75 @@ def test_to_geojson_reprojects_to_wgs84(tmp_path):
     written = gpd.read_file(tmp_path / "pipes.geojson")
     assert written.crs == CRS.from_epsg(4326)
     assert written.total_bounds[0] == pytest.approx(-81.3, abs=0.01)
+
+
+# ---- Axes state, group colours, scale and empty inputs (#64) -------------------------------
+
+
+def test_axes_can_be_redrawn_after_clear(ax, sub):
+    ids = sub.to_geodataframe("pipes").index
+    values = pd.Series(np.arange(len(ids), dtype=float), index=ids)
+    first = maps.plot_pipes(ax, sub, values, legend=True)
+    top = first.colorbar.ax.get_position().y1
+    ax.clear()
+    again = maps.plot_pipes(ax, sub, values, legend=True)  # used to raise: cannot remove artist
+    # The column of keys starts from the top again, not below the cleared colour bar.
+    assert again.colorbar.ax.get_position().y1 == pytest.approx(top)
+    assert len([a for a in ax.artists if isinstance(a, AnchoredSizeBar)]) == 1
+
+
+def test_list_colours_keep_their_group_with_an_empty_polygon(ax, sub):
+    polygons = maps.node_group_polygons(sub, GROUPS)
+    polygons.loc["A", "geometry"] = Polygon()  # e.g. outside the clip area
+    layer = maps.plot_groups(ax, polygons, colors=["red", "green", "blue", "black"])
+    assert layer.ids == ["B", "C", "trunk"]
+    faces = [matplotlib.colors.to_hex(c) for c in layer.artist.get_facecolors()]
+    assert faces == ["#008000", "#0000ff", "#000000"]  # green, blue, black: not shifted
+
+
+def test_stems_scale_linearly():
+    import time
+
+    import networkx as nx
+
+    n = 20_000
+    chain = nx.MultiDiGraph()
+    chain.add_edges_from((i, i + 1, i) for i in range(n))
+    disjoint = nx.MultiDiGraph()
+    disjoint.add_edges_from((2 * i, 2 * i + 1, i) for i in range(n))
+    start = time.perf_counter()
+    assert maps._stems(chain, list(range(n))) == [list(range(n))]
+    assert len(maps._stems(disjoint, list(range(n)))) == n
+    assert time.perf_counter() - start < 5.0  # about 1 s; quadratic before #64 (about 11 s)
+
+
+def test_voronoi_single_group_outside_the_clip_area(sub, caplog):
+    far = Point(0, 0).buffer(10)  # nowhere near the network
+    polygons = maps.node_group_polygons(sub, {"all": ["A1"]}, clip_to=far)
+    assert polygons.geometry["all"].equals(far)
+    with caplog.at_level("WARNING", logger="swmmbuilder"):
+        polygons = maps.node_group_polygons(sub, {"A": ["A1"], "B": ["B1"]}, clip_to=far)
+    assert "Groups with an empty polygon" in caplog.text
+
+
+def test_to_leaflet_with_no_pipes(network, tmp_path):
+    pytest.importorskip("folium")
+    lone = network.subnetwork(["A1"])  # one node, no pipe
+    maps.to_leaflet(lone, tmp_path / "map.html", [maps.PipeLayer(), maps.MarkerLayer(["A1"])])
+    assert "Pipes" in (tmp_path / "map.html").read_text()
+
+
+def test_leaflet_markers_need_positions(sub, tmp_path, monkeypatch):
+    pytest.importorskip("folium")
+    nodes = sub.network.nodes.copy()
+    nodes.loc["A1", "geometry"] = None
+    monkeypatch.setattr(sub.network, "nodes", nodes)
+    with pytest.raises(ValueError, match="Nodes with no position: A1"):
+        maps.to_leaflet(sub, tmp_path / "map.html", [maps.MarkerLayer(["A1", "OUT"])])
+
+
+def test_to_geodataframe_nodes_is_a_copy(network):
+    nodes = network.to_geodataframe("nodes")
+    assert nodes is not network.nodes
+    nodes["extra"] = 1
+    assert "extra" not in network.nodes

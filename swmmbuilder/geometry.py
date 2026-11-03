@@ -60,7 +60,7 @@ def to_geodataframe(pipes, nodes, kind="pipes", values=None):
     if kind == "pipes":
         data = pipes.set_index("pipe_id")
     elif kind == "nodes":
-        data = nodes
+        data = nodes.copy()  # never the network's own table
     else:
         raise ValueError(f"kind must be 'pipes' or 'nodes', not {kind!r}.")
     if values is None:
