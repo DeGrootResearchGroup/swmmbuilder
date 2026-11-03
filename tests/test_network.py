@@ -33,6 +33,7 @@ def test_flagged_abandoned_pipes_not_in_graph(network):
         "flow_type": {"storm": 1},
         "status": {"abandoned": 1},
         "structure_type": {},
+        "invalid": {},
     }
 
 
