@@ -10,7 +10,7 @@ from conftest import TEMPLATE, read_sections, run_swmm
 from shapely.geometry import LineString
 
 from swmmbuilder import LONDON_ON, Network, PumpStation, WetWell
-from swmmbuilder.swmm import force_main_roughness_rule
+from swmmbuilder.swmm import build_model, force_main_roughness_rule
 
 # Layout (flow direction; => is a force main, ~> an overflow), in UTM 17N metres:
 #
@@ -365,6 +365,244 @@ def test_station_names_must_be_free(tmp_path):
             tmp_path,
             pump_stations={"PS": IDEAL},
         )
+
+
+# --- Wet-well defaults --------------------------------------------------------------------------
+
+LONDON_WELL = LONDON_ON.design["wet_well_defaults"]
+LONDON_CHECKS = LONDON_ON.design["force_main_checks"]
+# PS's floor lowered to 247.0 m: its inlet (pipe 1, 300 mm) enters at 250.0 m, so London's rule
+# gives a low water level 0.3 m and a high water level 250.0 - 0.3 - 247.0 = 2.7 m above the floor.
+DEEP = {"PS": 247.0}
+CURVE = dict(curve=[(0.0, 20.0)], curve_type="PUMP2")
+
+
+def build(sub, **kwargs):
+    kwargs.setdefault("force_main_roughness", C)
+    return build_model(sub, **kwargs)
+
+
+def test_london_presets():
+    assert LONDON_WELL == dict(fill_time=30, high_level_below_inlet=0.3, low_level_above_pump=0.3)
+    assert LONDON_CHECKS == dict(min_diameter=100, velocity=[0.6, 3.0])
+
+
+def test_wet_well_from_rule(sub, tmp_path):
+    """10 L/s for 30 min = 18 m3 between depths 0.3 and 2.7 m: 7.5 m2. The well rises to the crown
+    of the inlet sewer, 250.3 m."""
+    station = dict(pump=CURVE, design_flow=10.0)
+    path = write(
+        sub,
+        tmp_path,
+        pump_stations={"PS": station},
+        wet_well_defaults=LONDON_WELL,
+        height_correction=DEEP,
+    )
+    s = read_sections(path)
+    (storage,) = s["STORAGE"]
+    assert storage[0] == "PS"
+    assert float(storage[1]) == 247.0
+    assert float(storage[2]) == pytest.approx(3.3)  # max depth
+    assert float(storage[7]) == pytest.approx(7.5)  # area
+    assert s["PUMPS"] == [["PS_P", "PS", "PS_D", "PS_curve", "ON", "2.7", "0.3"]]
+
+    report = build(
+        sub,
+        pump_stations={"PS": station},
+        wet_well_defaults=LONDON_WELL,
+        height_correction=DEEP,
+    ).derived_report()
+    assert list(report.columns) == ["element", "id", "attribute", "value", "rule", "basis"]
+    assert set(report["rule"]) == {"wet_well_defaults"}
+    assert dict(zip(report["attribute"], report["value"], strict=True)) == pytest.approx(
+        dict(area=7.5, max_depth=3.3, startup=2.7, shutoff=0.3)
+    )
+    assert "inlet invert 250.0 (pipe 1)" in report["basis"][0]
+
+
+def test_wet_well_rule_is_logged(sub, caplog):
+    caplog.set_level("INFO", logger="swmmbuilder.swmm")
+    build(
+        sub,
+        pump_stations={"PS": dict(pump=CURVE, design_flow=10.0)},
+        wet_well_defaults=LONDON_WELL,
+        height_correction=DEEP,
+    )
+    assert "storage area = 7.5 from rule wet_well_defaults, not data" in caplog.text
+
+
+def test_wet_well_rule_in_flow_units(sub):
+    """The design flow is in the FLOW_UNITS: 0.864 MLD = 10 L/s."""
+    model = build(
+        sub,
+        pump_stations={"PS": dict(pump=CURVE, design_flow=0.864)},
+        wet_well_defaults=LONDON_WELL,
+        height_correction=DEEP,
+        flow_units="MLD",
+    )
+    assert model.storage[0].area == pytest.approx(7.5)
+
+
+def test_explicit_values_win(sub):
+    station = dict(
+        pump=dict(CURVE, startup=2.0),
+        wet_well=WetWell(max_depth=4.0, area=2.0),
+        design_flow=10.0,
+    )
+    model = build(
+        sub, pump_stations={"PS": station}, wet_well_defaults=LONDON_WELL, height_correction=DEEP
+    )
+    assert (model.storage[0].max_depth, model.storage[0].area) == (4.0, 2.0)
+    assert (model.pumps[0].startup, model.pumps[0].shutoff) == (2.0, 0.3)
+    assert [(d.attribute, d.value) for d in model.derived] == [("shutoff", 0.3)]
+
+
+def test_wet_well_from_wet_wells_option_wins(sub):
+    model = build(
+        sub,
+        pump_stations={"PS": dict(pump=CURVE)},
+        wet_wells={"PS": dict(max_depth=4.0, area=2.0)},
+        wet_well_defaults=LONDON_WELL,
+        height_correction=DEEP,
+    )
+    assert model.storage[0].area == 2.0
+    assert {d.attribute for d in model.derived} == {"startup", "shutoff"}
+
+
+def test_ideal_pump_gets_no_on_off_depths(net):
+    sub = net.subnetwork(["U1", "PS", "F1", "MH", "OUT"])
+    model = build(
+        sub,
+        pump_stations={"PS": dict(IDEAL, design_flow=10.0)},
+        wet_well_defaults=LONDON_WELL,
+        height_correction=DEEP,
+    )
+    assert model.storage[0].area == pytest.approx(7.5)
+    assert (model.pumps[0].startup, model.pumps[0].shutoff) == (0.0, 0.0)
+    assert {d.attribute for d in model.derived} == {"area", "max_depth"}
+
+
+def test_no_rule_no_defaults(sub):
+    model = build(sub, pump_stations={"PS": dict(pump=CURVE, design_flow=10.0)})
+    assert model.storage == [] and model.derived == []
+    assert (model.pumps[0].startup, model.pumps[0].shutoff) == (0.0, 0.0)
+
+
+@pytest.mark.parametrize(
+    "station, correction, match",
+    [
+        (dict(pump=CURVE), DEEP, "PS has no wet well and no design_flow"),
+        # The floor is 249.8 m: the high water level, 249.7 m, is below the low one, 250.1 m.
+        (dict(pump=CURVE, design_flow=10.0), None, "PS: the high water level"),
+    ],
+)
+def test_wet_well_rule_rejected(sub, station, correction, match):
+    with pytest.raises(ValueError, match=match):
+        build(
+            sub,
+            pump_stations={"PS": station},
+            wet_well_defaults=LONDON_WELL,
+            height_correction=correction,
+        )
+
+
+@pytest.mark.parametrize(
+    "rule, match",
+    [
+        (dict(fill_time=30), "missing keys"),
+        (dict(LONDON_WELL, volume=1), "unknown keys"),
+        (dict(LONDON_WELL, fill_time=0), "fill_time must be positive"),
+        (30, "must be a dict"),
+    ],
+)
+def test_invalid_wet_well_rule_rejected(sub, rule, match):
+    with pytest.raises(ValueError, match=match):
+        build(sub, pump_stations={"PS": dict(pump=CURVE)}, wet_well_defaults=rule)
+
+
+def test_invalid_design_flow_rejected(sub):
+    with pytest.raises(ValueError, match="design_flow must be positive"):
+        build(sub, pump_stations={"PS": dict(pump=CURVE, design_flow=0)})
+
+
+def test_flow_units_must_match_template(sub, tmp_path):
+    with pytest.raises(ValueError, match="not the template's FLOW_UNITS LPS"):
+        write(sub, tmp_path, pump_stations={"PS": dict(pump=CURVE)}, flow_units="CMS")
+
+
+def test_derived_wet_well_runs_in_swmm(sub, tmp_path):
+    path = write(
+        sub,
+        tmp_path,
+        tpl=template(tmp_path, inflow=10.0, hours=3),
+        pump_stations={"PS": dict(pump=CURVE, design_flow=10.0)},
+        wet_well_defaults=LONDON_WELL,
+        height_correction=DEEP,
+    )
+    assert run_swmm(path, tmp_path) == []
+
+
+# --- Force-main checks ---------------------------------------------------------------------------
+
+# The force main PS => F1 => MH is 150 mm: 1 L/s is 0.0566 m/s.
+
+
+@pytest.mark.parametrize(
+    "station, match",
+    [
+        (dict(pump=dict(curve=[(0.0, 5.0), (1.0, 10.0)], curve_type="PUMP2")), "below 0.6 m/s"),
+        (dict(pump=dict(curve=[(0.0, 60.0)], curve_type="PUMP2")), "above 3 m/s"),
+        (dict(IDEAL, design_flow=10.0), "below 0.6 m/s: 2 \\(0.57 m/s\\), 3 \\(0.57 m/s\\)"),
+    ],
+)
+def test_force_main_velocity_warned(net, station, match):
+    """The curve's largest flow, or an ideal pump's design flow, over the full area."""
+    sub = net.subnetwork(["U1", "PS", "F1", "MH", "OUT"])
+    with pytest.warns(UserWarning, match=match):
+        build(sub, pump_stations={"PS": station}, force_main_checks=LONDON_CHECKS)
+
+
+@pytest.mark.parametrize(
+    "station",
+    [dict(pump=dict(curve=[(0.0, 20.0)], curve_type="PUMP2")), IDEAL],
+    ids=["1.13 m/s", "ideal, no design flow"],
+)
+def test_force_main_velocity_not_warned(net, recwarn, station):
+    sub = net.subnetwork(["U1", "PS", "F1", "MH", "OUT"])
+    build(sub, pump_stations={"PS": station}, force_main_checks=LONDON_CHECKS)
+    assert not [w for w in recwarn if "Force mains" in str(w.message)]
+
+
+def test_force_main_diameter_warned(sub):
+    with pytest.warns(UserWarning, match="narrower than 200 mm: 2 \\(150 mm\\), 3 \\(150 mm\\)"):
+        build(sub, pump_stations={"PS": dict(pump=CURVE)}, force_main_checks=dict(min_diameter=200))
+
+
+def test_shared_force_mains_velocity_not_checked(net, recwarn):
+    """PT's shared pump feeds 200 and 650 mm mains: the split is unknown."""
+    sub = net.subnetwork(["PT", "T1", "T2", "TO1", "TO2"])
+    station = dict(IDEAL, discharge="shared", design_flow=1.0)
+    build(sub, pump_stations={"PT": station}, force_main_checks=LONDON_CHECKS)
+    assert not [w for w in recwarn if "Force mains" in str(w.message)]
+
+
+def test_separate_force_mains_checked_each(net):
+    sub = net.subnetwork(["PT", "T1", "T2", "TO1", "TO2"])
+    station = dict(pump=dict(curve=[(0.0, 50.0)], curve_type="PUMP2"), discharge="separate")
+    # 50 L/s: 1.59 m/s in the 200 mm main, 0.15 m/s in the 650 mm one.
+    with pytest.warns(UserWarning, match="below 0.6 m/s: 10 \\(0.15 m/s\\)\\.$"):
+        build(sub, pump_stations={"PT": station}, force_main_checks=LONDON_CHECKS)
+
+
+def test_no_checks_no_warnings(net, recwarn):
+    sub = net.subnetwork(["U1", "PS", "F1", "MH", "OUT"])
+    build(sub, pump_stations={"PS": dict(pump=dict(curve=[(0.0, 60.0)], curve_type="PUMP2"))})
+    assert not [w for w in recwarn if "Force mains" in str(w.message)]
+
+
+def test_invalid_checks_rejected(sub):
+    with pytest.raises(ValueError, match="unknown keys"):
+        build(sub, pump_stations={"PS": dict(pump=CURVE)}, force_main_checks=dict(speed=1))
 
 
 # --- In SWMM --------------------------------------------------------------------------------

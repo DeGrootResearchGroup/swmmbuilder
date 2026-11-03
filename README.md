@@ -327,6 +327,39 @@ station, such as overflows, stay conduits (`include_overflows=False` drops them)
   `force_main_roughness_by_pipe={pipe_id: value}` overrides the rule. Schemas carry design-rule
   presets, never applied unless passed: `LONDON_ON.design["force_main_roughness"]` is London's
   C by diameter (Design Specifications & Requirements Manual, s. 4.8).
+- **Wet-well defaults (opt-in).** When a station's wet well is not known,
+  `wet_well_defaults={"fill_time": minutes, "high_level_below_inlet": m, "low_level_above_pump": m}`
+  derives one from the station's `design_flow` (design average flow, in the template's
+  `FLOW_UNITS`: L/s with the shipped template; the GIS data do not carry it, so it is given per
+  station) and the invert of its inlet sewer (the lowest gravity pipe entering it). The station
+  node invert is the wet-well floor, taken as the pump level: the shutoff depth is
+  `low_level_above_pump`, the startup depth is the inlet invert minus `high_level_below_inlet`,
+  the plan area holds `design_flow` for `fill_time` between the two, and the well rises to the
+  rim if known, else to the crown of the inlet sewer. On/off depths are derived only for a pump
+  with a curve and no `startup`/`shutoff`. Explicit `WetWell` (or `wet_wells`) and pump values
+  always win. Every derived value is logged and listed in `model.derived`
+  (`model.derived_report()` as a table), so nothing derived looks like data. London's preset
+  (s. 4.3.10: 30 min fill, high water 300 mm below the inlet, low water 300 mm above the pump) is
+  `LONDON_ON.design["wet_well_defaults"]`:
+
+  ```python
+  model = sub.to_inp(
+      "model.inp",
+      pump_stations={"SL6001": PumpStation(
+          pump=dict(curve=[(0.0, 120.0)], curve_type="PUMP2"), design_flow=40.0,
+      )},
+      force_main_roughness=LONDON_ON.design["force_main_roughness"],
+      wet_well_defaults=LONDON_ON.design["wet_well_defaults"],
+  )
+  print(model.derived_report())
+  ```
+
+- **Force-main checks (warnings).** `force_main_checks={"min_diameter": mm, "velocity": (min,
+  max)}` warns of force mains narrower than `min_diameter` and of those whose velocity, the
+  pumped flow over the full pipe area, is outside `velocity` (m/s). The pumped flow is the pump
+  curve's largest flow, or the station's `design_flow` for an ideal pump (not checked without
+  one); a shared pump feeding several force mains is not checked, as the split is unknown.
+  London's preset (100 mm, 0.6–3.0 m/s) is `LONDON_ON.design["force_main_checks"]`.
 - A pipe in both `pumps` and a station's force main, a station with no force-main outlet, and a
   wet well given both in `wet_wells` and a station are errors.
 
