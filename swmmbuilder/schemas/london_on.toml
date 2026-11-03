@@ -103,14 +103,20 @@ table = [[150, 100], [250, 110], [600, 120], [inf, 130]]
 [design.wet_well_defaults]
 # Ch. 4, s. 4.3.10: at least 30 min filling time at design average flow (from the firm-capacity
 # start to bypass); high water level 300 mm below the inlet sewer invert; low water level at least
-# 300 mm (or twice the suction diameter) above the pump volute centreline, taken as the wet well
-# floor. fill_time in minutes, levels in m.
+# 300 mm (or twice the suction diameter, for a station given its suction_diameter) above the pump
+# volute centreline, taken as the wet well floor. fill_time in minutes, levels in m.
 fill_time = 30
 high_level_below_inlet = 0.3
 low_level_above_pump = 0.3
+low_level_suction_diameters = 2
 
 [design.force_main_checks]
 # Ch. 4: force mains at least 100 mm; velocity 0.6-3.0 m/s (cleansing velocity 0.9 m/s). Checks
 # that give warnings, not rules. min_diameter in mm, velocity (min, max) in m/s.
 min_diameter = 100
 velocity = [0.6, 3.0]
+
+[design.default_pump]
+# s. 4.3.5: pumps deliver "as uniform a flow as practicable" at varying rates (variable speed), so
+# an ideal pump that passes its inflow on is the default for stations given without a pump.
+curve = "*"

@@ -45,7 +45,9 @@ class TopologyReport:
 
     force_main_ends : dict
         First pipe ID of a force-main chain -> (node, ``'force_main'`` or ``'dead_end'``), for the
-        chains that join another force main or end at a dead end.
+        chains that join another force main or end at a dead end. The .inp writer keeps the shared
+        main downstream of a join as a force main of both stations; a dead end is refused like any
+        other.
 
     pipe_count_mismatches : dict
         Node -> {'pipes_in': (node layer, graph), 'pipes_out': (node layer, graph)}, for every node
@@ -182,11 +184,12 @@ class Subnetwork:
             if structure == "force_main"
         )
 
-    def force_main_chain(self, pipe, outfalls=None):
+    def force_main_chain(self, pipe, outfalls=None, through_joins=False, stations=None):
         """The force main that starts with ``pipe``, followed downstream.
 
         A force main is often a chain of several GIS pipes. The chain continues through every node
-        whose only outlet pipe is a force main, and stops where it joins another force main.
+        whose only outlet pipe is a force main, and stops at a pump station (whose own pump starts
+        the next force main) and where it joins another force main.
 
         Parameters
         ----------
@@ -195,6 +198,14 @@ class Subnetwork:
 
         outfalls : iterable of str, optional
             The outfall nodes (default: :attr:`outfalls`).
+
+        through_joins : bool
+            Continue through a join with another force main into the shared main downstream
+            (default False). The join is still reported as the ``problem``.
+
+        stations : iterable of str, optional
+            The pump-station nodes where the chain stops (default: the nodes of type
+            'pump_station').
 
         Returns
         ----------
@@ -210,17 +221,24 @@ class Subnetwork:
             an outfall, else None.
         """
         outfalls = set(self.outfalls if outfalls is None else outfalls)
-        pipes = [pipe]
+        if stations is None:
+            stations = (n for n, t in self.graph.nodes(data="node_type") if t == "pump_station")
+        stations = set(stations)
+        pipes, problem = [pipe], None
         node = self._ends[pipe][1]
         while True:
+            if node in stations:
+                return pipes, node, problem
             entering = [p for _, _, p in self.graph.in_edges(node, keys=True)]
             if sum(self._is_force_main(p) for p in entering) > 1:
-                return pipes, node, "force_main"
+                if not through_joins:
+                    return pipes, node, "force_main"
+                problem = "force_main"
             outlets = [p for _, _, p in self.graph.out_edges(node, keys=True)]
             if not outlets and node not in outfalls:
                 return pipes, node, "dead_end"
             if len(outlets) != 1 or not self._is_force_main(outlets[0]) or outlets[0] in pipes:
-                return pipes, node, None
+                return pipes, node, problem
             pipes.append(outlets[0])
             node = self._ends[outlets[0]][1]
 
