@@ -22,7 +22,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from .gaps import _invert, fill_gaps, lowest_inverts, xsection
+from .gaps import _invert, fill_gaps, height_corrections, lowest_inverts, xsection
 from .geometry import line_coords
 
 logger = logging.getLogger(__name__)
@@ -1092,16 +1092,13 @@ def node_inverts(subnetwork, height_correction=None):
         If a node has no pipe with an invert.
     """
     nodes = set(subnetwork.nodes)
-    height_correction = subnetwork.match_nodes(height_correction or {}, "height_correction")
     inverts = lowest_inverts(subnetwork.pipes(), nodes)
     if nodes - set(inverts):
         inverts.update(lowest_inverts(subnetwork.network.full_data, nodes - set(inverts)))
     missing = sorted(nodes - set(inverts))
     if missing:
         raise ValueError(f"No pipe invert found for nodes: {', '.join(map(str, missing))}")
-    for node, invert in (height_correction or {}).items():
-        if node in nodes:
-            inverts[node] = float(invert)
+    inverts.update(height_corrections(subnetwork, height_correction))
     return inverts
 
 
