@@ -3,7 +3,7 @@
 import importlib
 import os
 import warnings
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, fields
 
 import geopandas as gpd
 import matplotlib as mpl
@@ -11,7 +11,14 @@ import numpy as np
 from matplotlib.colors import to_hex
 
 from ._deps import _optional
-from .colours import _aligned, _fitted_norm, _hex_colours
+from .colours import (
+    COLOUR_OPTIONS,
+    ColourScale,
+    _aligned,
+    _colour_options,
+    _fitted_norm,
+    _hex_colours,
+)
 from .crs import WGS84, _check_nodes, _with_crs, lonlat_positions
 
 
@@ -30,6 +37,16 @@ class PipeLayer:
     missing_color: str = "#bbbbbb"
     weight: float = 3.0
     show: bool = True
+    colour: ColourScale | None = None
+
+    def __post_init__(self):
+        # A ColourScale sets cmap, norm, vmin, vmax and missing_color (see plot_pipes).
+        defaults = tuple(_FIELD_DEFAULTS[type(self).__name__][n] for n in COLOUR_OPTIONS)
+        given = tuple(getattr(self, n) for n in COLOUR_OPTIONS)
+        for name, value in zip(
+            COLOUR_OPTIONS, _colour_options(self.colour, given, defaults), strict=True
+        ):
+            setattr(self, name, value)
 
 
 @dataclass
@@ -48,6 +65,22 @@ class GroupLayer:
     missing_color: str = "#dddddd"
     opacity: float = 0.5
     show: bool = True
+    colour: ColourScale | None = None
+
+    def __post_init__(self):
+        # A ColourScale sets cmap, norm, vmin, vmax and missing_color (see plot_pipes).
+        defaults = tuple(_FIELD_DEFAULTS[type(self).__name__][n] for n in COLOUR_OPTIONS)
+        given = tuple(getattr(self, n) for n in COLOUR_OPTIONS)
+        for name, value in zip(
+            COLOUR_OPTIONS, _colour_options(self.colour, given, defaults), strict=True
+        ):
+            setattr(self, name, value)
+
+
+# The declared defaults of the colour fields of each layer, for ColourScale clash checks.
+_FIELD_DEFAULTS = {
+    cls.__name__: {f.name: f.default for f in fields(cls)} for cls in (PipeLayer, GroupLayer)
+}
 
 
 @dataclass

@@ -2,6 +2,7 @@
 
 import copy
 import logging
+from dataclasses import dataclass, fields
 
 import matplotlib as mpl
 import matplotlib.cbook as cbook
@@ -32,6 +33,70 @@ TABLEAU10 = (
 
 
 NEUTRAL_COLOR = "#bab0ac"
+
+
+@dataclass(frozen=True)
+class ColourScale:
+    """How values are coloured, shared by the plot functions (``colour=``) and the Leaflet
+    layers (:class:`PipeLayer`, :class:`GroupLayer`), e.g. so that several plots use one scale::
+
+        scale = ColourScale(cmap="magma", norm="log", vmin=1e-3, vmax=10)
+        plot_pipes(ax1, sub, before, colour=scale)
+        plot_pipes(ax2, sub, after, colour=scale)
+
+    Attributes
+    ----------
+    cmap : str or matplotlib Colormap
+        Colour map.
+    norm : {'linear', 'log'} or matplotlib.colors.Normalize
+        Normalisation (a Normalize is copied, never changed).
+    vmin, vmax : float, optional
+        Limits; by default the range of the values that can be shown.
+    missing_color : optional
+        Colour of missing values (and non-positive ones under a log norm); by default that of
+        the function or layer it is passed to.
+    """
+
+    cmap: object = "viridis"
+    norm: object = "linear"
+    vmin: float | None = None
+    vmax: float | None = None
+    missing_color: object = None
+
+
+COLOUR_OPTIONS = ("cmap", "norm", "vmin", "vmax", "missing_color")
+
+
+def _same(value, default):
+    return value is default or (isinstance(value, str | int | float) and value == default)
+
+
+def _colour_options(colour, given, defaults):
+    """(cmap, norm, vmin, vmax, missing_color): ``given`` (those keywords as passed), or those of
+    ``colour``, a :class:`ColourScale`, with its unset ``missing_color`` from ``defaults``.
+
+    Raises
+    ------
+    ValueError
+        If ``colour`` and a keyword that differs from its default are both given.
+    """
+    if colour is None:
+        return given
+    if not isinstance(colour, ColourScale):
+        raise TypeError(f"colour must be a ColourScale, not {type(colour).__name__}.")
+    values = [getattr(colour, f.name) for f in fields(ColourScale)]
+    if values[-1] is None:
+        values[-1] = defaults[-1]
+    # A keyword clashes if it was changed from its default to something else than the scale's
+    # (equal values are not a clash: e.g. dataclasses.replace of a layer made with colour=).
+    clash = [
+        name
+        for name, v, d, c in zip(COLOUR_OPTIONS, given, defaults, values, strict=True)
+        if not _same(v, d) and not _same(v, c)
+    ]
+    if clash:
+        raise ValueError(f"Pass either colour= or {', '.join(clash)}, not both.")
+    return tuple(values)
 
 
 def _aligned(values, index, what="values"):

@@ -33,10 +33,12 @@ from .basemap import (  # noqa: F401
     add_basemap,
 )
 from .colours import (  # noqa: F401
+    COLOUR_OPTIONS,
     NEUTRAL_CATEGORIES,
     NEUTRAL_COLOR,
     SCALES,
     TABLEAU10,
+    ColourScale,
     _aligned,
     _colour_by,
     _fitted_norm,

@@ -126,6 +126,11 @@ sub.to_geodataframe("pipes", values=concentration)  # or "nodes" (rows of net.no
   scales line widths by the square root of the value by default (`width_scale="linear"` or
   `"log"`), drawing thick pipes last. `context=True` draws them lighter and thinner, as context
   beneath zones or ribbons.
+- **Colour scales.** `cmap`, `norm`, `vmin`, `vmax` and `missing_color` can be given together
+  as a `maps.ColourScale` (`colour=` on `plot_pipes` and `plot_groups`, or on `PipeLayer` and
+  `GroupLayer`), e.g. so that several plots share one scale:
+  `scale = maps.ColourScale(norm="log", vmin=1e-3, vmax=10)`, then
+  `maps.plot_pipes(ax, sub, before, colour=scale)` and `maps.PipeLayer(after, colour=scale)`.
 - **Ribbons.** `plot_ribbons` splits each pipe into strands, one per category, as wide as its
   share. By default the ribbon width is proportional to the pipe's total load, with the largest
   2.5 % of the network's extent wide (`max_width=` in metres to override); ribbons under 5 % of
