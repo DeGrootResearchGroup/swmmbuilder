@@ -346,3 +346,58 @@ def test_written_inp_runs_in_swmm(snapped, tmp_path):
     assert [row[0] for row in sections["OUTFALLS"]] == ["OF1"]
     assert [row[0] for row in sections["PUMPS"]] == [str(FORCE_MAIN)]
     assert run_swmm(path, tmp_path) == []
+
+
+# --- Node IDs of the .inp options (#59) -----------------------------------------------------
+
+
+def test_normalize_ids_skips_missing_ids():
+    # A plain str method as the hook: the pipes with no node ID ('Abandoned' -> NaN) used to
+    # reach it and raise TypeError.
+    net = Network(TESTS / "data" / "fixture_network.geojson", normalize_ids=str.upper)
+    assert "A1" in net.graph
+
+
+def test_options_resolve_normalized_ids(tmp_path):
+    def upper(node):
+        return node.upper() if isinstance(node, str) else node
+
+    net = Network(TESTS / "data" / "fixture_network.geojson", normalize_ids=upper)
+    sub = net.subnetwork(["a1", "a2", "j1"])
+
+    def written(case):
+        ids = {n: case(n) for n in ("A1", "A2", "J1")}
+        path = write_inp(
+            sub,
+            tmp_path,
+            name=f"{case.__name__}.inp",
+            outfalls={ids["J1"]: "FREE"},
+            dwf={ids["A1"]: 1.0},
+            wet_wells={ids["A2"]: dict(max_depth=2.0, area=3.0)},
+            height_correction={ids["A1"]: 104.9},
+        )
+        return read_sections(path)
+
+    assert written(str.lower) == written(str.upper)
+    sections = written(str.lower)
+    assert sections["OUTFALLS"][0][0] == "J1"
+    assert sections["DWF"][0][0] == "A1"
+    assert sections["STORAGE"][0][0] == "A2"
+    assert {r[0]: r[1] for r in sections["JUNCTIONS"]}["A1"] == "104.9"
+
+
+def test_options_resolve_snapped_aliases(snapped):
+    sub = snapped.subnetwork(["M8", "DUP1", "M3"])
+    model = build_model(sub, outfalls=["M3"], dwf={"DUP2": 1.0}, height_correction={"DUP2": 1.0})
+    assert [d.node for d in model.dwf] == ["DUP1"]
+    assert {j.name: j.invert for j in model.junctions}["DUP1"] == 1.0
+
+
+def test_height_correction_outside_the_subnetwork(snapped, caplog):
+    sub = snapped.subnetwork(["M8", "DUP1", "M3"])
+    with caplog.at_level("WARNING", logger="swmmbuilder"):
+        model = build_model(sub, outfalls=["M3"], height_correction={"M1": 1.0, "NOPE": 1.0})
+    # M1 is in the network but not in the subnetwork: skipped quietly; NOPE is in neither.
+    assert "nodes not in the network, ignored: NOPE" in caplog.text
+    assert "M1" not in caplog.text
+    assert "M1" not in {j.name for j in model.junctions}

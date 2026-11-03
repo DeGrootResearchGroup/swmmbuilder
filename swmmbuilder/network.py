@@ -124,9 +124,10 @@ class Network:
         the pipes' inventory types, if the schema maps them.
 
     normalize_ids : callable, optional
-        Applied to every node ID of the pipes and node layers, and to the node IDs passed to
-        :meth:`catchment`, :meth:`subnetwork` and :meth:`Subnetwork.from_node_list`, e.g.
-        :func:`strip_leading_zeros`.
+        Applied to every node ID of the pipes and node layers (missing IDs are skipped), and to
+        the node IDs passed to :meth:`catchment`, :meth:`subnetwork`,
+        :meth:`Subnetwork.from_node_list` and the node-keyed options of :meth:`Subnetwork.to_inp`
+        (see :meth:`Subnetwork.match_node`), e.g. :func:`strip_leading_zeros`.
 
     snap_tolerance : float, optional
         If set, :meth:`snap_nodes` is called with it (and ``max_invert_difference``) on loading,
@@ -193,7 +194,9 @@ class Network:
         self.full_data = schema.normalize(_read(source))
         if normalize_ids is not None:
             for column in ("from_node", "to_node"):
-                self.full_data[column] = self.full_data[column].map(normalize_ids)
+                self.full_data[column] = self.full_data[column].map(
+                    normalize_ids, na_action="ignore"
+                )
         self.removed = {"flow_type": {}, "status": {}, "structure_type": {}, "invalid": {}}
         self._drop_invalid()
 
@@ -278,7 +281,7 @@ class Network:
                 continue
             nodes = self.schema.normalize_nodes(_read(layer), NODE_LAYERS[name])
             if self.normalize_ids is not None:
-                nodes["node_id"] = nodes["node_id"].map(self.normalize_ids)
+                nodes["node_id"] = nodes["node_id"].map(self.normalize_ids, na_action="ignore")
             if self.full_data.crs is not None and nodes.crs != self.full_data.crs:
                 nodes = nodes.to_crs(self.full_data.crs)
             frames.append(nodes.assign(layer=name))

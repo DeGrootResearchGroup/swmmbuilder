@@ -237,7 +237,7 @@ def test_long_names_and_numbers_stay_separate_fields(tmp_path):
         sub,
         tmp_path,
         routing="DYNWAVE",
-        outfalls=(longer("OUT"),),  # to_inp does not normalize node IDs yet (#59)
+        outfalls=("OUT",),  # normalized like the other node IDs
         size_overrides={pipe: 0.1 + 0.2},  # 0.30000000000000004
     )
     sections = read_sections(path)

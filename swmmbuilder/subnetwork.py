@@ -149,14 +149,29 @@ class Subnetwork:
         return list(self.graph.nodes)
 
     def match_node(self, key):
-        """The node ID that an option key names: ``key`` itself if it is a node, else the node
-        whose ID has the same text (so ``2151735`` and ``'2151735'`` name the same node), else
-        ``key`` unchanged, for the caller to report as not in the subnetwork."""
+        """The node ID that an option key names, tried in this order: ``key`` itself if it is a
+        node; the node it resolves to through the network's ``normalize_ids`` and snap aliases
+        (see :meth:`Network.resolve`); the node whose ID has the same text as either (so
+        ``2151735`` and ``'2151735'`` name the same node); else ``key`` unchanged, for the
+        caller to report as not in the subnetwork."""
         if key in self.graph:
             return key
+        resolved = self.network.resolve(key)
+        if resolved in self.graph:
+            return resolved
         if self._by_text is None:
             self._by_text = {str(n): n for n in self.graph}
-        return self._by_text.get(str(key), key)
+        for candidate in (key, resolved):
+            if str(candidate) in self._by_text:
+                return self._by_text[str(candidate)]
+        return key
+
+    def in_network(self, key):
+        """True if ``key`` names a node of the whole network (see :meth:`match_node`)."""
+        network = self.network
+        if key in network.graph or network.resolve(key) in network.graph:
+            return True
+        return str(key) in {str(n) for n in network.graph}
 
     def match_nodes(self, mapping, option):
         """``mapping`` with its keys replaced by :meth:`match_node`.

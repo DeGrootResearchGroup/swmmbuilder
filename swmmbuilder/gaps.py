@@ -96,6 +96,23 @@ def lowest_inverts(pipes, nodes):
     return found
 
 
+def height_corrections(subnetwork, height_correction):
+    """{node: invert} of the ``height_correction`` option for the nodes of ``subnetwork``.
+
+    Keys are matched with :meth:`Subnetwork.match_node`. Nodes of the network outside the
+    subnetwork are skipped, so one mapping can serve several subnetworks; keys that name no node
+    of the network at all (likely typos) are skipped with a warning.
+    """
+    matched = subnetwork.match_nodes(height_correction or {}, "height_correction")
+    unknown = sorted(str(n) for n in matched if not subnetwork.in_network(n))
+    if unknown:
+        logger.warning(
+            "height_correction: nodes not in the network, ignored: %s", ", ".join(unknown)
+        )
+    nodes = set(subnetwork.nodes)
+    return {node: float(invert) for node, invert in matched.items() if node in nodes}
+
+
 def force_main_discharge_rule(rule):
     """A function (pipe, receiving invert) -> downstream invert, from the ``force_main_discharge``
     option of :func:`fill_gaps`.
@@ -354,12 +371,10 @@ def fill_gaps(
         inverts.update(lowest_inverts(subnetwork.network.full_data, nodes - set(inverts)))
     for node in nodes - set(inverts):
         original[("node", node, "no_node_invert")] = "no invert from any pipe"
-    height_correction = subnetwork.match_nodes(height_correction or {}, "height_correction")
-    for node, invert in height_correction.items():
-        if node in nodes:
-            if node not in inverts:
-                record("node", node, "no_node_invert", "height_correction", float(invert))
-            inverts[node] = float(invert)
+    for node, invert in height_corrections(subnetwork, height_correction).items():
+        if node not in inverts:
+            record("node", node, "no_node_invert", "height_correction", invert)
+        inverts[node] = invert
     unknown_nodes = sorted(nodes - set(inverts), key=str)
     if invert_fill is not None or headwater_slope is not None:
         _fill_node_inverts(
