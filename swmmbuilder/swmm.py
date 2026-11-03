@@ -10,6 +10,7 @@ template and the topology, builds the model and writes the file.
 
 import logging
 import math
+import numbers
 import re
 import warnings
 from collections import Counter
@@ -964,6 +965,39 @@ def node_inverts(subnetwork, height_correction=None):
     return inverts
 
 
+# Decimals that numbers are rounded to in the .inp file: 1 micrometre for lengths in metres.
+DECIMALS = 6
+
+
+def _number(value):
+    """Text of a number for the .inp file: ints as is, floats rounded to :data:`DECIMALS`
+    decimals in their shortest form (so 0.30000000000000004 is written 0.3)."""
+    if isinstance(value, bool):
+        raise TypeError(f"Expected a number, not {value!r}.")
+    if isinstance(value, numbers.Integral):
+        return str(int(value))
+    value = round(float(value), DECIMALS)
+    return repr(value + 0.0)  # + 0.0 turns -0.0 into 0.0
+
+
+def _name(value):
+    """Text of a SWMM object name; raise ValueError if SWMM could not read it as one token."""
+    text = str(value)
+    if not text or any(c.isspace() for c in text) or ";" in text:
+        raise ValueError(
+            f"SWMM name {text!r} is empty or contains whitespace or ';', which SWMM would split "
+            "or read as a comment; rename it (e.g. with Network's normalize_ids)."
+        )
+    return text
+
+
+def _line(*fields):
+    """One .inp line of (value, width) fields: left-aligned in columns of at least ``width``
+    characters, and always separated by a space."""
+    cells = [(_number(v) if isinstance(v, numbers.Number) else str(v)).ljust(w) for v, w in fields]
+    return " ".join(cells).rstrip() + "\n"
+
+
 @dataclass(frozen=True)
 class Junction:
     name: str
@@ -1091,69 +1125,123 @@ class SwmmModel:
         return pd.DataFrame([vars(d) for d in self.derived], columns=columns)
 
     def sections(self):
-        """{placeholder: text} for every placeholder in :data:`TEMPLATE_PLACEHOLDERS`."""
+        """{placeholder: text} for every placeholder in :data:`TEMPLATE_PLACEHOLDERS`.
+
+        Fields are padded into columns for readability, but always separated by at least one
+        space, so a long name or number cannot run into the next field. Numbers are rounded to
+        :data:`DECIMALS` decimals.
+
+        Raises
+        ------
+        ValueError
+            If a name is empty or contains whitespace or ';', which SWMM would split or read as
+            a comment.
+        """
         return {
             "nodes": "".join(
-                f"{j.name:<16} {j.invert:<11} {j.max_depth:<11} {j.init_depth:<11}"
-                f"{j.surcharge_depth:<11} {j.ponding_area:<11}\n"
+                _line(
+                    (_name(j.name), 16),
+                    (j.invert, 11),
+                    (j.max_depth, 11),
+                    (j.init_depth, 11),
+                    (j.surcharge_depth, 11),
+                    (j.ponding_area, 11),
+                )
                 for j in self.junctions
             ),
             "outfalls": "".join(
-                f"{o.name:<16} {o.invert:<11}  {o.type:<28} {'NO':<10}\n" for o in self.outfalls
+                _line((_name(o.name), 16), (o.invert, 11), (o.type, 28), ("NO", 10))
+                for o in self.outfalls
             ),
             # FUNCTIONAL area = 0 * depth^0 + area: a constant plan area.
             "storage": "".join(
-                f"{s.name:<16} {s.invert:<11} {s.max_depth:<11} {s.init_depth:<11} "
-                f"{'FUNCTIONAL':<12} {0:<11} {0:<11} {s.area:<11} {0:<11} {0:<11}\n"
+                _line(
+                    (_name(s.name), 16),
+                    (s.invert, 11),
+                    (s.max_depth, 11),
+                    (s.init_depth, 11),
+                    ("FUNCTIONAL", 12),
+                    (0, 11),
+                    (0, 11),
+                    (s.area, 11),
+                    (0, 11),
+                    (0, 11),
+                )
                 for s in self.storage
             ),
             "conduits": "".join(
-                f"{c.name:<16} {c.inlet:<16} {c.outlet:<16}"
-                f"{c.length:<11} {c.roughness:<11} "
-                f"{c.inlet_offset:<11} {c.outlet_offset:<11}"
-                f"{c.init_flow:<11} {c.max_flow:<11}\n"
+                _line(
+                    (_name(c.name), 16),
+                    (_name(c.inlet), 16),
+                    (_name(c.outlet), 16),
+                    (c.length, 11),
+                    (c.roughness, 11),
+                    (c.inlet_offset, 11),
+                    (c.outlet_offset, 11),
+                    (c.init_flow, 11),
+                    (c.max_flow, 11),
+                )
                 for c in self.conduits
             ),
             "pumps": "".join(
-                f"{p.name:<16} {p.inlet:<16} {p.outlet:<16} {p.curve:<16} {p.status:<6} "
-                f"{p.startup:<11} {p.shutoff:<11}\n"
+                _line(
+                    (_name(p.name), 16),
+                    (_name(p.inlet), 16),
+                    (_name(p.outlet), 16),
+                    (p.curve if p.curve == "*" else _name(p.curve), 16),
+                    (p.status, 6),
+                    (p.startup, 11),
+                    (p.shutoff, 11),
+                )
                 for p in self.pumps
             ),
             "xsections": "".join(
-                f"{x.name:<16} {x.shape:<16} {x.geom1:<16}{x.geom2:<11} {0.0:<11} {0.0:<11} "
-                f"{x.barrels:<11}\n"
+                _line(
+                    (_name(x.name), 16),
+                    (x.shape, 16),
+                    (x.geom1, 16),
+                    (x.geom2, 11),
+                    (0.0, 11),
+                    (0.0, 11),
+                    (x.barrels, 11),
+                )
                 for x in self.xsections
             ),
             "curves": "".join(
                 "".join(
-                    f"{c.name:<16} {c.type if i == 0 else '':<9} {x:<11} {y:<11}\n"
+                    _line((_name(c.name), 16), (c.type if i == 0 else "", 9), (x, 11), (y, 11))
                     for i, (x, y) in enumerate(c.points)
                 )
                 + "\n"
                 for c in self.curves
             ),
             "dwf": "".join(
-                f"{d.node:<16} {'FLOW':<16} {d.base:<11} "
-                + " ".join(f'"{p}"' for p in d.patterns)
-                + "\n"
+                _line(
+                    (_name(d.node), 16),
+                    ("FLOW", 16),
+                    (d.base, 11),
+                    *((f'"{_name(p)}"', 0) for p in d.patterns),
+                )
                 for d in self.dwf
             ),
             # Six multipliers a line; the type is on the first line only.
             "patterns": "".join(
                 "".join(
-                    f"{p.name:<16} {p.type if i == 0 else '':<10} "
-                    + " ".join(f"{m:<8}" for m in p.multipliers[i : i + 6])
-                    + "\n"
+                    _line(
+                        (_name(p.name), 16),
+                        (p.type if i == 0 else "", 10),
+                        *((m, 8) for m in p.multipliers[i : i + 6]),
+                    )
                     for i in range(0, len(p.multipliers), 6)
                 )
                 + "\n"
                 for p in self.patterns
             ),
             "coordinates": "".join(
-                f"{node:<16} {x:<18} {y:<18}\n" for node, (x, y) in self.coordinates.items()
+                f"{_name(node):<16} {x:<18} {y:<18}\n" for node, (x, y) in self.coordinates.items()
             ),
             "vertices": "".join(
-                f"{name:<16} {x:<18} {y:<18}\n"
+                f"{_name(name):<16} {x:<18} {y:<18}\n"
                 for name, points in self.vertices.items()
                 for x, y in points
             ),
