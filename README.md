@@ -21,6 +21,19 @@ maps.to_leaflet(sub, "map.html")                    # interactive map; see Maps 
 A `Subnetwork`'s `graph` is a `networkx.MultiDiGraph` in the direction of flow, with one edge per
 pipe keyed by pipe ID, so parallel pipes are kept.
 
+## Install
+
+```bash
+pip install -e .                 # from a clone of this repository
+pip install -e ".[maps]"         # + web-tile basemaps and Leaflet maps (contextily, xyzservices, folium)
+pip install -e ".[simulate]"     # + pyswmm, to run the .inp files
+```
+
+swmmbuilder only writes `.inp` files and never imports pyswmm, so pyswmm is optional. pyswmm
+depends on `julian`, an sdist-only package whose `setup.py` imports `distutils`, which fails to
+build on some setups (e.g. `AttributeError: install_layout`); swmmbuilder itself installs and works
+without it.
+
 ## Node layers
 
 The pipes name their end nodes, but say little about them. Node layers add what they are and what

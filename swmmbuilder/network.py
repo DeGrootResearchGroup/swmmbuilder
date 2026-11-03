@@ -321,14 +321,14 @@ class Network:
             Largest difference between the inverts of merged nodes, in m.
 
         Returns
-        ----------
+        -------
         pandas.DataFrame
             One row per pair of nodes within ``tolerance``: ``node_1``, ``node_2``, ``distance``,
             ``invert_1``, ``invert_2``, ``snapped`` (bool), ``kept`` (the ID they were merged
             into) and ``reason`` (why a pair was not merged).
 
         Raises
-        ----------
+        ------
         ValueError
             If the data have no CRS.
         """
@@ -398,7 +398,7 @@ class Network:
         """The :class:`Subnetwork` made of ``nodes`` and every pipe between two of them.
 
         Raises
-        ----------
+        ------
         ValueError
             If a node is not in the network.
         """
@@ -426,7 +426,7 @@ class Network:
             outlet that ``node`` drains to.
 
         Raises
-        ----------
+        ------
         ValueError
             If a node is not in the network, or ``node`` drains to none of the outlets.
         """

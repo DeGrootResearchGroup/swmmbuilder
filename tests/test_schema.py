@@ -274,3 +274,11 @@ def test_from_toml_unknown_key(tmp_path):
     path.write_text(LONDON_TOML.replace("size_unit", "size_units"))
     with pytest.raises(ValueError, match=r"Unknown keys .*\['size_units'\]"):
         Schema.from_toml(path)
+
+
+def test_schema_is_hashable():
+    # Frozen, so usable as a dict key or in a set, e.g. to cache per schema.
+    copy = Schema.from_toml(REPO / "swmmbuilder" / "schemas" / "london_on.toml")
+    assert copy == LONDON_ON
+    assert hash(copy) == hash(LONDON_ON)
+    assert len({LONDON_ON, copy, dataclasses.replace(LONDON_ON, name="other")}) == 2

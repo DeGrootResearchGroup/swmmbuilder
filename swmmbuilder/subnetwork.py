@@ -99,7 +99,7 @@ class Subnetwork:
         attributes of ``network.graph``.
 
     Raises
-    ----------
+    ------
     ValueError
         If a node is not in the network.
     """
@@ -197,7 +197,7 @@ class Subnetwork:
             The outfall nodes (default: :attr:`outfalls`).
 
         Returns
-        ----------
+        -------
         pipes : list
             The pipe IDs of the chain, in flow order.
 
@@ -233,7 +233,7 @@ class Subnetwork:
             The outfall nodes, which need no outlet pipe (default: :attr:`outfalls`).
 
         Returns
-        ----------
+        -------
         TopologyReport
             Flow splits, cycles, dead ends (classified by node type) and parallel pipes, plus the
             force mains (with the pump stations that have none, the force mains that start at no
@@ -321,7 +321,7 @@ class Subnetwork:
             :func:`swmmbuilder.gaps.fill_gaps`.
 
         Returns
-        ----------
+        -------
         pandas.DataFrame
             One row per gap: ``element`` ('pipe' or 'node'), ``id``, ``gap``, ``detail``,
             ``filled_from`` (the rule that filled it; NaN if it is not filled), ``value``,
@@ -335,7 +335,7 @@ class Subnetwork:
         """Write the subnetwork to a SWMM .inp file; see :func:`swmmbuilder.swmm.write_inp`.
 
         Returns
-        ----------
+        -------
         SwmmModel
             The model that was written.
         """

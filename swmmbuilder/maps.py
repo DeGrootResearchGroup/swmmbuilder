@@ -28,7 +28,6 @@ import weakref
 from dataclasses import dataclass, field
 
 import geopandas as gpd
-import gmplot
 import matplotlib as mpl
 import matplotlib.patheffects as pe
 import numpy as np
@@ -480,7 +479,7 @@ def ribbon_strands(line, shares, width):
     is centred on the line. Units are those of the line's coordinates.
 
     Returns
-    ----------
+    -------
     list of shapely.Polygon
         One per share; empty for a zero share.
     """
@@ -688,7 +687,7 @@ def plot_pipes(
         CRS to draw in; default :func:`plot_crs`.
 
     Returns
-    ----------
+    -------
     DrawnLayer
         ``artist``: a LineCollection with one line per pipe, thinnest first so that thick pipes
         are drawn on top; ``ids``: the pipe IDs in that order.
@@ -817,7 +816,7 @@ def plot_ribbons(
         CRS to draw in; default :func:`plot_crs`.
 
     Returns
-    ----------
+    -------
     DrawnLayer
         ``artist``: a PatchCollection with one patch per strand; ``ids``: the pipe IDs drawn as
         ribbons; ``handles``: one per category drawn.
@@ -947,12 +946,12 @@ def node_group_polygons(
         CRS of the polygons; default :func:`plot_crs`.
 
     Returns
-    ----------
+    -------
     geopandas.GeoDataFrame
         A (Multi)Polygon per group, in the order of ``groups``, indexed by group name.
 
     Raises
-    ----------
+    ------
     ValueError
         If a node is not in ``net``, a group has no node with a position, or, for 'voronoi', a
         node position is in two groups.
@@ -1073,7 +1072,7 @@ def plot_groups(
         Style the axes as a map (:func:`map_axes`).
 
     Returns
-    ----------
+    -------
     DrawnLayer
         ``artist``: a PatchCollection with one patch per group that has an area; ``ids``: those
         groups.
@@ -1184,12 +1183,12 @@ def plot_markers(
         CRS to draw in; default :func:`plot_crs`.
 
     Returns
-    ----------
+    -------
     DrawnLayer
         ``artist``: the markers (a PathCollection), in the order of ``node_ids``.
 
     Raises
-    ----------
+    ------
     ValueError
         If a node is not in ``net`` or has no position.
     """
@@ -1465,7 +1464,7 @@ def to_leaflet(net, path, layers=None, *, tiles="OpenStreetMap"):
         Basemap tiles, as for :class:`folium.Map` (None for none).
 
     Returns
-    ----------
+    -------
     folium.Map
         The map that was written.
     """
@@ -1529,6 +1528,7 @@ def generate_gmap(subnetwork, file_name, origin=None):
             raise ValueError("The subnetwork has no node positions to centre the map on.")
         lon, lat = next(iter(positions.values()))
         origin = (lat, lon)
+    gmplot = _optional("gmplot")
     gmap = gmplot.GoogleMapPlotter(origin[0], origin[1], zoom=18)
 
     for node, (lon, lat) in positions.items():
