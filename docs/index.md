@@ -11,7 +11,7 @@ sub = net.catchment("OUT")                     # every node draining to OUT
 sub.to_inp("model.inp", outfalls=["OUT"])
 ```
 
-The [README](https://github.com/DeGrootResearchGroup/SewerNetworkx#readme) is the user guide: node
+The [README](https://github.com/DeGrootResearchGroup/swmmbuilder#readme) is the user guide: node
 layers, schemas, pumping stations, dry-weather flow, data gaps, maps and diagnostics. This site is
 the API reference, generated from the docstrings:
 

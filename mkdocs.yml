@@ -1,6 +1,6 @@
 site_name: swmmbuilder
 site_description: GIS sewer networks to SWMM .inp files
-repo_url: https://github.com/DeGrootResearchGroup/SewerNetworkx
+repo_url: https://github.com/DeGrootResearchGroup/swmmbuilder
 edit_uri: ""
 strict: true
 
@@ -20,7 +20,7 @@ nav:
       - Data gaps: api/gaps.md
       - Diagnostics: api/diagnostics.md
       - Maps: api/maps.md
-  - Changelog: https://github.com/DeGrootResearchGroup/SewerNetworkx/blob/main/CHANGELOG.md
+  - Changelog: https://github.com/DeGrootResearchGroup/swmmbuilder/blob/main/CHANGELOG.md
 
 markdown_extensions:
   - admonition
