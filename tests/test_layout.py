@@ -49,18 +49,25 @@ def test_data_and_design_layers_do_not_import_the_writer(module):
 
 def test_every_subpackage_is_packaged():
     # The tests run on an editable install, which finds every module; a regular install takes
-    # only the packages pyproject.toml selects (#84: swmmbuilder.swmm was left out).
+    # only the packages pyproject.toml selects (#84: swmmbuilder.swmm was left out). Checked
+    # with the standard library only: setuptools is not installed in every test environment.
     import tomllib
-
-    from setuptools import find_packages
+    from fnmatch import fnmatchcase
 
     config = tomllib.loads((REPO / "pyproject.toml").read_text())["tool"]["setuptools"]
     on_disk = {
         ".".join(p.relative_to(REPO).parts[:-1])
         for p in (REPO / "swmmbuilder").rglob("__init__.py")
     }
-    if "packages" in config and isinstance(config["packages"], list):
-        packaged = set(config["packages"])
+    if isinstance(config.get("packages"), list):
+        missing = on_disk - set(config["packages"])
     else:
-        packaged = set(find_packages(str(REPO), **config["packages"]["find"]))
-    assert on_disk <= packaged
+        find = config["packages"]["find"]
+        include, exclude = find.get("include", ["*"]), find.get("exclude", [])
+        missing = {
+            package
+            for package in on_disk
+            if not any(fnmatchcase(package, pattern) for pattern in include)
+            or any(fnmatchcase(package, pattern) for pattern in exclude)
+        }
+    assert not missing, f"Subpackages a regular install leaves out: {sorted(missing)}"
