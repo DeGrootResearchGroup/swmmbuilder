@@ -45,3 +45,22 @@ def _package_imports(module):
 @pytest.mark.parametrize("module", ["schema.py", "design.py", "pumps.py", "units.py"])
 def test_data_and_design_layers_do_not_import_the_writer(module):
     assert not any(m == "swmm" or m.startswith("swmm.") for m in _package_imports(module))
+
+
+def test_every_subpackage_is_packaged():
+    # The tests run on an editable install, which finds every module; a regular install takes
+    # only the packages pyproject.toml selects (#84: swmmbuilder.swmm was left out).
+    import tomllib
+
+    from setuptools import find_packages
+
+    config = tomllib.loads((REPO / "pyproject.toml").read_text())["tool"]["setuptools"]
+    on_disk = {
+        ".".join(p.relative_to(REPO).parts[:-1])
+        for p in (REPO / "swmmbuilder").rglob("__init__.py")
+    }
+    if "packages" in config and isinstance(config["packages"], list):
+        packaged = set(config["packages"])
+    else:
+        packaged = set(find_packages(str(REPO), **config["packages"]["find"]))
+    assert on_disk <= packaged
