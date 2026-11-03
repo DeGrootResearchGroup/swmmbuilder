@@ -110,7 +110,7 @@ class Subnetwork:
 
     def __init__(self, network, nodes):
         nodes = sorted({network.resolve(n) for n in nodes})
-        network._check_nodes(nodes)
+        network.check_nodes(nodes)
         self._network = network
         self._version = network.version
         # Built explicitly: networkx's subgraph views iterate their nodes in set order.
@@ -124,6 +124,7 @@ class Subnetwork:
         )
         self._ends = {pipe: (up, down) for up, down, pipe in self.graph.edges(keys=True)}
         self._by_text = None
+        self._pipes_by_text = None
 
     @classmethod
     def from_node_list(cls, network, path):
@@ -202,6 +203,50 @@ class Subnetwork:
             matched[node] = value
         if clashes:
             raise ValueError(f"{option}: nodes given more than once: {', '.join(clashes)}")
+        return matched
+
+    def match_pipe(self, key):
+        """The pipe ID that an option key names: ``key`` itself if it is a pipe of the
+        subnetwork, else the pipe whose ID has the same text (so ``1010`` and ``'1010'`` name the
+        same pipe), else ``key`` unchanged."""
+        if key in self._ends:
+            return key
+        if self._pipes_by_text is None:
+            self._pipes_by_text = {str(p): p for p in self._ends}
+        return self._pipes_by_text.get(str(key), key)
+
+    def match_pipes(self, mapping, option, unknown="raise"):
+        """``mapping`` with its keys replaced by :meth:`match_pipe`.
+
+        Parameters
+        ----------
+        mapping : dict
+            {pipe ID: value}, e.g. an option of :func:`~swmmbuilder.swmm.build_model`.
+        option : str
+            The option's name, for the error messages.
+        unknown : {'raise', 'ignore'}
+            Keys that name no pipe of the subnetwork: raise ValueError, or leave them out (for
+            options that may list pipes of other subnetworks too).
+
+        Raises
+        ------
+        ValueError
+            If a key names no pipe of the subnetwork (with ``unknown='raise'``), or two keys
+            name the same pipe with different values.
+        """
+        matched, clashes, missing = {}, [], []
+        for key, value in mapping.items():
+            pipe = self.match_pipe(key)
+            if pipe not in self._ends:
+                missing.append(str(key))
+                continue
+            if pipe in matched and matched[pipe] != value:
+                clashes.append(str(pipe))
+            matched[pipe] = value
+        if missing and unknown == "raise":
+            raise ValueError(f"{option}: pipes not in the subnetwork: {', '.join(sorted(missing))}")
+        if clashes:
+            raise ValueError(f"{option}: pipes given more than once: {', '.join(clashes)}")
         return matched
 
     @property

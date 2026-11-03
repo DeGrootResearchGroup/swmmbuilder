@@ -72,7 +72,7 @@ def node_inverts(subnetwork, height_correction=None):
     nodes = set(subnetwork.nodes)
     inverts = lowest_inverts(subnetwork.pipes(), nodes)
     if nodes - set(inverts):
-        inverts.update(lowest_inverts(subnetwork.network.full_data, nodes - set(inverts)))
+        inverts.update(subnetwork.network.lowest_inverts(nodes - set(inverts)))
     missing = sorted(nodes - set(inverts))
     if missing:
         raise ValueError(f"No pipe invert found for nodes: {', '.join(map(str, missing))}")
@@ -667,7 +667,9 @@ def build_model(
         pipes[pipes["pipe_id"].isin(list(inputs.force_mains))],
         sections,
         force_main_roughness,
-        force_main_roughness_by_pipe,
+        subnetwork.match_pipes(
+            force_main_roughness_by_pipe or {}, "force_main_roughness_by_pipe", unknown="ignore"
+        ),
     )
     model = SwmmModel(data_gaps=filled.report, derived=derived)
     discharge_of = _add_nodes(model, subnetwork, inputs, pipes, inverts, defaults)

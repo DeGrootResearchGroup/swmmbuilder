@@ -9,8 +9,8 @@ from ..pumps import Pump, PumpStation, StationPump, WetWell
 def resolve_pumps(subnetwork, pumps):
     """{pipe_id: Pump} from the ``pumps`` option of :func:`build_model`.
 
-    The keys are matched to the subnetwork pipe IDs as strings, so ``1010`` and ``'1010'`` are
-    the same pipe; the result is keyed by the pipe IDs of the data.
+    The keys are matched with :meth:`Subnetwork.match_pipe`, so ``1010`` and ``'1010'`` are the
+    same pipe; the result is keyed by the pipe IDs of the data.
 
     Raises
     ------
@@ -19,11 +19,10 @@ def resolve_pumps(subnetwork, pumps):
     """
     if not pumps:
         return {}
-    ids = {str(p): p for p in subnetwork.pipes()["pipe_id"]}
-    missing = sorted(str(k) for k in pumps if str(k) not in ids)
-    if missing:
-        raise ValueError(f"Pumped pipes not in the subnetwork: {', '.join(missing)}")
-    return {ids[str(k)]: Pump.coerce(k, v, curve_type="PUMP3") for k, v in pumps.items()}
+    return {
+        pipe: Pump.coerce(pipe, value, curve_type="PUMP3")
+        for pipe, value in subnetwork.match_pipes(pumps, "pumps").items()
+    }
 
 
 def resolve_wet_wells(subnetwork, wet_wells, outfalls=()):
@@ -62,9 +61,7 @@ def resolve_pump_stations(subnetwork, pump_stations, outfalls=(), default_pump=N
         return {}, []
     pump_stations = subnetwork.match_nodes(pump_stations, "pump_stations")
     nodes = set(subnetwork.nodes)
-    taken = {str(n) for n in subnetwork.network.graph.nodes} | {
-        str(p) for p in subnetwork.network.full_data["pipe_id"]
-    }
+    taken = {str(i) for i in subnetwork.network.ids()}
     typed = {n for n, t in subnetwork.graph.nodes(data="node_type") if t == "pump_station"}
     ends = typed | set(pump_stations)
     stations, links, problems = {}, [], []
@@ -82,15 +79,15 @@ def resolve_pump_stations(subnetwork, pump_stations, outfalls=(), default_pump=N
             continue
         chosen = outlets
         if station.force_mains is not None:
-            ids = {str(p): p for p in outlets}
-            wrong = [str(p) for p in station.force_mains if str(p) not in ids]
+            matched = [subnetwork.match_pipe(p) for p in station.force_mains]
+            wrong = [str(p) for p in matched if p not in outlets]
             if wrong:
                 problems.append(
                     f"{node}: force mains {', '.join(wrong)} do not leave it "
                     f"(its force mains: {', '.join(map(str, outlets))})"
                 )
                 continue
-            chosen = [ids[str(p)] for p in station.force_mains]
+            chosen = matched
             unused = [str(p) for p in outlets if p not in chosen]
             if unused:
                 warnings.warn(
