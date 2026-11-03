@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import numbers
 from typing import TYPE_CHECKING
 
 import matplotlib.patheffects as pe
@@ -129,7 +130,7 @@ def plot_pipes(
     pipes = _geodata(net, "pipes", crs)
     if width is None:
         linewidths = np.full(len(pipes), 1.0)
-    elif isinstance(width, int | float):
+    elif isinstance(width, numbers.Real):  # Python or NumPy
         linewidths = np.full(len(pipes), float(width))
     else:
         linewidths = _scaled(_aligned(width, pipes.index, "widths"), width_range, width_scale)

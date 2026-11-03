@@ -55,8 +55,9 @@ pythonpath = [".", "tests"]
 
 [tool.mypy]
 # The public API is annotated (#81); the private helpers mostly are not, and mypy skips their
-# bodies. geopandas, networkx, shapely and the plotting libraries ship no type stubs.
-python_version = "3.11"
+# bodies. geopandas, networkx, shapely and the plotting libraries ship no type stubs. No
+# python_version: dependencies' stubs may use newer syntax (numpy 2.5's need 3.12), so mypy checks
+# as the Python it runs on; the 3.11 test job and ruff's target-version cover 3.11.
 ignore_missing_imports = true
 warn_unused_ignores = true
 warn_redundant_casts = true

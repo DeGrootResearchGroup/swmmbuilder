@@ -168,7 +168,7 @@ def add_legends(
     for layer in layers:
         if layer.mappable is not None:
             top = state["key_top"]
-            cax = ax.inset_axes([x, top - colorbar_height, 0.03, colorbar_height])
+            cax = ax.inset_axes((x, top - colorbar_height, 0.03, colorbar_height))
             state["keys"].append(cax)
             layer.colorbar = fig.colorbar(layer.mappable, cax=cax)
             layer.colorbar.set_label(layer.title or "", size=8)
