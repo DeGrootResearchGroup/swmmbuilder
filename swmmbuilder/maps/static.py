@@ -9,7 +9,7 @@ from matplotlib.lines import Line2D
 from matplotlib.patches import Patch, PathPatch
 
 from ..geometry import line_coords
-from .colours import _aligned, _colour_by, _scaled, category_colors
+from .colours import _aligned, _colour_by, _colour_options, _scaled, category_colors
 from .crs import _check_nodes, _geodata
 from .polygons import _path
 from .style import DrawnLayer, _finish, add_legends
@@ -35,6 +35,7 @@ def plot_pipes(
     vmax=None,
     color=None,
     missing_color="0.75",
+    colour=None,
     width=None,
     width_range=(0.4, 4.0),
     width_scale="sqrt",
@@ -65,6 +66,10 @@ def plot_pipes(
         Colour map, ``'linear'``, ``'log'`` or a matplotlib Normalize, and its limits (default:
         the range of the values).
 
+    colour : ColourScale, optional
+        ``cmap``, ``norm``, ``vmin``, ``vmax`` and ``missing_color`` in one object, e.g. to share
+        a scale between plots; not with those keywords.
+
     width : float, pandas.Series or dict, optional
         Line width in points (constant on screen when zooming): one for every pipe, or a value
         per pipe (e.g. flow) mapped onto ``width_range`` by ``width_scale``. Default 1.
@@ -94,6 +99,11 @@ def plot_pipes(
         ``artist``: a LineCollection with one line per pipe, thinnest first so that thick pipes
         are drawn on top; ``ids``: the pipe IDs in that order.
     """
+    cmap, norm, vmin, vmax, missing_color = _colour_options(
+        colour,
+        (cmap, norm, vmin, vmax, missing_color),
+        ("viridis", "linear", None, None, "0.75"),
+    )
     if context and values is not None:
         raise ValueError("Context pipes are drawn in one colour; values cannot be given.")
     if color is None:
@@ -141,6 +151,7 @@ def plot_groups(
     vmax=None,
     color=None,
     missing_color="0.85",
+    colour=None,
     edgecolor="white",
     linewidth=1.2,
     alpha=0.3,
@@ -167,6 +178,10 @@ def plot_groups(
     values : pandas.Series or dict, optional
         Value per group, coloured through ``cmap``/``norm`` with a colour bar (groups with no
         value in ``missing_color``).
+
+    colour : ColourScale, optional
+        ``cmap``, ``norm``, ``vmin``, ``vmax`` and ``missing_color`` in one object (see
+        :func:`plot_pipes`); not with those keywords.
 
     colors : dict or list, optional
         Without ``values``: colour per group (default :func:`category_colors` of the groups),
@@ -197,6 +212,11 @@ def plot_groups(
         ``artist``: a PatchCollection with one patch per group that has an area; ``ids``: those
         groups.
     """
+    cmap, norm, vmin, vmax, missing_color = _colour_options(
+        colour,
+        (cmap, norm, vmin, vmax, missing_color),
+        ("viridis", "linear", None, None, "0.85"),
+    )
     paths = [(g, _path(geometry)) for g, geometry in polygons.geometry.items()]
     paths = [(g, p) for g, p in paths if p is not None]
     ids = [g for g, _ in paths]

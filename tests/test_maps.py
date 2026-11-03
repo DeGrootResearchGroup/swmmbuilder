@@ -3,6 +3,7 @@ basemaps and export."""
 
 import dataclasses
 import json
+import re
 import sys
 import types
 
@@ -857,3 +858,75 @@ line_coords
 @pytest.mark.parametrize("name", FORMER_MAPS_NAMES)
 def test_former_maps_names_are_importable(name):
     assert hasattr(maps, name)
+
+
+# ---- ColourScale (#80) ---------------------------------------------------------------------
+
+
+def _drawn(sub, **kwargs):
+    ids = sub.to_geodataframe("pipes").index
+    values = pd.Series(np.arange(1.0, len(ids) + 1), index=ids)
+    values.iloc[0] = np.nan
+    fig, ax = plt.subplots()
+    layer = maps.plot_pipes(ax, sub, values, **kwargs)
+    fig.canvas.draw()
+    colours = [to_hex(c) for c in layer.artist.get_colors()]
+    norm = layer.mappable.norm
+    plt.close(fig)
+    return colours, (type(norm), norm.vmin, norm.vmax)
+
+
+def test_colour_scale_draws_like_the_keywords(sub):
+    keywords = dict(cmap="magma", norm="log", vmin=2.0, vmax=6.0, missing_color="#ff0000")
+    assert _drawn(sub, colour=maps.ColourScale(**keywords)) == _drawn(sub, **keywords)
+
+
+def test_colour_scale_missing_colour_defaults_to_the_function(sub, ax):
+    colours, _ = _drawn(sub, colour=maps.ColourScale(cmap="magma"))
+    assert to_hex("0.75") in colours  # plot_pipes' default missing colour
+    polygons = maps.node_group_polygons(sub, GROUPS)
+    layer = maps.plot_groups(ax, polygons, {"A": 1.0}, colour=maps.ColourScale(cmap="magma"))
+    ax.figure.canvas.draw()
+    assert to_hex("0.85") in [to_hex(c) for c in layer.artist.get_facecolors()]
+
+
+def test_one_colour_scale_for_two_plots(sub):
+    scale = maps.ColourScale(vmin=0.0, vmax=100.0)
+    ids = sub.to_geodataframe("pipes").index
+    norms = []
+    for factor in (1, 10):
+        fig, ax = plt.subplots()
+        values = pd.Series(factor * np.arange(len(ids), dtype=float), index=ids)
+        layer = maps.plot_pipes(ax, sub, values, colour=scale)
+        norms.append((layer.mappable.norm.vmin, layer.mappable.norm.vmax))
+        plt.close(fig)
+    assert norms == [(0.0, 100.0), (0.0, 100.0)]
+
+
+def test_colour_scale_and_keywords_clash(ax, sub):
+    with pytest.raises(ValueError, match="Pass either colour= or cmap, vmin, not both"):
+        maps.plot_pipes(ax, sub, {}, colour=maps.ColourScale(), cmap="magma", vmin=1.0)
+    with pytest.raises(ValueError, match="Pass either colour= or norm, not both"):
+        maps.PipeLayer(norm="log", colour=maps.ColourScale(norm="linear"))
+    with pytest.raises(TypeError, match="colour must be a ColourScale"):
+        maps.plot_pipes(ax, sub, {}, colour="magma")
+
+
+def test_leaflet_layers_take_a_colour_scale(sub, tmp_path):
+    pytest.importorskip("folium")
+    scale = maps.ColourScale(cmap="magma", norm="log", vmin=1.0, vmax=10.0)
+    layer = maps.PipeLayer(colour=scale)
+    assert (layer.cmap, layer.norm, layer.vmin, layer.vmax) == ("magma", "log", 1.0, 10.0)
+    assert layer.missing_color == "#bbbbbb"  # the layer's own default
+    assert maps.GroupLayer(GROUPS, colour=scale).missing_color == "#dddddd"
+    assert dataclasses.replace(layer, name="Again").cmap == "magma"  # no spurious clash
+    ids = sub.to_geodataframe("pipes").index
+    values = pd.Series(np.arange(1.0, len(ids) + 1), index=ids)
+    html = []
+    for each in (
+        maps.PipeLayer(values, colour=scale),
+        maps.PipeLayer(values, cmap="magma", norm="log", vmin=1.0, vmax=10.0),
+    ):
+        maps.to_leaflet(sub, tmp_path / "map.html", [each], tiles=None)
+        html.append(re.findall(r'"_colour": "(#[0-9a-f]{6})"', (tmp_path / "map.html").read_text()))
+    assert html[0] == html[1] and html[0]
