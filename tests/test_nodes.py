@@ -401,3 +401,32 @@ def test_height_correction_outside_the_subnetwork(snapped, caplog):
     assert "nodes not in the network, ignored: NOPE" in caplog.text
     assert "M1" not in caplog.text
     assert "M1" not in {j.name for j in model.junctions}
+
+
+# --- Subnetworks made before a snap (#75) ---------------------------------------------------
+
+
+def test_subnetwork_made_before_a_snap_is_out_of_date(tmp_path):
+    net = load()
+    sub = net.subnetwork(["M8", "DUP1", "DUP2", "M3"])
+    sub.validate()  # fine before the snap
+    net.snap_nodes(0.5, max_invert_difference=1.0)  # DUP2 -> DUP1
+    for use in (sub.pipes, sub.validate, sub.data_gaps, lambda: sub.to_inp(tmp_path / "x.inp")):
+        with pytest.raises(RuntimeError, match=r"out of date.*network\.subnetwork"):
+            use()
+    rebuilt = net.subnetwork(sub.nodes)  # DUP2 resolves to DUP1
+    assert rebuilt.nodes == ["DUP1", "M3", "M8"]
+    rebuilt.validate()
+
+
+def test_snap_that_merges_nothing_keeps_subnetworks():
+    net = load()
+    sub = net.subnetwork(["M8", "DUP1"])
+    net.snap_nodes(0.001)  # nothing that close
+    assert not net.aliases
+    sub.validate()
+
+
+def test_subnetwork_made_after_a_snap_is_current():
+    net = load(snap_tolerance=0.5, max_invert_difference=1.0)
+    net.subnetwork(["M8", "DUP1", "M3"]).validate()

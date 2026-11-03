@@ -93,7 +93,9 @@ class Subnetwork:
     Attributes
     ----------
     network : Network
-        The network the subnetwork belongs to.
+        The network the subnetwork belongs to. Reading it raises ``RuntimeError`` once the
+        network has changed since the subnetwork was made (e.g. by :meth:`Network.snap_nodes`):
+        the subnetwork's nodes and pipes would no longer match the network's.
 
     graph : networkx.MultiDiGraph
         The induced subgraph of ``network.graph``: edges in the direction of flow, keyed by
@@ -109,7 +111,8 @@ class Subnetwork:
     def __init__(self, network, nodes):
         nodes = sorted({network.resolve(n) for n in nodes})
         network._check_nodes(nodes)
-        self.network = network
+        self._network = network
+        self._version = network.version
         # Built explicitly: networkx's subgraph views iterate their nodes in set order.
         selected = set(nodes)
         self.graph = nx.MultiDiGraph()
@@ -142,6 +145,16 @@ class Subnetwork:
         """
         lines = ["# swmmbuilder node list: one node ID per line", *map(str, self.nodes)]
         Path(path).write_text("\n".join(lines) + "\n")
+
+    @property
+    def network(self):
+        if self._network.version != self._version:
+            raise RuntimeError(
+                "This subnetwork is out of date: its network changed since it was made (e.g. "
+                "nodes were merged by snap_nodes). Rebuild it with "
+                "network.subnetwork(subnetwork.nodes); merged IDs resolve to the IDs kept."
+            )
+        return self._network
 
     @property
     def nodes(self):
