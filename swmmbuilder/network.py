@@ -12,7 +12,7 @@ import pandas as pd
 from shapely import Point
 
 from .gaps import lowest_inverts
-from .geometry import node_positions, to_geodataframe
+from .geometry import is_disjoint, node_positions, to_geodataframe
 from .schema import LONDON_ON, NODE_COLUMNS, as_schema
 from .subnetwork import Subnetwork
 
@@ -61,6 +61,24 @@ def _pipe_records(data):
         if pd.isna(up) or pd.isna(down):
             continue
         yield oid, up, down, length, None if pd.isna(structure) else structure
+
+
+def _ids(ids, limit=20):
+    """Text listing up to ``limit`` IDs."""
+    ids = [str(i) for i in ids]
+    more = f" and {len(ids) - limit} more" if len(ids) > limit else ""
+    return ", ".join(ids[:limit]) + more
+
+
+def _nullable(dtype):
+    """A dtype that holds ``dtype``'s values and missing values: NumPy ints and bools become
+    pandas' nullable Int64 and boolean (a node layer's column, e.g. an all-numeric name, is
+    missing for nodes that are not in the layer)."""
+    if pd.api.types.is_bool_dtype(dtype):
+        return "boolean"
+    if pd.api.types.is_integer_dtype(dtype):
+        return "Int64"
+    return dtype
 
 
 def _read(layer):
@@ -143,8 +161,10 @@ class Network:
 
     removed : dict
         What was dropped on loading: ``{'flow_type': {flow_type: count}, 'status': {status:
-        count}, 'structure_type': {structure_type: count}}``. Pipes with no flow type are counted
-        under ``'None'``.
+        count}, 'structure_type': {structure_type: count}, 'invalid': {problem: count}}``. Pipes
+        with no flow type are counted under ``'None'``; ``'invalid'`` counts the pipes with
+        ``'no pipe_id'`` or ``'no length'`` (none in the data, and no geometry to compute it
+        from), which cannot be used. Pipes with no geometry but a length are kept.
 
     snap_report : pandas.DataFrame or None
         The report of :meth:`snap_nodes` if ``snap_tolerance`` was given.
@@ -174,7 +194,8 @@ class Network:
         if normalize_ids is not None:
             for column in ("from_node", "to_node"):
                 self.full_data[column] = self.full_data[column].map(normalize_ids)
-        self.removed = {"flow_type": {}, "status": {}, "structure_type": {}}
+        self.removed = {"flow_type": {}, "status": {}, "structure_type": {}, "invalid": {}}
+        self._drop_invalid()
 
         if flow_types is not None and "flow_type" in schema.columns:
             flow_types = {schema.flow_type(f) for f in flow_types}
@@ -201,6 +222,43 @@ class Network:
         self._build()
         if snap_tolerance is not None:
             self.snap_report = self.snap_nodes(snap_tolerance, max_invert_difference)
+
+    def _drop_invalid(self):
+        """Drop the pipes that cannot be used (no pipe_id, or no length from the data or the
+        geometry), counting them in ``removed['invalid']``, and warn about pipes with no
+        geometry or whose MultiLineString parts do not join."""
+        data = self.full_data
+        problems = {
+            "no pipe_id": data["pipe_id"].isna(),
+            "no length": data["pipe_id"].notna() & data["length"].isna(),
+        }
+        for problem, mask in problems.items():
+            if mask.any():
+                self.removed["invalid"][problem] = int(mask.sum())
+                logger.warning(
+                    "Removed %d pipes with %s%s",
+                    int(mask.sum()),
+                    problem,
+                    "" if problem == "no pipe_id" else f": {_ids(data.loc[mask, 'pipe_id'])}",
+                )
+        self.full_data = data[~(problems["no pipe_id"] | problems["no length"])]
+        geometry = self.full_data.geometry
+        missing = geometry.isna() | geometry.is_empty
+        if missing.any():
+            logger.warning(
+                "%d pipes have no geometry; they are kept (their length is from the data), but "
+                "they give no node positions or vertices: %s",
+                int(missing.sum()),
+                _ids(self.full_data.loc[missing, "pipe_id"]),
+            )
+        disjoint = geometry[~missing].map(is_disjoint)
+        if disjoint.any():
+            logger.warning(
+                "%d pipes are MultiLineStrings whose parts do not join; their parts are joined "
+                "in order, with a straight segment across each gap: %s",
+                int(disjoint.sum()),
+                _ids(self.full_data.loc[disjoint[disjoint].index, "pipe_id"]),
+            )
 
     def _drop(self, keep, column, reason):
         """Drop the pipes not in ``keep``, counting them by ``column`` in ``removed``."""
@@ -270,7 +328,7 @@ class Network:
             layers = layers[~duplicated].set_index("node_id")
             nodes.update(layers[[*columns, "layer"]])
             for column in columns:
-                nodes[column] = nodes[column].astype(layers[column].dtype)
+                nodes[column] = nodes[column].astype(_nullable(layers[column].dtype))
             geometry.update(layers.geometry)
 
         inventory = pd.concat(

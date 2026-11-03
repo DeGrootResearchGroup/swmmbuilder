@@ -497,7 +497,8 @@ def _fill_node_inverts(graph, unknown, inverts, invert_fill, headwater_slope, re
         (down_node, down_length) = down
         if up is not None and invert_fill == "interpolate":
             up_node, up_length = up
-            fraction = down_length / (up_length + down_length)
+            total = up_length + down_length
+            fraction = down_length / total if total > 0 else 0.0
             value = known[down_node] + (known[up_node] - known[down_node]) * fraction
             rule = "interpolate"
             source = (
