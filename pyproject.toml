@@ -39,8 +39,9 @@ test = [
   "pyswmm",
 ]
 
-[tool.setuptools]
-packages = ["swmmbuilder"]
+# Found, not listed, so that subpackages (swmmbuilder.swmm, swmmbuilder.maps) are installed too.
+[tool.setuptools.packages.find]
+include = ["swmmbuilder*"]
 
 [tool.setuptools.package-data]
 # The default .inp template and the schema presets, loaded with importlib.resources.
