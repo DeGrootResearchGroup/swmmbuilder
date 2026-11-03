@@ -4,6 +4,7 @@ import logging
 import warnings
 from collections import Counter
 from collections.abc import Iterable
+from dataclasses import dataclass
 from pathlib import Path
 
 from ..design import (
@@ -91,6 +92,361 @@ def outfall_types(outfalls, subnetwork=None):
     if subnetwork is None:
         return dict(outfalls)
     return subnetwork.match_nodes(outfalls, "outfalls")
+
+
+# ---- The phases of build_model ---------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class _Defaults:
+    """The junction and conduit defaults of :func:`build_model`."""
+
+    max_depth: float
+    init_depth: float
+    surcharge_depth: float
+    ponding_area: float
+    force_main_surcharge_depth: float
+    manning_n: float
+    manning_n_by_material: dict
+    init_flow: float
+    max_flow: float
+    barrels: float
+
+
+@dataclass(frozen=True)
+class ModelInputs:
+    """The options of :func:`build_model`, resolved against a subnetwork and cross-checked.
+
+    The mappings may be filled in by later phases (``wet_wells`` and the stations' wet wells
+    and pump levels, by the ``wet_well_defaults`` rule); the fields are not reassigned.
+    """
+
+    outfalls: dict
+    pumps: dict
+    height_correction: dict | None
+    wet_wells: dict
+    stations: dict
+    station_pumps: list
+    chains: dict
+    force_mains: frozenset
+    dwf: dict
+    patterns: dict
+    dwf_patterns: dict
+    flow_units: str
+    inlets: dict
+
+
+def _resolve_inputs(
+    subnetwork,
+    outfalls,
+    height_correction,
+    pumps,
+    wet_wells,
+    pump_stations,
+    default_pump,
+    dwf,
+    patterns,
+    dwf_patterns,
+    flow_units,
+):
+    """The :class:`ModelInputs` of the options of :func:`build_model`; raise ValueError for an
+    invalid option or two options that contradict each other."""
+    outfalls = outfall_types(outfalls, subnetwork)
+    unknown = sorted(set(outfalls) - set(subnetwork.nodes))
+    if unknown:
+        raise ValueError(f"Outfalls not in the subnetwork: {', '.join(map(str, unknown))}")
+    pumps = resolve_pumps(subnetwork, pumps)
+    if height_correction is not None:
+        height_correction = subnetwork.match_nodes(height_correction, "height_correction")
+    wet_wells = resolve_wet_wells(subnetwork, wet_wells, outfalls)
+    stations, station_pumps = resolve_pump_stations(
+        subnetwork, pump_stations, outfalls, default_pump
+    )
+    both = sorted(str(n) for n, s in stations.items() if s.wet_well is not None and n in wet_wells)
+    if both:
+        raise ValueError(f"Wet wells given both in wet_wells and pump_stations: {', '.join(both)}")
+    flow_units = str(flow_units).upper()
+    if flow_units not in _FLOW_UNIT_LPS:
+        raise ValueError(f"flow_units must be one of {list(_FLOW_UNIT_LPS)}, not {flow_units!r}.")
+    wet_wells.update({n: s.wet_well for n, s in stations.items() if s.wet_well is not None})
+    chains = {first: chain for link in station_pumps for first, chain in link.force_mains.items()}
+    force_mains = frozenset(pipe for chain in chains.values() for pipe in chain)
+    both = sorted(str(p) for p in pumps if p in force_mains)
+    if both:
+        raise ValueError(
+            "Pipes both in pumps and in a pump station's force main: " + ", ".join(both)
+        )
+    curves = {f"{p}_curve" for p, pump in pumps.items() if pump.curve != "*"}
+    both = sorted(
+        f"{n}_curve" for n, s in stations.items() if s.pump.curve != "*" and f"{n}_curve" in curves
+    )
+    if both:
+        raise ValueError(
+            "Pump curve names of both a pumped pipe and a pump station (a pipe ID equal to a "
+            f"station node): {', '.join(both)}"
+        )
+    dwf = resolve_dwf(subnetwork, dwf, outfalls)
+    patterns = resolve_patterns(patterns)
+    dwf_patterns = resolve_dwf_patterns(dwf_patterns, dwf, patterns, subnetwork)
+    pipes = subnetwork.pipes()
+    inlets = dict(zip(pipes["pipe_id"], pipes["from_node"], strict=True))
+    dry = sorted(
+        f"{name} (inlet {inlets[name]})"
+        for name, pump in pumps.items()
+        if pump.curve != "*" and pump.curve_type == "PUMP1" and inlets[name] not in wet_wells
+    )
+    if dry:
+        raise ValueError(
+            f"PUMP1 pumps need a wet well at their inlet node (pass wet_wells): {', '.join(dry)}"
+        )
+    return ModelInputs(
+        outfalls=outfalls,
+        pumps=pumps,
+        height_correction=height_correction,
+        wet_wells=wet_wells,
+        stations=stations,
+        station_pumps=station_pumps,
+        chains=chains,
+        force_mains=force_mains,
+        dwf=dwf,
+        patterns=patterns,
+        dwf_patterns=dwf_patterns,
+        flow_units=flow_units,
+        inlets=inlets,
+    )
+
+
+def _refuse_remaining_gaps(subnetwork, filled):
+    """Raise ValueError listing the gaps that stop the subnetwork from being written."""
+    remaining = filled.remaining
+    if len(remaining):
+        lines = [f"{row.element} {row.id}: {row.detail}" for row in remaining.itertuples()]
+        raise ValueError(
+            f"Cannot write the subnetwork: {len(lines)} gaps in the data remain (see "
+            "Subnetwork.data_gaps() for the full report, and its fill options):\n  "
+            + "\n  ".join(lines)
+            + f"\nKnown shape codes in schema {subnetwork.schema.name!r}: "
+            f"{list(subnetwork.schema.shapes)}."
+        )
+
+
+def _apply_design_rules(subnetwork, inputs, pipes, inverts, wet_well_defaults):
+    """Apply ``wet_well_defaults`` (filling ``inputs.wet_wells`` and the stations), check the
+    pumps' wet wells and levels, and return the :class:`Derived` values."""
+    stations, wet_wells = inputs.stations, inputs.wet_wells
+    derived = []
+    if wet_well_defaults is not None:
+        for node, station in stations.items():
+            if station.wet_well is None and node in wet_wells:
+                station.wet_well = wet_wells[node]
+        derived = apply_wet_well_defaults(
+            subnetwork,
+            pipes,
+            stations,
+            inverts,
+            wet_well_defaults,
+            inputs.flow_units,
+            inputs.force_mains,
+            pump_names={
+                node: [link.name for link in inputs.station_pumps if link.station == node]
+                for node in stations
+            },
+        )
+    wet_wells.update({n: s.wet_well for n, s in stations.items() if s.wet_well is not None})
+    problems = [
+        f"{node} has a PUMP1 pump and no wet well (pass wet_well, wet_wells or wet_well_defaults)"
+        for node, station in stations.items()
+        if station.pump.curve != "*"
+        and station.pump.curve_type == "PUMP1"
+        and node not in wet_wells
+    ]
+    problems += [
+        problem
+        for node, station in stations.items()
+        if (problem := pump_level_problem(node, station.pump, wet_wells.get(node)))
+    ]
+    problems += [
+        problem
+        for name, pump in inputs.pumps.items()
+        if (problem := pump_level_problem(name, pump, wet_wells.get(inputs.inlets[name])))
+    ]
+    if problems:
+        raise ValueError("Invalid pumps:\n  " + "\n  ".join(problems))
+    return derived
+
+
+def _add_nodes(model, subnetwork, inputs, pipes, inverts, defaults):
+    """Add the junctions, outfalls, storage nodes and coordinates of ``subnetwork``, and each
+    pump station's discharge node (whose invert is added to ``inverts``) to ``model``. Return
+    {first pipe of a force main: discharge node}."""
+    outfalls, wet_wells, height_correction = (
+        inputs.outfalls,
+        inputs.wet_wells,
+        inputs.height_correction,
+    )
+    outlets = dict(zip(pipes["pipe_id"], pipes["to_node"], strict=True))
+    pressurised = {outlets[p] for chain in inputs.chains.values() for p in chain[:-1]}
+    for node in subnetwork.nodes:
+        invert = inverts[node]
+        if height_correction is not None and node in height_correction:
+            logger.info("Node %s: invert set to %s by height_correction", node, invert)
+        if node in outfalls:
+            model.outfalls.append(Outfall(node, invert, outfalls[node]))
+        elif node in wet_wells:
+            well = wet_wells[node]
+            model.storage.append(Storage(node, invert, well.max_depth, well.init_depth, well.area))
+        else:
+            depth = defaults.max_depth
+            rim = subnetwork.graph.nodes[node].get("rim_elevation")
+            if rim is not None and rim > invert:
+                depth = round(rim - invert, 4)
+            elif rim is not None:
+                logger.warning(
+                    "Node %s: rim elevation %s is not above the invert %s; max depth %s is used",
+                    node,
+                    rim,
+                    invert,
+                    defaults.max_depth,
+                )
+            surcharge = defaults.surcharge_depth
+            if node in pressurised:
+                surcharge = max(defaults.surcharge_depth, defaults.force_main_surcharge_depth)
+            model.junctions.append(
+                Junction(node, invert, depth, defaults.init_depth, surcharge, defaults.ponding_area)
+            )
+
+    positions = subnetwork.node_positions()
+    for node in subnetwork.nodes:
+        if node in positions:
+            model.coordinates[node] = positions[node]
+        else:
+            logger.warning("Node %s has no position; it is left out of [COORDINATES]", node)
+
+    us_inverts = dict(zip(pipes["pipe_id"], pipes["us_invert"], strict=True))
+    discharge_of = {}
+    for link in inputs.station_pumps:
+        ends = [_invert(us_inverts[p]) for p in link.force_mains]
+        ends = [e for e in ends if e is not None]
+        inverts[link.discharge] = min(ends) if ends else inverts[link.station]
+        surcharge = max(defaults.surcharge_depth, defaults.force_main_surcharge_depth)
+        model.junctions.append(
+            Junction(
+                link.discharge,
+                inverts[link.discharge],
+                defaults.max_depth,
+                defaults.init_depth,
+                surcharge,
+                defaults.ponding_area,
+            )
+        )
+        if link.station in positions:
+            model.coordinates[link.discharge] = positions[link.station]
+        discharge_of.update(dict.fromkeys(link.force_mains, link.discharge))
+    return discharge_of
+
+
+def _add_links(model, inputs, pipes, inverts, discharge_of, sections, roughness_of, defaults):
+    """Add the conduits, pumps, cross-sections, curves and vertices to ``model``. Return the
+    descriptions of the conduits with an adverse slope (force mains excepted)."""
+    pumps, force_mains = inputs.pumps, inputs.force_mains
+    adverse = []
+    for _, row in pipes.iterrows():
+        name, inlet, outlet = row["pipe_id"], row["from_node"], row["to_node"]
+        inlet = discharge_of.get(name, inlet)
+        interior = line_coords(row["geometry"])[1:-1]
+        if interior:
+            model.vertices[name] = interior
+
+        if name in pumps:
+            pump = pumps[name]
+            curve = "*" if pump.curve == "*" else f"{name}_curve"
+            model.pumps.append(
+                PumpLink(
+                    name,
+                    inlet,
+                    outlet,
+                    curve,
+                    pump.status,
+                    pump.startup or 0.0,
+                    pump.shutoff or 0.0,
+                )
+            )
+            if curve != "*":
+                model.curves.append(Curve(curve, pump.curve_type, tuple(pump.curve)))
+            continue
+
+        roughness = defaults.manning_n_by_material.get(row["material"], defaults.manning_n)
+
+        ends = []
+        for node, pipe_invert in ((inlet, row["us_invert"]), (outlet, row["ds_invert"])):
+            pipe_invert = _invert(pipe_invert)
+            offset = 0.0 if pipe_invert is None else round(pipe_invert - inverts[node], 4)
+            if offset < 0:
+                warnings.warn(
+                    f"Pipe {name}: invert {pipe_invert} is below the invert of node {node} "
+                    f"({inverts[node]}); its offset there is set to 0.",
+                    stacklevel=3,  # the caller of build_model
+                )
+                offset = 0.0
+            ends.append((offset, inverts[node] + offset))
+        (inlet_offset, inlet_elev), (outlet_offset, outlet_elev) = ends
+        if outlet_elev > inlet_elev and name not in force_mains:
+            adverse.append(f"{name} ({inlet} {inlet_elev:.3f} -> {outlet} {outlet_elev:.3f})")
+
+        model.conduits.append(
+            Conduit(
+                name,
+                inlet,
+                outlet,
+                row["length"],
+                roughness,
+                inlet_offset,
+                outlet_offset,
+                defaults.init_flow,
+                defaults.max_flow,
+            )
+        )
+        if name in force_mains:
+            diameter = sections[name][1]
+            model.xsections.append(
+                XSection(name, "FORCE_MAIN", diameter, roughness_of[name], defaults.barrels)
+            )
+        else:
+            model.xsections.append(XSection(name, *sections[name], defaults.barrels))
+
+    for link in inputs.station_pumps:
+        pump = inputs.stations[link.station].pump
+        curve = "*" if pump.curve == "*" else f"{link.station}_curve"
+        model.pumps.append(
+            PumpLink(
+                link.name,
+                link.station,
+                link.discharge,
+                curve,
+                pump.status,
+                pump.startup or 0.0,
+                pump.shutoff or 0.0,
+            )
+        )
+        if curve != "*" and curve not in {c.name for c in model.curves}:
+            model.curves.append(Curve(curve, pump.curve_type, tuple(pump.curve)))
+    return adverse
+
+
+def _check_ideal_pumps(model):
+    """Raise ValueError if an ideal pump is not the only outlet link of its inlet node (SWMM's
+    ERROR 134)."""
+    outlet_links = Counter(link.inlet for link in model.conduits + model.pumps)
+    lone = sorted(
+        f"{p.name} (inlet {p.inlet}, {outlet_links[p.inlet]} outlet links)"
+        for p in model.pumps
+        if p.curve == "*" and outlet_links[p.inlet] > 1
+    )
+    if lone:
+        raise ValueError(
+            "An ideal pump (curve '*') must be the only outlet link of its inlet node (SWMM "
+            f"ERROR 134); use a pump curve or drop the other outlets: {', '.join(lone)}"
+        )
 
 
 def build_model(
@@ -271,275 +627,61 @@ def build_model(
         or not below its wet well's max depth, a PUMP1 station has no wet well, or an ideal pump
         is not the only outlet link of its inlet node (SWMM's ERROR 134).
     """
-    outfalls = outfall_types(outfalls, subnetwork)
-    unknown = sorted(set(outfalls) - set(subnetwork.nodes))
-    if unknown:
-        raise ValueError(f"Outfalls not in the subnetwork: {', '.join(map(str, unknown))}")
-    pumps = resolve_pumps(subnetwork, pumps)
-    if height_correction is not None:
-        height_correction = subnetwork.match_nodes(height_correction, "height_correction")
-    wet_wells = resolve_wet_wells(subnetwork, wet_wells, outfalls)
-    stations, station_pumps = resolve_pump_stations(
-        subnetwork, pump_stations, outfalls, default_pump
+    defaults = _Defaults(
+        max_depth=max_depth,
+        init_depth=init_depth,
+        surcharge_depth=surcharge_depth,
+        ponding_area=ponding_area,
+        force_main_surcharge_depth=force_main_surcharge_depth,
+        manning_n=manning_n,
+        manning_n_by_material=manning_n_by_material or {},
+        init_flow=init_flow,
+        max_flow=max_flow,
+        barrels=barrels,
     )
-    both = sorted(str(n) for n, s in stations.items() if s.wet_well is not None and n in wet_wells)
-    if both:
-        raise ValueError(f"Wet wells given both in wet_wells and pump_stations: {', '.join(both)}")
-    flow_units = str(flow_units).upper()
-    if flow_units not in _FLOW_UNIT_LPS:
-        raise ValueError(f"flow_units must be one of {list(_FLOW_UNIT_LPS)}, not {flow_units!r}.")
-    wet_wells.update({n: s.wet_well for n, s in stations.items() if s.wet_well is not None})
-    chains = {first: chain for link in station_pumps for first, chain in link.force_mains.items()}
-    force_mains = {pipe for chain in chains.values() for pipe in chain}
-    both = sorted(str(p) for p in pumps if p in force_mains)
-    if both:
-        raise ValueError(
-            "Pipes both in pumps and in a pump station's force main: " + ", ".join(both)
-        )
-    curves = {f"{p}_curve" for p, pump in pumps.items() if pump.curve != "*"}
-    both = sorted(
-        f"{n}_curve" for n, s in stations.items() if s.pump.curve != "*" and f"{n}_curve" in curves
+    inputs = _resolve_inputs(
+        subnetwork,
+        outfalls,
+        height_correction,
+        pumps,
+        wet_wells,
+        pump_stations,
+        default_pump,
+        dwf,
+        patterns,
+        dwf_patterns,
+        flow_units,
     )
-    if both:
-        raise ValueError(
-            "Pump curve names of both a pumped pipe and a pump station (a pipe ID equal to a "
-            f"station node): {', '.join(both)}"
-        )
-    dwf = resolve_dwf(subnetwork, dwf, outfalls)
-    patterns = resolve_patterns(patterns)
-    dwf_patterns = resolve_dwf_patterns(dwf_patterns, dwf, patterns, subnetwork)
-    pipes = subnetwork.pipes()
-    inlets = dict(zip(pipes["pipe_id"], pipes["from_node"], strict=True))
-    dry = sorted(
-        f"{name} (inlet {inlets[name]})"
-        for name, pump in pumps.items()
-        if pump.curve != "*" and pump.curve_type == "PUMP1" and inlets[name] not in wet_wells
+    filled = fill_gaps(
+        subnetwork, pumps=inputs.pumps, height_correction=inputs.height_correction, **fills
     )
-    if dry:
-        raise ValueError(
-            f"PUMP1 pumps need a wet well at their inlet node (pass wet_wells): {', '.join(dry)}"
-        )
-    filled = fill_gaps(subnetwork, pumps=pumps, height_correction=height_correction, **fills)
-    remaining = filled.remaining
-    if len(remaining):
-        lines = [f"{row.element} {row.id}: {row.detail}" for row in remaining.itertuples()]
-        raise ValueError(
-            f"Cannot write the subnetwork: {len(lines)} gaps in the data remain (see "
-            "Subnetwork.data_gaps() for the full report, and its fill options):\n  "
-            + "\n  ".join(lines)
-            + f"\nKnown shape codes in schema {subnetwork.schema.name!r}: "
-            f"{list(subnetwork.schema.shapes)}."
-        )
+    _refuse_remaining_gaps(subnetwork, filled)
     pipes, inverts = filled.pipes, filled.inverts
-    derived = []
-    if wet_well_defaults is not None:
-        for node, station in stations.items():
-            if station.wet_well is None and node in wet_wells:
-                station.wet_well = wet_wells[node]
-        derived = apply_wet_well_defaults(
-            subnetwork,
-            pipes,
-            stations,
-            inverts,
-            wet_well_defaults,
-            flow_units,
-            force_mains,
-            pump_names={
-                node: [link.name for link in station_pumps if link.station == node]
-                for node in stations
-            },
-        )
-    wet_wells.update({n: s.wet_well for n, s in stations.items() if s.wet_well is not None})
-    problems = [
-        f"{node} has a PUMP1 pump and no wet well (pass wet_well, wet_wells or wet_well_defaults)"
-        for node, station in stations.items()
-        if station.pump.curve != "*"
-        and station.pump.curve_type == "PUMP1"
-        and node not in wet_wells
-    ]
-    problems += [
-        problem
-        for node, station in stations.items()
-        if (problem := pump_level_problem(node, station.pump, wet_wells.get(node)))
-    ]
-    problems += [
-        problem
-        for name, pump in pumps.items()
-        if (problem := pump_level_problem(name, pump, wet_wells.get(inlets[name])))
-    ]
-    if problems:
-        raise ValueError("Invalid pumps:\n  " + "\n  ".join(problems))
+    derived = _apply_design_rules(subnetwork, inputs, pipes, inverts, wet_well_defaults)
+
     sections = {
         name: xsection(row)
         for name, row in zip(pipes["pipe_id"], pipes.to_dict("records"), strict=True)
     }
     roughness_of = force_main_roughnesses(
-        pipes[pipes["pipe_id"].isin(list(force_mains))],
+        pipes[pipes["pipe_id"].isin(list(inputs.force_mains))],
         sections,
         force_main_roughness,
         force_main_roughness_by_pipe,
     )
-    outlets = dict(zip(pipes["pipe_id"], pipes["to_node"], strict=True))
-    pressurised = {outlets[p] for chain in chains.values() for p in chain[:-1]}
     model = SwmmModel(data_gaps=filled.report, derived=derived)
-
-    for node in subnetwork.nodes:
-        invert = inverts[node]
-        if height_correction is not None and node in height_correction:
-            logger.info("Node %s: invert set to %s by height_correction", node, invert)
-        if node in outfalls:
-            model.outfalls.append(Outfall(node, invert, outfalls[node]))
-        elif node in wet_wells:
-            well = wet_wells[node]
-            model.storage.append(Storage(node, invert, well.max_depth, well.init_depth, well.area))
-        else:
-            depth = max_depth
-            rim = subnetwork.graph.nodes[node].get("rim_elevation")
-            if rim is not None and rim > invert:
-                depth = round(rim - invert, 4)
-            elif rim is not None:
-                logger.warning(
-                    "Node %s: rim elevation %s is not above the invert %s; max depth %s is used",
-                    node,
-                    rim,
-                    invert,
-                    max_depth,
-                )
-            surcharge = surcharge_depth
-            if node in pressurised:
-                surcharge = max(surcharge_depth, force_main_surcharge_depth)
-            model.junctions.append(
-                Junction(node, invert, depth, init_depth, surcharge, ponding_area)
-            )
-
-    positions = subnetwork.node_positions()
-    for node in subnetwork.nodes:
-        if node in positions:
-            model.coordinates[node] = positions[node]
-        else:
-            logger.warning("Node %s has no position; it is left out of [COORDINATES]", node)
-
-    us_inverts = dict(zip(pipes["pipe_id"], pipes["us_invert"], strict=True))
-    discharge_of = {}
-    for link in station_pumps:
-        ends = [_invert(us_inverts[p]) for p in link.force_mains]
-        ends = [e for e in ends if e is not None]
-        inverts[link.discharge] = min(ends) if ends else inverts[link.station]
-        surcharge = max(surcharge_depth, force_main_surcharge_depth)
-        model.junctions.append(
-            Junction(
-                link.discharge,
-                inverts[link.discharge],
-                max_depth,
-                init_depth,
-                surcharge,
-                ponding_area,
-            )
-        )
-        if link.station in positions:
-            model.coordinates[link.discharge] = positions[link.station]
-        discharge_of.update(dict.fromkeys(link.force_mains, link.discharge))
-
-    adverse = []
-    for _, row in pipes.iterrows():
-        name, inlet, outlet = row["pipe_id"], row["from_node"], row["to_node"]
-        inlet = discharge_of.get(name, inlet)
-        interior = line_coords(row["geometry"])[1:-1]
-        if interior:
-            model.vertices[name] = interior
-
-        if name in pumps:
-            pump = pumps[name]
-            curve = "*" if pump.curve == "*" else f"{name}_curve"
-            model.pumps.append(
-                PumpLink(
-                    name,
-                    inlet,
-                    outlet,
-                    curve,
-                    pump.status,
-                    pump.startup or 0.0,
-                    pump.shutoff or 0.0,
-                )
-            )
-            if curve != "*":
-                model.curves.append(Curve(curve, pump.curve_type, tuple(pump.curve)))
-            continue
-
-        roughness = (manning_n_by_material or {}).get(row["material"], manning_n)
-
-        ends = []
-        for node, pipe_invert in ((inlet, row["us_invert"]), (outlet, row["ds_invert"])):
-            pipe_invert = _invert(pipe_invert)
-            offset = 0.0 if pipe_invert is None else round(pipe_invert - inverts[node], 4)
-            if offset < 0:
-                warnings.warn(
-                    f"Pipe {name}: invert {pipe_invert} is below the invert of node {node} "
-                    f"({inverts[node]}); its offset there is set to 0.",
-                    stacklevel=2,
-                )
-                offset = 0.0
-            ends.append((offset, inverts[node] + offset))
-        (inlet_offset, inlet_elev), (outlet_offset, outlet_elev) = ends
-        if outlet_elev > inlet_elev and name not in force_mains:
-            adverse.append(f"{name} ({inlet} {inlet_elev:.3f} -> {outlet} {outlet_elev:.3f})")
-
-        model.conduits.append(
-            Conduit(
-                name,
-                inlet,
-                outlet,
-                row["length"],
-                roughness,
-                inlet_offset,
-                outlet_offset,
-                init_flow,
-                max_flow,
-            )
-        )
-        if name in force_mains:
-            diameter = sections[name][1]
-            model.xsections.append(
-                XSection(name, "FORCE_MAIN", diameter, roughness_of[name], barrels)
-            )
-        else:
-            model.xsections.append(XSection(name, *sections[name], barrels))
-
-    for link in station_pumps:
-        pump = stations[link.station].pump
-        curve = "*" if pump.curve == "*" else f"{link.station}_curve"
-        model.pumps.append(
-            PumpLink(
-                link.name,
-                link.station,
-                link.discharge,
-                curve,
-                pump.status,
-                pump.startup or 0.0,
-                pump.shutoff or 0.0,
-            )
-        )
-        if curve != "*" and curve not in {c.name for c in model.curves}:
-            model.curves.append(Curve(curve, pump.curve_type, tuple(pump.curve)))
-
-    outlet_links = Counter(link.inlet for link in model.conduits + model.pumps)
-    lone = sorted(
-        f"{p.name} (inlet {p.inlet}, {outlet_links[p.inlet]} outlet links)"
-        for p in model.pumps
-        if p.curve == "*" and outlet_links[p.inlet] > 1
+    discharge_of = _add_nodes(model, subnetwork, inputs, pipes, inverts, defaults)
+    adverse = _add_links(
+        model, inputs, pipes, inverts, discharge_of, sections, roughness_of, defaults
     )
-    if lone:
-        raise ValueError(
-            "An ideal pump (curve '*') must be the only outlet link of its inlet node (SWMM "
-            f"ERROR 134); use a pump curve or drop the other outlets: {', '.join(lone)}"
-        )
+    _check_ideal_pumps(model)
 
+    # Warned here, not in the helpers, so that they point at the caller of build_model.
     if force_main_checks is not None:
         for message in check_force_mains(
-            station_pumps, stations, sections, force_main_checks, flow_units
+            inputs.station_pumps, inputs.stations, sections, force_main_checks, inputs.flow_units
         ):
             warnings.warn(message, stacklevel=2)
-
     if adverse:
         warnings.warn(
             f"Conduits with an adverse slope (outlet invert above inlet invert): "
@@ -548,9 +690,12 @@ def build_model(
         )
 
     model.dwf = [
-        DryWeatherFlow(node, flow, tuple(dwf_patterns.get(node, ()))) for node, flow in dwf.items()
+        DryWeatherFlow(node, flow, tuple(inputs.dwf_patterns.get(node, ())))
+        for node, flow in inputs.dwf.items()
     ]
-    model.patterns = [Pattern(name, kind, values) for name, (kind, values) in patterns.items()]
+    model.patterns = [
+        Pattern(name, kind, values) for name, (kind, values) in inputs.patterns.items()
+    ]
     return model
 
 
