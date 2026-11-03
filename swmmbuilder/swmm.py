@@ -16,6 +16,7 @@ from collections import Counter
 from collections.abc import Mapping
 from dataclasses import dataclass, field, replace
 from importlib import resources
+from numbers import Real
 from pathlib import Path
 
 import pandas as pd
@@ -190,7 +191,8 @@ class Pump:
     curve_type : str
         PUMP1 (x: wet well volume, m3; the inlet must be a wet well), PUMP2 (x: inlet depth, m,
         stepwise), PUMP3 (x: head difference, m), PUMP4 (x: inlet depth, m, continuous) or PUMP5
-        (variable-speed PUMP3). Ignored for an ideal pump.
+        (variable-speed PUMP3). Ignored for an ideal pump. Required for a pump station's curve;
+        a pumped pipe's (``pumps``) defaults to PUMP3.
 
     status : str
         Initial status, 'ON' or 'OFF'.
@@ -201,15 +203,18 @@ class Pump:
     """
 
     curve: object
-    curve_type: str = "PUMP3"
+    curve_type: str | None = None
     status: str = "ON"
     startup: float | None = None
     shutoff: float | None = None
 
     @classmethod
-    def coerce(cls, pump_id, value):
-        """A Pump from a Pump or a dict of its fields, checked; raise ValueError if it is invalid."""
+    def coerce(cls, pump_id, value, curve_type=None):
+        """A Pump from a Pump or a dict of its fields, checked, with ``curve_type`` if it has none;
+        raise ValueError if it is invalid."""
         pump = replace(value) if isinstance(value, cls) else cls(**value)
+        if pump.curve_type is None:
+            pump.curve_type = curve_type
         problems = []
         if isinstance(pump.curve, str):
             if pump.curve != "*":
@@ -220,11 +225,14 @@ class Pump:
                 problems.append("curve must be a non-empty list of (x, y) points")
             else:
                 pump.curve = [(float(x), float(y)) for x, y in points]
-            if pump.curve_type.upper() not in PUMP_CURVE_TYPES:
+            if pump.curve_type is None:
+                problems.append(f"a curve needs a curve_type, one of {list(PUMP_CURVE_TYPES)}")
+            elif str(pump.curve_type).upper() not in PUMP_CURVE_TYPES:
                 problems.append(
                     f"curve_type {pump.curve_type!r} is not one of {list(PUMP_CURVE_TYPES)}"
                 )
-            pump.curve_type = pump.curve_type.upper()
+            else:
+                pump.curve_type = pump.curve_type.upper()
         pump.status = pump.status.upper()
         if pump.status not in ("ON", "OFF"):
             problems.append(f"status must be 'ON' or 'OFF', not {pump.status!r}")
@@ -282,7 +290,7 @@ def resolve_pumps(subnetwork, pumps):
     missing = sorted(str(k) for k in pumps if str(k) not in ids)
     if missing:
         raise ValueError(f"Pumped pipes not in the subnetwork: {', '.join(missing)}")
-    return {ids[str(k)]: Pump.coerce(k, v) for k, v in pumps.items()}
+    return {ids[str(k)]: Pump.coerce(k, v, curve_type="PUMP3") for k, v in pumps.items()}
 
 
 def resolve_wet_wells(subnetwork, wet_wells, outfalls=()):
@@ -311,10 +319,11 @@ class PumpStation:
 
     Attributes
     ----------
-    pump : Pump or dict
-        The pump. There is no default: an ideal pump (``curve='*'``) suits a variable-speed
-        station that delivers a near-uniform flow, a curve with startup and shutoff depths
-        (e.g. PUMP2 or PUMP4) a fixed-speed station that cycles on and off.
+    pump : Pump or dict, optional
+        The pump: an ideal pump (``curve='*'``) suits a variable-speed station that delivers a
+        near-uniform flow, a curve with startup and shutoff depths (e.g. PUMP2 or PUMP4) a
+        fixed-speed station that cycles on and off. There is no built-in default: a station
+        without one takes the ``default_pump`` of :func:`build_model`, which must then be given.
 
     wet_well : WetWell or dict, optional
         The station node's wet well; without one the station node is a junction.
@@ -330,20 +339,33 @@ class PumpStation:
     design_flow : float, optional
         Design average flow into the station, in the template's FLOW_UNITS (L/s with the shipped
         template). Used only by the ``wet_well_defaults`` rule (the wet well's plan area) and the
-        ``force_main_checks`` of an ideal pump (its pumped flow); the GIS data do not carry it.
+        ``force_main_checks`` of an ideal pump or a head-flow curve (its pumped flow); the GIS
+        data do not carry it.
+
+    suction_diameter : float, optional
+        Diameter of the pump suction (mm), for the ``low_level_suction_diameters`` parameter of
+        the ``wet_well_defaults`` rule.
     """
 
-    pump: object
+    pump: object = None
     wet_well: object = None
     force_mains: object = None
     discharge: str | None = None
     design_flow: float | None = None
+    suction_diameter: float | None = None
 
     @classmethod
-    def coerce(cls, node, value):
-        """A PumpStation from a PumpStation or a dict of its fields, with its pump and wet well
-        coerced; raise ValueError if it is invalid."""
+    def coerce(cls, node, value, default_pump=None):
+        """A PumpStation from a PumpStation or a dict of its fields, with its pump (or
+        ``default_pump``) and wet well coerced; raise ValueError if it is invalid."""
         station = replace(value) if isinstance(value, cls) else cls(**value)
+        if station.pump is None:
+            station.pump = default_pump
+        if station.pump is None:
+            raise ValueError(
+                f"Pump station {node} has no pump: pass its pump, or a default_pump for the "
+                "stations."
+            )
         station.pump = Pump.coerce(node, station.pump)
         if station.wet_well is not None:
             station.wet_well = WetWell.coerce(node, station.wet_well)
@@ -351,10 +373,12 @@ class PumpStation:
             isinstance(station.force_mains, str) or not hasattr(station.force_mains, "__iter__")
         ):
             station.force_mains = [station.force_mains]
-        if station.design_flow is not None:
-            station.design_flow = float(station.design_flow)
-            if not station.design_flow > 0:
-                raise ValueError(f"Pump station {node}: design_flow must be positive.")
+        for name in ("design_flow", "suction_diameter"):
+            value = getattr(station, name)
+            if value is not None:
+                if not _is_finite_number(value) or not float(value) > 0:
+                    raise ValueError(f"Pump station {node}: {name} must be positive.")
+                setattr(station, name, float(value))
         if station.discharge not in (None, "shared", "separate"):
             raise ValueError(
                 f"Pump station {node}: discharge must be 'shared' or 'separate', "
@@ -374,7 +398,7 @@ class StationPump:
     force_mains: dict
 
 
-def resolve_pump_stations(subnetwork, pump_stations, outfalls=()):
+def resolve_pump_stations(subnetwork, pump_stations, outfalls=(), default_pump=None):
     """({node: PumpStation}, [StationPump]) from the ``pump_stations`` option of
     :func:`build_model`.
 
@@ -383,7 +407,7 @@ def resolve_pump_stations(subnetwork, pump_stations, outfalls=()):
     ValueError
         If a station node is not in the subnetwork, is an outfall or has no force-main outlet, a
         chosen force main does not leave it, it has several force mains and no ``discharge``,
-        a pump or wet well is invalid, a PUMP1 pump has no wet well, or a name the station needs
+        a pump is missing or invalid, a wet well is invalid, or a name the station needs
         (``<node>_P``, ``<node>_D``) is already a node or pipe ID. Every problem is listed.
     """
     if not pump_stations:
@@ -392,6 +416,8 @@ def resolve_pump_stations(subnetwork, pump_stations, outfalls=()):
     taken = {str(n) for n in subnetwork.network.graph.nodes} | {
         str(p) for p in subnetwork.network.full_data["pipe_id"]
     }
+    typed = {n for n, t in subnetwork.graph.nodes(data="node_type") if t == "pump_station"}
+    ends = typed | set(pump_stations)
     stations, links, problems = {}, [], []
     for node, value in pump_stations.items():
         if node not in nodes:
@@ -400,7 +426,7 @@ def resolve_pump_stations(subnetwork, pump_stations, outfalls=()):
         if node in set(outfalls):
             problems.append(f"{node} is an outfall")
             continue
-        station = stations[node] = PumpStation.coerce(node, value)
+        station = stations[node] = PumpStation.coerce(node, value, default_pump)
         outlets = subnetwork.force_main_outlets(node)
         if not outlets:
             problems.append(f"{node} has no force-main outlet pipe")
@@ -429,9 +455,6 @@ def resolve_pump_stations(subnetwork, pump_stations, outfalls=()):
                 "discharge='shared' (one pump feeding all of them) or 'separate' (one pump each)"
             )
             continue
-        pump = station.pump
-        if pump.curve != "*" and pump.curve_type == "PUMP1" and station.wet_well is None:
-            problems.append(f"{node} has a PUMP1 pump and no wet well")
         if station.discharge == "separate":
             groups = [(f"{node}_P{i}", f"{node}_D{i}", [p]) for i, p in enumerate(chosen, 1)]
         else:
@@ -440,10 +463,17 @@ def resolve_pump_stations(subnetwork, pump_stations, outfalls=()):
         if clashes:
             problems.append(f"{node}: {', '.join(clashes)} already exist in the network")
         for name, discharge, mains in groups:
-            chains = {p: subnetwork.force_main_chain(p, outfalls)[0] for p in mains}
+            chains = {p: subnetwork.force_main_chain(p, outfalls, True, ends)[0] for p in mains}
             links.append(StationPump(name, node, discharge, chains))
     if problems:
         raise ValueError("Invalid pump stations:\n  " + "\n  ".join(problems))
+    undeclared = sorted(str(n) for n in typed - set(stations) if subnetwork.force_main_outlets(n))
+    if undeclared:
+        warnings.warn(
+            f"Pump-station nodes with force mains not in pump_stations: {', '.join(undeclared)}; "
+            "their force mains are written as ordinary conduits.",
+            stacklevel=3,
+        )
     return stations, links
 
 
@@ -546,6 +576,11 @@ def _is_finite_number(value):
         return False
 
 
+def _is_real(value):
+    """True for a finite real number that is not a bool or a string."""
+    return isinstance(value, Real) and not isinstance(value, bool) and math.isfinite(value)
+
+
 @dataclass(frozen=True)
 class Derived:
     """A model value that comes from a design rule, not from the data (see
@@ -556,7 +591,7 @@ class Derived:
     element : str
         'storage' or 'pump'.
     id : str
-        The node or pump name.
+        The storage node, or the pump link (``<node>_P``, ``<node>_P1``, ...).
     attribute : str
         e.g. 'area', 'max_depth', 'startup', 'shutoff'.
     value : float
@@ -576,6 +611,7 @@ class Derived:
 
 
 WET_WELL_DEFAULTS = ("fill_time", "high_level_below_inlet", "low_level_above_pump")
+WET_WELL_OPTIONS = ("low_level_suction_diameters",)
 FORCE_MAIN_CHECKS = ("min_diameter", "velocity")
 
 
@@ -596,21 +632,49 @@ def _rule_params(name, rule, keys, required):
     return dict(rule)
 
 
+NOT_GRAVITY = ("force_main", "overflow")
+
+
 def gravity_inlets(pipes, node, force_mains=()):
-    """Rows of ``pipes`` entering ``node`` that are not in ``force_mains`` and have a
-    downstream invert."""
+    """Rows of ``pipes`` entering ``node`` that have a downstream invert and are neither in
+    ``force_mains`` nor of a structure type in :data:`NOT_GRAVITY`."""
     entering = pipes[(pipes["to_node"] == node) & ~pipes["pipe_id"].isin(list(force_mains))]
+    if "structure_type" in entering:
+        entering = entering[~entering["structure_type"].isin(NOT_GRAVITY)]
     return entering[entering["ds_invert"].notna()]
 
 
-def apply_wet_well_defaults(subnetwork, pipes, stations, inverts, rule, flow_units, force_mains=()):
+def wet_well_params(rule):
+    """(fill_time, high_level_below_inlet, low_level_above_pump, low_level_suction_diameters)
+    of a ``wet_well_defaults`` rule, the last 0 if not given; raise ValueError if the rule is
+    invalid."""
+    params = _rule_params(
+        "wet_well_defaults", rule, WET_WELL_DEFAULTS + WET_WELL_OPTIONS, WET_WELL_DEFAULTS
+    )
+    values = [params[k] for k in WET_WELL_DEFAULTS] + [params.get("low_level_suction_diameters", 0)]
+    if not all(_is_real(v) for v in values):
+        raise ValueError(f"wet_well_defaults: the parameters must be numbers, not {params}.")
+    fill_time, below_inlet, above_pump, suctions = map(float, values)
+    if not (fill_time > 0 and below_inlet >= 0 and above_pump >= 0 and suctions >= 0):
+        raise ValueError(
+            "wet_well_defaults: fill_time must be positive and the levels not negative."
+        )
+    return fill_time, below_inlet, above_pump, suctions
+
+
+def apply_wet_well_defaults(
+    subnetwork, pipes, stations, inverts, rule, flow_units, force_mains=(), pump_names=None
+):
     """Fill in the stations' missing wet wells and pump on/off depths from the
     ``wet_well_defaults`` rule of :func:`build_model`, in place.
 
     The wet well's floor is the station node invert, taken as the pump level, and the inlet
-    invert is the lowest downstream invert of the gravity pipes entering the station:
+    invert is the lowest downstream invert of the gravity pipes entering the station (see
+    :func:`gravity_inlets`):
 
-    - shutoff depth (low water level) = ``low_level_above_pump``;
+    - shutoff depth (low water level) = ``low_level_above_pump``, or, if the rule gives
+      ``low_level_suction_diameters`` and the station a ``suction_diameter``, that many suction
+      diameters if it is higher;
     - startup depth (high water level) = inlet invert - ``high_level_below_inlet`` - floor;
     - plan area = design flow x ``fill_time`` (minutes) / (startup - shutoff depth), so that the
       design flow fills the well from the low to the high water level in ``fill_time``;
@@ -619,6 +683,8 @@ def apply_wet_well_defaults(subnetwork, pipes, stations, inverts, rule, flow_uni
 
     A station with a :class:`WetWell` keeps it, and a pump's own ``startup``/``shutoff`` are kept;
     the on/off depths are derived only for a pump with a curve (an ideal pump does not cycle).
+    ``pump_names`` ({node: [pump link names]}, default the node) names the pumps in the
+    :class:`Derived` rows.
 
     Returns
     ----------
@@ -632,14 +698,7 @@ def apply_wet_well_defaults(subnetwork, pipes, stations, inverts, rule, flow_uni
         a high water level not above its low water level, or (for its wet well) no
         ``design_flow``. Every problem is listed.
     """
-    params = _rule_params("wet_well_defaults", rule, WET_WELL_DEFAULTS, WET_WELL_DEFAULTS)
-    fill_time = float(params["fill_time"])
-    below_inlet = float(params["high_level_below_inlet"])
-    above_pump = float(params["low_level_above_pump"])
-    if not (fill_time > 0 and below_inlet >= 0 and above_pump >= 0):
-        raise ValueError(
-            "wet_well_defaults: fill_time must be positive and the levels not negative."
-        )
+    fill_time, below_inlet, above_pump, suctions = wet_well_params(rule)
     derived, problems = [], []
     for node, station in stations.items():
         pump = station.pump
@@ -654,13 +713,21 @@ def apply_wet_well_defaults(subnetwork, pipes, stations, inverts, rule, flow_uni
             continue
         lowest = inlets.loc[inlets["ds_invert"].idxmin()]
         inlet = float(lowest["ds_invert"])
+        low_how = f"{above_pump} m above the floor"
         low = round(above_pump, 4)
+        if suctions and station.suction_diameter is not None:
+            by_suction = round(suctions * station.suction_diameter / 1000, 4)
+            if by_suction > low:
+                low = by_suction
+                low_how = (
+                    f"{suctions:g} suction diameters ({station.suction_diameter:g} mm) above "
+                    "the floor"
+                )
         high = round(inlet - below_inlet - floor, 4)
         if high <= low:
             problems.append(
                 f"{node}: the high water level ({below_inlet} m below the inlet invert "
-                f"{inlet}) is not above the low water level ({above_pump} m above the floor "
-                f"{floor})"
+                f"{inlet}) is not above the low water level ({low_how}, floor {floor})"
             )
             continue
         basis = f"floor {floor}, inlet invert {inlet} (pipe {lowest['pipe_id']})"
@@ -695,18 +762,20 @@ def apply_wet_well_defaults(subnetwork, pipes, stations, inverts, rule, flow_uni
             found.append(("pump", "startup", high, f"{below_inlet} m below the inlet invert"))
         if needs_levels and pump.shutoff is None:
             pump.shutoff = low
-            found.append(("pump", "shutoff", low, f"{above_pump} m above the floor"))
+            found.append(("pump", "shutoff", low, low_how))
+        names = (pump_names or {}).get(node, [node])
         for element, attribute, value, how in found:
-            derived.append(
-                Derived(element, node, attribute, value, "wet_well_defaults", f"{how}; {basis}")
-            )
+            for name in [node] if element == "storage" else names:
+                derived.append(
+                    Derived(element, name, attribute, value, "wet_well_defaults", f"{how}; {basis}")
+                )
     if problems:
         raise ValueError("wet_well_defaults cannot be applied:\n  " + "\n  ".join(problems))
     for d in derived:
         logger.info(
-            "Pump station %s: %s %s = %s from rule %s, not data (%s)",
+            "%s %s: %s = %s from rule %s, not data (%s)",
+            d.element.capitalize(),
             d.id,
-            d.element,
             d.attribute,
             d.value,
             d.rule,
@@ -715,12 +784,72 @@ def apply_wet_well_defaults(subnetwork, pipes, stations, inverts, rule, flow_uni
     return derived
 
 
+HEAD_FLOW_CURVES = ("PUMP3", "PUMP5")
+
+
+def pump_level_problem(name, pump, well=None):
+    """Why a pump's startup and shutoff depths cannot work, or None: a startup depth not above
+    the shutoff depth, or not below the max depth of its inlet's wet well ``well``."""
+    startup, shutoff = pump.startup or 0.0, pump.shutoff or 0.0
+    if startup > 0 and startup <= shutoff:
+        return f"{name}: startup depth {startup} m is not above the shutoff depth {shutoff} m"
+    if well is not None and startup >= well.max_depth:
+        return (
+            f"{name}: startup depth {startup} m is not below the wet well's max depth "
+            f"{well.max_depth} m, so the pump never starts"
+        )
+    return None
+
+
 def pumped_flow(station):
     """Flow (in the FLOW_UNITS) a station's pump delivers: the largest flow of its curve, or
-    its ``design_flow`` for an ideal pump (None if it has none)."""
-    if station.pump.curve == "*":
+    its ``design_flow`` (None if it has none) for an ideal pump or a head-flow curve (PUMP3,
+    PUMP5), whose largest flow is at zero head, not against the force main."""
+    pump = station.pump
+    if pump.curve == "*" or pump.curve_type in HEAD_FLOW_CURVES:
         return station.design_flow
-    return max(y for _, y in station.pump.curve)
+    return max(y for _, y in pump.curve)
+
+
+def force_main_check_params(rule):
+    """(min_diameter, velocity) of a ``force_main_checks`` rule, each None if not given;
+    raise ValueError if the rule is invalid."""
+    params = _rule_params("force_main_checks", rule, FORCE_MAIN_CHECKS, ())
+    min_diameter = params.get("min_diameter")
+    velocity = params.get("velocity")
+    if min_diameter is not None:
+        if not _is_real(min_diameter) or not min_diameter > 0:
+            raise ValueError(
+                f"force_main_checks: min_diameter must be a positive number (mm), "
+                f"not {min_diameter!r}."
+            )
+        min_diameter = float(min_diameter)
+    if velocity is not None:
+        if (
+            isinstance(velocity, (str, bytes))
+            or not hasattr(velocity, "__len__")
+            or len(velocity) != 2
+            or not all(_is_real(v) and v >= 0 for v in velocity)
+        ):
+            raise ValueError(
+                "force_main_checks: velocity must be (min, max), two numbers in m/s that are "
+                f"not negative, not {velocity!r}."
+            )
+        velocity = tuple(sorted(float(v) for v in velocity))
+    return min_diameter, velocity
+
+
+def check_design_rule(name, rule):
+    """Raise ValueError if ``rule`` is not a valid ``name`` design rule of :func:`build_model`
+    (``force_main_discharge`` is checked by :func:`swmmbuilder.gaps.fill_gaps`)."""
+    if name == "wet_well_defaults":
+        wet_well_params(rule)
+    elif name == "force_main_checks":
+        force_main_check_params(rule)
+    elif name == "force_main_roughness":
+        force_main_roughness_rule(rule)
+    elif name == "default_pump":
+        Pump.coerce("default_pump", rule)
 
 
 def check_force_mains(station_pumps, stations, sections, rule, flow_units):
@@ -728,44 +857,48 @@ def check_force_mains(station_pumps, stations, sections, rule, flow_units):
     ``force_main_checks`` of :func:`build_model`: a diameter below ``min_diameter`` (mm) or a
     velocity (pumped flow / full area) outside ``velocity`` (min, max), in m/s.
 
-    The pumped flow is :func:`pumped_flow`; with ``discharge='shared'`` and several force mains
-    the split between them is not known, so their velocity is not checked. Raise ValueError if
-    the rule is invalid.
+    The pumped flow is :func:`pumped_flow`, summed over the pumps feeding a main shared
+    downstream of a join. With ``discharge='shared'`` and several force mains the split between
+    them is not known, so the velocity of those mains is not checked. Raise ValueError if the
+    rule is invalid.
     """
-    params = _rule_params("force_main_checks", rule, FORCE_MAIN_CHECKS, ())
-    min_diameter = params.get("min_diameter")
-    velocity = params.get("velocity")
-    if velocity is not None:
-        low, high = sorted(float(v) for v in velocity)
-    narrow, slow, fast, unchecked = [], [], [], []
+    min_diameter, velocity = force_main_check_params(rule)
+    flows = {}  # pipe -> pumped flows of the links feeding it (None: unknown)
     for link in station_pumps:
         flow = pumped_flow(stations[link.station])
+        if len(link.force_mains) > 1:
+            flow = None
         for chain in link.force_mains.values():
             for name in chain:
-                diameter = sections[name][1]
-                if min_diameter is not None and round(1000 * diameter, 6) < float(min_diameter):
-                    narrow.append(f"{name} ({1000 * diameter:g} mm)")
-                if velocity is None:
-                    continue
-                if flow is None or len(link.force_mains) > 1:
-                    unchecked.append(str(name))
-                    continue
-                v = flow * _FLOW_UNIT_LPS[flow_units] / 1000 / (math.pi / 4 * diameter**2)
-                if v < low:
-                    slow.append(f"{name} ({v:.2f} m/s)")
-                elif v > high:
-                    fast.append(f"{name} ({v:.2f} m/s)")
+                flows.setdefault(name, []).append(flow)
+    narrow, slow, fast, unchecked = [], [], [], []
+    for name in sorted(flows, key=lambda p: (isinstance(p, str), p)):
+        feeds = flows[name]
+        diameter = sections[name][1]
+        if min_diameter is not None and round(1000 * diameter, 6) < min_diameter:
+            narrow.append(f"{name} ({1000 * diameter:g} mm)")
+        if velocity is None:
+            continue
+        if None in feeds:
+            unchecked.append(str(name))
+            continue
+        flow = sum(feeds)
+        v = flow * _FLOW_UNIT_LPS[flow_units] / 1000 / (math.pi / 4 * diameter**2)
+        if v < velocity[0]:
+            slow.append(f"{name} ({v:.2f} m/s)")
+        elif v > velocity[1]:
+            fast.append(f"{name} ({v:.2f} m/s)")
     found = []
     if narrow:
         found.append(f"Force mains narrower than {min_diameter:g} mm: {', '.join(narrow)}.")
     if slow:
-        found.append(f"Force mains with a velocity below {low:g} m/s: {', '.join(slow)}.")
+        found.append(f"Force mains with a velocity below {velocity[0]:g} m/s: {', '.join(slow)}.")
     if fast:
-        found.append(f"Force mains with a velocity above {high:g} m/s: {', '.join(fast)}.")
+        found.append(f"Force mains with a velocity above {velocity[1]:g} m/s: {', '.join(fast)}.")
     if unchecked:
         logger.info(
-            "Force-main velocity not checked (an ideal pump with no design_flow, or a shared "
-            "pump feeding several force mains): %s",
+            "Force-main velocity not checked (no design_flow for an ideal pump or a head-flow "
+            "curve, or a shared pump feeding several force mains): %s",
             ", ".join(unchecked),
         )
     return found
@@ -1194,6 +1327,7 @@ def build_model(
     pumps=None,
     wet_wells=None,
     pump_stations=None,
+    default_pump=None,
     force_main_roughness=None,
     force_main_roughness_by_pipe=None,
     force_main_surcharge_depth=100.0,
@@ -1269,6 +1403,11 @@ def build_model(
         Other outlets of the station, e.g. overflows, stay conduits. With ``discharge='separate'``
         the pumps and discharge nodes are numbered: ``<node>_P1``, ``<node>_D1``, ...
 
+    default_pump : Pump or dict, optional
+        The pump of the stations in ``pump_stations`` given without one. Not applied unless
+        given; London's preset, an ideal pump for its variable-speed stations (s. 4.3.5), is
+        ``LONDON_ON.design['default_pump']``.
+
     force_main_roughness : float, dict or callable
         Roughness of the FORCE_MAIN cross-sections, read by SWMM as a Hazen-Williams C or a
         Darcy-Weisbach roughness height (mm) according to the template's FORCE_MAIN_EQUATION.
@@ -1314,7 +1453,9 @@ def build_model(
 
     wet_well_defaults : dict, optional
         A design rule for stations whose wet well is not known: ``{'fill_time': minutes,
-        'high_level_below_inlet': m, 'low_level_above_pump': m}``. A station with no wet well
+        'high_level_below_inlet': m, 'low_level_above_pump': m}``, and optionally
+        ``'low_level_suction_diameters'`` (the low water level is then at least that many of a
+        station's ``suction_diameter`` above the floor). A station with no wet well
         (in ``pump_stations`` or ``wet_wells``) gets one whose plan area holds its
         ``design_flow`` for ``fill_time`` between the low and high water levels, and a pump with
         a curve and no ``startup``/``shutoff`` gets them at those levels (see
@@ -1340,8 +1481,9 @@ def build_model(
         remains after the fills (a conduit with no cross-section, a node with no invert; every
         such gap is listed), a pump, wet well, pump station, dry-weather flow, pattern or fill
         rule is invalid, a pipe is both pumped and part of a station's force main, a force main
-        has no roughness or is not circular, or an ideal pump is not the only outlet link of its
-        inlet node (SWMM's ERROR 134).
+        has no roughness or is not circular, a pump's startup depth is not above its shutoff depth
+        or not below its wet well's max depth, a PUMP1 station has no wet well, or an ideal pump
+        is not the only outlet link of its inlet node (SWMM's ERROR 134).
     """
     outfalls = outfall_types(outfalls, subnetwork)
     unknown = sorted(set(outfalls) - set(subnetwork.nodes))
@@ -1349,10 +1491,13 @@ def build_model(
         raise ValueError(f"Outfalls not in the subnetwork: {', '.join(map(str, unknown))}")
     pumps = resolve_pumps(subnetwork, pumps)
     wet_wells = resolve_wet_wells(subnetwork, wet_wells, outfalls)
-    stations, station_pumps = resolve_pump_stations(subnetwork, pump_stations, outfalls)
+    stations, station_pumps = resolve_pump_stations(
+        subnetwork, pump_stations, outfalls, default_pump
+    )
     both = sorted(str(n) for n, s in stations.items() if s.wet_well is not None and n in wet_wells)
     if both:
         raise ValueError(f"Wet wells given both in wet_wells and pump_stations: {', '.join(both)}")
+    flow_units = str(flow_units).upper()
     if flow_units not in _FLOW_UNIT_LPS:
         raise ValueError(f"flow_units must be one of {list(_FLOW_UNIT_LPS)}, not {flow_units!r}.")
     wet_wells.update({n: s.wet_well for n, s in stations.items() if s.wet_well is not None})
@@ -1362,6 +1507,15 @@ def build_model(
     if both:
         raise ValueError(
             "Pipes both in pumps and in a pump station's force main: " + ", ".join(both)
+        )
+    curves = {f"{p}_curve" for p, pump in pumps.items() if pump.curve != "*"}
+    both = sorted(
+        f"{n}_curve" for n, s in stations.items() if s.pump.curve != "*" and f"{n}_curve" in curves
+    )
+    if both:
+        raise ValueError(
+            "Pump curve names of both a pumped pipe and a pump station (a pipe ID equal to a "
+            f"station node): {', '.join(both)}"
         )
     dwf = resolve_dwf(subnetwork, dwf, outfalls)
     patterns = resolve_patterns(patterns)
@@ -1395,9 +1549,38 @@ def build_model(
             if station.wet_well is None and node in wet_wells:
                 station.wet_well = wet_wells[node]
         derived = apply_wet_well_defaults(
-            subnetwork, pipes, stations, inverts, wet_well_defaults, flow_units, force_mains
+            subnetwork,
+            pipes,
+            stations,
+            inverts,
+            wet_well_defaults,
+            flow_units,
+            force_mains,
+            pump_names={
+                node: [link.name for link in station_pumps if link.station == node]
+                for node in stations
+            },
         )
     wet_wells.update({n: s.wet_well for n, s in stations.items() if s.wet_well is not None})
+    problems = [
+        f"{node} has a PUMP1 pump and no wet well (pass wet_well, wet_wells or wet_well_defaults)"
+        for node, station in stations.items()
+        if station.pump.curve != "*"
+        and station.pump.curve_type == "PUMP1"
+        and node not in wet_wells
+    ]
+    problems += [
+        problem
+        for node, station in stations.items()
+        if (problem := pump_level_problem(node, station.pump, wet_wells.get(node)))
+    ]
+    problems += [
+        problem
+        for name, pump in pumps.items()
+        if (problem := pump_level_problem(name, pump, wet_wells.get(inlets[name])))
+    ]
+    if problems:
+        raise ValueError("Invalid pumps:\n  " + "\n  ".join(problems))
     sections = {
         name: xsection(row)
         for name, row in zip(pipes["pipe_id"], pipes.to_dict("records"), strict=True)
@@ -1638,7 +1821,7 @@ def write_inp(subnetwork, path, outfalls=None, template_path=None, dead_ends="ra
         outfalls = {**outfalls, **{node: "FREE" for node in report.dead_ends}}
 
     flow_units = template_flow_units(template)
-    if options.get("flow_units", flow_units) != flow_units:
+    if str(options.get("flow_units", flow_units)).upper() != flow_units:
         raise ValueError(
             f"flow_units {options['flow_units']!r} is not the template's FLOW_UNITS {flow_units}."
         )
