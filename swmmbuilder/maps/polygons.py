@@ -1,6 +1,9 @@
 """Polygons covering groups of nodes (e.g. drainage zones)."""
 
+from __future__ import annotations
+
 import logging
+from typing import TYPE_CHECKING
 
 import geopandas as gpd
 import numpy as np
@@ -10,6 +13,14 @@ from matplotlib.path import Path
 from shapely import MultiPoint
 
 from .crs import _check_nodes, _geodata, _with_crs, network_footprint, plot_crs
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable, Mapping
+    from typing import Any
+
+    from .._types import NodeId
+    from ..network import Network
+    from ..subnetwork import Subnetwork
 
 logger = logging.getLogger(__name__)
 
@@ -31,16 +42,16 @@ def _path(geometry):
 
 
 def node_group_polygons(
-    net,
-    groups,
-    method="voronoi",
+    net: Network | Subnetwork,
+    groups: Mapping[Any, Iterable[NodeId]],
+    method: str = "voronoi",
     *,
-    clip_to=None,
-    footprint=None,
-    buffer=10.0,
-    ratio=0.3,
-    crs=None,
-):
+    clip_to: Any = None,
+    footprint: float | bool | None = None,
+    buffer: float = 10.0,
+    ratio: float = 0.3,
+    crs: Any = None,
+) -> gpd.GeoDataFrame:
     """Polygons covering groups of nodes (e.g. drainage zones).
 
     Parameters
@@ -113,7 +124,7 @@ def node_group_polygons(
     elif method == "voronoi":
         if clip_to is None:
             clip_to = MultiPoint(list(positions)).convex_hull.buffer(buffer)
-        owner = {}
+        owner: dict[tuple[float, float], Any] = {}
         for group, ps in points.items():
             for p in ps:
                 if owner.setdefault((p.x, p.y), group) != group:
@@ -122,7 +133,7 @@ def node_group_polygons(
                     )
         seeds = [shapely.Point(xy) for xy in owner]
         groups_of_seeds = list(owner.values())
-        tiles = {g: [] for g in points}
+        tiles: dict[Any, list] = {g: [] for g in points}
         if len(seeds) == 1:
             # The whole area, even if the one node is outside it.
             tiles[groups_of_seeds[0]].append(clip_to)

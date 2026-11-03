@@ -1,5 +1,10 @@
 """Static plots of pipes, group polygons and node markers."""
 
+from __future__ import annotations
+
+import numbers
+from typing import TYPE_CHECKING
+
 import matplotlib.patheffects as pe
 import numpy as np
 import pandas as pd
@@ -14,6 +19,18 @@ from .crs import _check_nodes, _geodata
 from .polygons import _path
 from .style import DrawnLayer, _finish, add_legends
 
+if TYPE_CHECKING:
+    from collections.abc import Iterable, Mapping, Sequence
+    from typing import Any
+
+    import geopandas as gpd
+    from matplotlib.axes import Axes
+
+    from .._types import NodeId, Values
+    from ..maps.colours import ColourScale
+    from ..network import Network
+    from ..subnetwork import Subnetwork
+
 # Pipes drawn as context under other layers (plot_pipes(context=True)): colour and width factor.
 CONTEXT_COLOR = "0.6"
 
@@ -25,27 +42,27 @@ DEFAULT_HATCHES = ("//", "\\\\", "xx", "..", "++", "oo")
 
 
 def plot_pipes(
-    ax,
-    net,
-    values=None,
+    ax: Axes,
+    net: Network | Subnetwork,
+    values: Values | None = None,
     *,
-    cmap="viridis",
-    norm="linear",
-    vmin=None,
-    vmax=None,
-    color=None,
-    missing_color="0.75",
-    colour=None,
-    width=None,
-    width_range=(0.4, 4.0),
-    width_scale="sqrt",
-    context=False,
-    legend=True,
-    label=None,
-    style=True,
-    crs=None,
-    zorder=None,
-):
+    cmap: Any = "viridis",
+    norm: Any = "linear",
+    vmin: float | None = None,
+    vmax: float | None = None,
+    color: Any = None,
+    missing_color: Any = "0.75",
+    colour: ColourScale | None = None,
+    width: float | Values | None = None,
+    width_range: tuple[float, float] = (0.4, 4.0),
+    width_scale: str = "sqrt",
+    context: bool = False,
+    legend: bool = True,
+    label: str | None = None,
+    style: bool = True,
+    crs: Any = None,
+    zorder: float | None = None,
+) -> DrawnLayer:
     """Draw the pipes of ``net``, coloured by a per-pipe value, or as light context under other
     layers.
 
@@ -113,7 +130,7 @@ def plot_pipes(
     pipes = _geodata(net, "pipes", crs)
     if width is None:
         linewidths = np.full(len(pipes), 1.0)
-    elif np.isscalar(width):
+    elif isinstance(width, numbers.Real):  # Python or NumPy
         linewidths = np.full(len(pipes), float(width))
     else:
         linewidths = _scaled(_aligned(width, pipes.index, "widths"), width_range, width_scale)
@@ -140,29 +157,29 @@ def plot_pipes(
 
 
 def plot_groups(
-    ax,
-    polygons,
-    values=None,
-    colors=None,
+    ax: Axes,
+    polygons: gpd.GeoDataFrame,
+    values: Values | None = None,
+    colors: Any = None,
     *,
-    cmap="viridis",
-    norm="linear",
-    vmin=None,
-    vmax=None,
-    color=None,
-    missing_color="0.85",
-    colour=None,
-    edgecolor="white",
-    linewidth=1.2,
-    alpha=0.3,
-    hatch_groups=None,
-    hatches=DEFAULT_HATCHES,
-    hatch_color="0.55",
-    legend=True,
-    label=None,
-    style=True,
-    zorder=1,
-):
+    cmap: Any = "viridis",
+    norm: Any = "linear",
+    vmin: float | None = None,
+    vmax: float | None = None,
+    color: Any = None,
+    missing_color: Any = "0.85",
+    colour: ColourScale | None = None,
+    edgecolor: Any = "white",
+    linewidth: float = 1.2,
+    alpha: float = 0.3,
+    hatch_groups: Any = None,
+    hatches: Sequence[str] = DEFAULT_HATCHES,
+    hatch_color: Any = "0.55",
+    legend: bool = True,
+    label: str | None = None,
+    style: bool = True,
+    zorder: float = 1,
+) -> DrawnLayer:
     """Draw group polygons as light fills: by category (the default), by a per-group value, or
     in one colour.
 
@@ -272,24 +289,24 @@ def plot_groups(
 
 
 def plot_markers(
-    ax,
-    net,
-    node_ids,
-    sizes=None,
-    labels=False,
+    ax: Axes,
+    net: Network | Subnetwork,
+    node_ids: Iterable[NodeId],
+    sizes: Values | None = None,
+    labels: bool | Mapping[NodeId, str] = False,
     *,
-    name=None,
-    color="#c0392b",
-    marker="o",
-    size=60.0,
-    size_range=(20.0, 200.0),
-    edgecolor="white",
-    fontsize=8,
-    legend=True,
-    style=True,
-    crs=None,
-    zorder=4,
-):
+    name: str | None = None,
+    color: Any = "#c0392b",
+    marker: str = "o",
+    size: float = 60.0,
+    size_range: tuple[float, float] = (20.0, 200.0),
+    edgecolor: Any = "white",
+    fontsize: float = 8,
+    legend: bool = True,
+    style: bool = True,
+    crs: Any = None,
+    zorder: float = 4,
+) -> DrawnLayer:
     """Mark nodes, e.g. sampler or site locations.
 
     Parameters

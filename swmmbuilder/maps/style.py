@@ -1,8 +1,11 @@
 """Map axes (scale bar, north arrow) and the column of keys (colour bars and legends)
 to the right of them."""
 
+from __future__ import annotations
+
 import weakref
 from dataclasses import dataclass, field
+from typing import TYPE_CHECKING, Any
 
 import matplotlib as mpl
 import numpy as np
@@ -10,6 +13,9 @@ from matplotlib.colors import LogNorm
 from matplotlib.legend import Legend
 from matplotlib.ticker import LogFormatterSciNotation, LogLocator, NullFormatter
 from mpl_toolkits.axes_grid1.anchored_artists import AnchoredSizeBar
+
+if TYPE_CHECKING:
+    from matplotlib.axes import Axes
 
 
 @dataclass
@@ -40,18 +46,18 @@ class DrawnLayer:
         The legend, once :func:`add_legends` has drawn it.
     """
 
-    artist: object
+    artist: Any
     ids: list = field(default_factory=list)
-    mappable: object = None
+    mappable: Any = None
     handles: list = field(default_factory=list)
     title: str | None = None
-    colorbar: object = None
-    legend: object = None
+    colorbar: Any = None
+    legend: Any = None
 
 
 # Per-axes state: the scale bar and north arrow (replaced on restyling) and the top of the free
 # space in the column of keys to the right of the axes, in axes fraction.
-_AXES_STATE = weakref.WeakKeyDictionary()
+_AXES_STATE: weakref.WeakKeyDictionary[Axes, dict[str, Any]] = weakref.WeakKeyDictionary()
 
 
 def _state(ax):
@@ -80,7 +86,7 @@ def _nice_length(length):
     return max(m * power for m in (1, 2, 5) if m * power <= length)
 
 
-def map_axes(ax, scalebar=True, north_arrow=False, units="m"):
+def map_axes(ax: Axes, scalebar: bool = True, north_arrow: bool = False, units: str = "m") -> None:
     """Style ``ax`` as a map: equal aspect, no ticks or frame, a scale bar about a fifth of the
     width (rounded to 1, 2 or 5 x 10^n, in km from 1000 m) and optionally a north arrow.
 
@@ -147,7 +153,9 @@ def _renderer(fig):
         return None
 
 
-def add_legends(ax, *layers, x=1.02, colorbar_height=0.3):
+def add_legends(
+    ax: Axes, *layers: DrawnLayer, x: float = 1.02, colorbar_height: float = 0.3
+) -> None:
     """Draw the colour bars and legends of ``layers`` in a column to the right of ``ax``, from the
     top, below the keys already added to ``ax``.
 
@@ -160,7 +168,7 @@ def add_legends(ax, *layers, x=1.02, colorbar_height=0.3):
     for layer in layers:
         if layer.mappable is not None:
             top = state["key_top"]
-            cax = ax.inset_axes([x, top - colorbar_height, 0.03, colorbar_height])
+            cax = ax.inset_axes((x, top - colorbar_height, 0.03, colorbar_height))
             state["keys"].append(cax)
             layer.colorbar = fig.colorbar(layer.mappable, cax=cax)
             layer.colorbar.set_label(layer.title or "", size=8)

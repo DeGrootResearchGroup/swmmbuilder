@@ -1,16 +1,26 @@
 """Coordinates: the plot CRS (always projected in metres), WGS 84 positions, and the
 extent and footprint of a network."""
 
+from __future__ import annotations
+
 import math
+from typing import TYPE_CHECKING
 
 import numpy as np
 import shapely
 from pyproj import CRS, Transformer
 
+if TYPE_CHECKING:
+    from typing import Any
+
+    from .._types import NodeId
+    from ..network import Network
+    from ..subnetwork import Subnetwork
+
 WGS84 = CRS.from_epsg(4326)
 
 
-def lonlat_positions(subnetwork):
+def lonlat_positions(subnetwork: Subnetwork) -> dict[NodeId, tuple[float, float]]:
     """{node: (longitude, latitude)} of the subnetwork's nodes, in WGS 84.
 
     Positions in another CRS (e.g. a projected one such as :data:`TORONTO_ON`'s EPSG:2952) are
@@ -24,7 +34,7 @@ def lonlat_positions(subnetwork):
     return {node: transformer.transform(x, y) for node, (x, y) in positions.items()}
 
 
-def plot_crs(net, crs=None):
+def plot_crs(net: Network | Subnetwork, crs: Any = None) -> CRS:
     """The CRS the static plots of ``net`` are drawn in, always projected in metres, so that the
     scale bar, buffers, footprints and ribbon widths are in metres.
 
@@ -91,13 +101,13 @@ FOOTPRINT_PIPES = 2.0
 FOOTPRINT_EXTENT = 0.05
 
 
-def network_extent(net, crs=None):
+def network_extent(net: Network | Subnetwork, crs: Any = None) -> float:
     """The larger side of the bounding box of the pipes of ``net``, in metres of the plot CRS."""
     xmin, ymin, xmax, ymax = _geodata(net, "pipes", crs).total_bounds
     return float(max(xmax - xmin, ymax - ymin))
 
 
-def footprint_distance(net, crs=None):
+def footprint_distance(net: Network | Subnetwork, crs: Any = None) -> float:
     """The default :func:`network_footprint` distance of ``net``: twice the median pipe length,
     at most 5 % of :func:`network_extent`, in metres."""
     pipes = _geodata(net, "pipes", crs)
@@ -105,7 +115,9 @@ def footprint_distance(net, crs=None):
     return min(FOOTPRINT_PIPES * median, FOOTPRINT_EXTENT * network_extent(net, crs))
 
 
-def network_footprint(net, distance=None, crs=None):
+def network_footprint(
+    net: Network | Subnetwork, distance: float | None = None, crs: Any = None
+) -> shapely.Geometry:
     """The area served by the pipes of ``net``: within about ``distance`` metres of a pipe
     (default :func:`footprint_distance`), with narrow gaps between pipes filled in, as a shapely
     geometry in the plot CRS."""

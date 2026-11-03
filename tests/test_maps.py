@@ -930,3 +930,9 @@ def test_leaflet_layers_take_a_colour_scale(sub, tmp_path):
         maps.to_leaflet(sub, tmp_path / "map.html", [each], tiles=None)
         html.append(re.findall(r'"_colour": "(#[0-9a-f]{6})"', (tmp_path / "map.html").read_text()))
     assert html[0] == html[1] and html[0]
+
+
+def test_numpy_scalar_widths_are_constant(ax, sub):
+    # A NumPy integer is a number, not per-pipe values (#81: isinstance numbers.Real).
+    layer = maps.plot_pipes(ax, sub, width=np.int64(2))
+    assert set(layer.artist.get_linewidths()) == {2.0}

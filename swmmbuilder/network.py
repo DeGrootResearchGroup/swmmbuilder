@@ -1,10 +1,13 @@
 """A city's sewer network: its pipes and node layers, loaded through a
 :class:`~swmmbuilder.Schema`, and the flow graph between their nodes."""
 
+from __future__ import annotations
+
 import logging
 import re
 from collections.abc import Iterable
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import geopandas as gpd
 import networkx as nx
@@ -15,6 +18,13 @@ from .gaps import lowest_inverts
 from .geometry import is_disjoint, node_positions, to_geodataframe
 from .schema import LONDON_ON, NODE_COLUMNS, as_schema
 from .subnetwork import Subnetwork
+
+if TYPE_CHECKING:
+    from collections.abc import Callable, Collection
+    from typing import Any
+
+    from ._types import NodeId, StrPath, Values
+    from .schema import Schema
 
 logger = logging.getLogger(__name__)
 
@@ -34,7 +44,7 @@ NODE_LAYERS = {
 }
 
 
-def strip_leading_zeros(node_id):
+def strip_leading_zeros(node_id: NodeId) -> NodeId:
     """Node ID with the leading zeros of its number removed, e.g. 'OK0329' -> 'OK329'.
 
     A ``normalize_ids`` hook for :class:`Network`: newer London exports drop the zeros that older
@@ -177,31 +187,36 @@ class Network:
 
     def __init__(
         self,
-        source,
-        flow_types=DEFAULT_FLOW_TYPES,
-        keep_abandoned=False,
-        schema=LONDON_ON,
-        status=DEFAULT_STATUSES,
-        include_overflows=True,
-        maintenance_holes=None,
-        pump_stations=None,
-        outfalls=None,
-        other_nodes=None,
-        normalize_ids=None,
-        snap_tolerance=None,
-        max_invert_difference=None,
-    ):
+        source: StrPath | gpd.GeoDataFrame,
+        flow_types: Iterable[str] | None = DEFAULT_FLOW_TYPES,
+        keep_abandoned: bool = False,
+        schema: Schema | StrPath = LONDON_ON,
+        status: Iterable[str] | None = DEFAULT_STATUSES,
+        include_overflows: bool = True,
+        maintenance_holes: StrPath | gpd.GeoDataFrame | None = None,
+        pump_stations: StrPath | gpd.GeoDataFrame | None = None,
+        outfalls: StrPath | gpd.GeoDataFrame | None = None,
+        other_nodes: StrPath | gpd.GeoDataFrame | None = None,
+        normalize_ids: Callable[[Any], Any] | None = None,
+        snap_tolerance: float | None = None,
+        max_invert_difference: float | None = None,
+    ) -> None:
         self.schema = schema = as_schema(schema)
         self.normalize_ids = normalize_ids
-        self.aliases = {}
-        self.snap_report = None
+        self.aliases: dict[NodeId, NodeId] = {}
+        self.snap_report: pd.DataFrame | None = None
         self.full_data = schema.normalize(_read(source))
         if normalize_ids is not None:
             for column in ("from_node", "to_node"):
                 self.full_data[column] = self.full_data[column].map(
                     normalize_ids, na_action="ignore"
                 )
-        self.removed = {"flow_type": {}, "status": {}, "structure_type": {}, "invalid": {}}
+        self.removed: dict[str, dict[str, int]] = {
+            "flow_type": {},
+            "status": {},
+            "structure_type": {},
+            "invalid": {},
+        }
         self._drop_invalid()
 
         if flow_types is not None and "flow_type" in schema.columns:
@@ -366,13 +381,15 @@ class Network:
         geometry = gpd.GeoSeries(geometry.where(geometry.notna(), None), crs=data.crs)
         return gpd.GeoDataFrame(nodes, geometry=geometry)
 
-    def resolve(self, node):
+    def resolve(self, node: NodeId) -> NodeId:
         """The node ID that ``node`` refers to: normalized and with merged IDs replaced."""
         if self.normalize_ids is not None:
             node = self.normalize_ids(node)
         return self.aliases.get(node, node)
 
-    def snap_nodes(self, tolerance=0.5, max_invert_difference=None):
+    def snap_nodes(
+        self, tolerance: float = 0.5, max_invert_difference: float | None = None
+    ) -> pd.DataFrame:
         """Merge node IDs whose points are within ``tolerance`` of each other.
 
         The same structure sometimes has two IDs at one point, which disconnects the network
@@ -421,7 +438,9 @@ class Network:
         )
         ids = list(present.index)
         inverts = self.nodes["invert"]
-        pairs, parent, members = [], {}, {}
+        pairs: list[tuple] = []
+        parent: dict[NodeId, NodeId] = {}
+        members: dict[NodeId, set[NodeId]] = {}
 
         def root(node):
             while parent.get(node, node) != node:
@@ -446,9 +465,9 @@ class Network:
             elif max_invert_difference is not None and not difference <= max_invert_difference:
                 reason = f"inverts differ by more than {max_invert_difference} m"
             elif root(a) != root(b):
-                merged = group(a) | group(b)
-                spread = inverts[sorted(merged)]
-                if any(neighbours(n) & merged for n in group(a)):
+                union = group(a) | group(b)
+                spread = inverts[sorted(union)]
+                if any(neighbours(n) & union for n in group(a)):
                     reason = "would merge nodes joined by a pipe"
                 elif max_invert_difference is not None and (
                     spread.isna().any() or not spread.max() - spread.min() <= max_invert_difference
@@ -460,22 +479,22 @@ class Network:
                 else:
                     ra, rb = root(a), root(b)
                     parent[rb] = ra
-                    members[ra] = merged
+                    members[ra] = union
                     members.pop(rb, None)
             distance = present[a].distance(present[b]) * metres
             pairs.append((a, b, distance, inverts[a], inverts[b], reason is None, reason))
 
-        groups = {}
+        groups: dict[NodeId, set[NodeId]] = {}
         for node in set(parent) | set(parent.values()):
             groups.setdefault(root(node), set()).add(node)
         rank = {"maintenance_holes": 0}
-        merged = {}
-        for group in groups.values():
-            layers = self.nodes.loc[sorted(group), "layer"]
+        merged: dict[NodeId, NodeId] = {}
+        for snapped in groups.values():
+            layers = self.nodes.loc[sorted(snapped), "layer"]
             kept = min(
-                group, key=lambda n: (rank.get(layers[n], 1 if pd.notna(layers[n]) else 2), n)
+                snapped, key=lambda n: (rank.get(layers[n], 1 if pd.notna(layers[n]) else 2), n)
             )
-            merged.update({n: kept for n in group if n != kept})
+            merged.update({n: kept for n in snapped if n != kept})
 
         report = pd.DataFrame(
             pairs,
@@ -495,7 +514,7 @@ class Network:
         )
         return report
 
-    def subnetwork(self, nodes):
+    def subnetwork(self, nodes: Iterable[NodeId]) -> Subnetwork:
         """The :class:`Subnetwork` made of ``nodes`` and every pipe between two of them.
 
         Raises
@@ -505,7 +524,13 @@ class Network:
         """
         return Subnetwork(self, nodes)
 
-    def catchment(self, node, max_hops=None, max_length=None, outlet=None):
+    def catchment(
+        self,
+        node: NodeId,
+        max_hops: int | None = None,
+        max_length: float | None = None,
+        outlet: NodeId | Iterable[NodeId] | None = None,
+    ) -> Subnetwork:
         """The :class:`Subnetwork` of ``node``'s catchment: every node that drains to it.
 
         With ``max_hops`` or ``max_length`` the catchment is truncated, and with ``outlet`` the
@@ -547,9 +572,10 @@ class Network:
         selected.add(node)
 
         if outlet is not None:
-            single = isinstance(outlet, str) or not isinstance(outlet, Iterable)
-            outlets = [outlet] if single else list(outlet)
-            outlets = [self.resolve(o) for o in outlets]
+            if isinstance(outlet, str) or not isinstance(outlet, Iterable):
+                outlets = [self.resolve(outlet)]
+            else:
+                outlets = [self.resolve(o) for o in outlet]
             self.check_nodes(outlets)
             reachable = [o for o in sorted(outlets) if nx.has_path(self.graph, node, o)]
             if not reachable:
@@ -559,7 +585,9 @@ class Network:
 
         return self.subnetwork(selected)
 
-    def to_geodataframe(self, kind="pipes", values=None):
+    def to_geodataframe(
+        self, kind: str = "pipes", values: Values | None = None
+    ) -> gpd.GeoDataFrame:
         """The pipes or nodes as a GeoDataFrame, in the network's CRS, for plotting or export.
 
         Parameters
@@ -575,7 +603,7 @@ class Network:
         """
         return to_geodataframe(self.full_data, self.nodes, kind, values)
 
-    def check_nodes(self, nodes):
+    def check_nodes(self, nodes: Iterable[NodeId]) -> None:
         """Raise ValueError listing the ``nodes`` that are not in the network."""
         missing = sorted(n for n in nodes if n not in self.graph)
         if missing:
@@ -583,11 +611,11 @@ class Network:
 
     _check_nodes = check_nodes  # the former name
 
-    def ids(self):
+    def ids(self) -> set[NodeId]:
         """Every node ID and pipe ID of the network, e.g. to check that a new name is free."""
         return set(self.graph.nodes) | set(self.full_data["pipe_id"])
 
-    def lowest_inverts(self, nodes):
+    def lowest_inverts(self, nodes: Collection[NodeId]) -> dict[NodeId, float]:
         """{node: lowest invert of the network's pipes connected to it} for ``nodes`` (see
         :func:`swmmbuilder.gaps.lowest_inverts`)."""
         return lowest_inverts(self.full_data, nodes)
@@ -598,7 +626,7 @@ class Network:
         return min(attrs["length"] for attrs in pipes.values())
 
 
-def pipe_end_points(data, nodes):
+def pipe_end_points(data: pd.DataFrame, nodes: Iterable[NodeId]) -> dict[NodeId, Point]:
     """{node: shapely Point} for the nodes in ``nodes``, from the pipe geometry.
 
     A node is placed at the upstream end of a pipe leaving it or, if no pipe leaves it, at the

@@ -1,9 +1,12 @@
 """Interactive Leaflet maps and GeoJSON export."""
 
+from __future__ import annotations
+
 import importlib
 import os
 import warnings
 from dataclasses import dataclass, field, fields
+from typing import TYPE_CHECKING
 
 import geopandas as gpd
 import matplotlib as mpl
@@ -20,6 +23,14 @@ from .colours import (
     _hex_colours,
 )
 from .crs import WGS84, _check_nodes, _with_crs, lonlat_positions
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
+    from typing import Any
+
+    from .._types import StrPath, Values
+    from ..network import Network
+    from ..subnetwork import Subnetwork
 
 
 @dataclass
@@ -186,7 +197,13 @@ def _add_markers(m, folium, net, layer):
     group.add_to(m)
 
 
-def to_leaflet(net, path, layers=None, *, tiles="OpenStreetMap"):
+def to_leaflet(
+    net: Network | Subnetwork,
+    path: StrPath,
+    layers: Sequence[PipeLayer | GroupLayer | MarkerLayer] | None = None,
+    *,
+    tiles: str | None = "OpenStreetMap",
+) -> Any:
     """Write an interactive Leaflet map of ``net`` to an HTML file, with ``folium``.
 
     The data are embedded in the file; Leaflet and the basemap tiles are loaded from the web
@@ -232,14 +249,18 @@ def to_leaflet(net, path, layers=None, *, tiles="OpenStreetMap"):
     return m
 
 
-def to_geojson(net, path, kind="pipes", values=None):
+def to_geojson(
+    net: Network | Subnetwork, path: StrPath, kind: str = "pipes", values: Values | None = None
+) -> None:
     """Write the pipes or nodes of ``net`` (with ``values``; see
     :meth:`~swmmbuilder.Network.to_geodataframe`) to a GeoJSON file in WGS 84."""
     data = _with_crs(net.to_geodataframe(kind, values)).to_crs(WGS84)
     data.to_file(path, driver="GeoJSON")
 
 
-def generate_gmap(subnetwork, file_name, origin=None):
+def generate_gmap(
+    subnetwork: Subnetwork, file_name: str, origin: tuple[float, float] | None = None
+) -> None:
     """Write an html file showing the subnetwork overlaid on Google Maps.
 
     .. deprecated::

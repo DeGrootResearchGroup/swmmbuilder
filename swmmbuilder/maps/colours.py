@@ -1,9 +1,12 @@
 """Values to colours and sizes: scaling, norms, colour maps and category palettes."""
 
+from __future__ import annotations
+
 import copy
 import logging
 import warnings
 from dataclasses import dataclass, fields
+from typing import TYPE_CHECKING
 
 import matplotlib as mpl
 import matplotlib.cbook as cbook
@@ -12,6 +15,10 @@ import pandas as pd
 from matplotlib.colors import LogNorm, Normalize, to_hex
 
 from ..diagnostics import OptionWarning
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable
+    from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -215,7 +222,9 @@ def _hex_colours(values, cmap, norm, missing_color):
     return [to_hex(c) for c in cmap(np.ma.masked_invalid(norm(masked)))]
 
 
-def category_colors(categories, colors=None, other=NEUTRAL_COLOR):
+def category_colors(
+    categories: Iterable[Any], colors: Any = None, other: Any = NEUTRAL_COLOR
+) -> dict[Any, Any]:
     """{category: colour} for categorical maps, e.g. zones and the ribbons of their loads.
 
     ``colors`` (a dict, or a list in the order of the categories) where given; otherwise Tableau 10

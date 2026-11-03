@@ -1,6 +1,11 @@
 """Ribbons: pipes drawn as bands of strands, one per share of the flow, along main
 stems with mitred joins."""
 
+from __future__ import annotations
+
+import numbers
+from typing import TYPE_CHECKING
+
 import numpy as np
 import pandas as pd
 import shapely
@@ -13,6 +18,12 @@ from .colours import NEUTRAL_COLOR, _aligned, category_colors
 from .crs import _geodata, network_extent
 from .polygons import _path
 from .style import DrawnLayer, _finish, add_legends
+
+if TYPE_CHECKING:
+    from matplotlib.axes import Axes
+
+    from ..network import Network
+    from ..subnetwork import Subnetwork
 
 # Name of the strand that lumps the categories dropped by plot_ribbons' top_k and min_share.
 OTHER = "other"
@@ -191,9 +202,9 @@ def _shares_table(shares, top_k, min_share):
 
 
 def plot_ribbons(
-    ax,
-    net,
-    shares,
+    ax: Axes,
+    net: Network | Subnetwork,
+    shares: pd.DataFrame,
     colors=None,
     *,
     width="total",
@@ -210,7 +221,7 @@ def plot_ribbons(
     style=True,
     crs=None,
     zorder=2,
-):
+) -> DrawnLayer:
     """Draw pipes as ribbons of parallel strands, one per category, each as wide as its share of
     the pipe's load (a mass-flow map).
 
@@ -286,7 +297,10 @@ def plot_ribbons(
     """
     if order not in ("category", "share"):
         raise ValueError(f"order must be 'category' or 'share', not {order!r}.")
-    width_tol, share_tol = (merge_tol, merge_tol) if np.isscalar(merge_tol) else merge_tol
+    if isinstance(merge_tol, numbers.Real):  # one tolerance for both
+        width_tol = share_tol = float(merge_tol)
+    else:
+        width_tol, share_tol = (float(t) for t in merge_tol)
     pipes = _geodata(net, "pipes", crs)
     raw = shares.astype(float).fillna(0.0)
     raw = raw.loc[raw.index.isin(pipes.index)]
@@ -297,7 +311,7 @@ def plot_ribbons(
             max_width = RIBBON_WIDTH * network_extent(net, crs)
         totals = raw.sum(axis=1)
         widths = totals / totals.max() * max_width if len(totals) else totals
-    elif np.isscalar(width):
+    elif isinstance(width, numbers.Real):  # Python or NumPy
         widths = pd.Series(float(width), index=raw.index)
     else:
         widths = pd.Series(_aligned(width, raw.index, "widths"), index=raw.index)
@@ -320,7 +334,7 @@ def plot_ribbons(
             )
         )
 
-    width_tol *= widths.max() if len(widths) else 0.0
+    width_tol *= float(widths.max()) if len(widths) else 0.0
     runs = [
         _merged(chain, table, widths, width_tol, share_tol)
         for chain in _stems(net.graph, list(table.index), widths)

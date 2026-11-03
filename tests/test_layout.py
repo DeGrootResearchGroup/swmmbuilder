@@ -71,3 +71,41 @@ def test_every_subpackage_is_packaged():
             or any(fnmatchcase(package, pattern) for pattern in exclude)
         }
     assert not missing, f"Subpackages a regular install leaves out: {sorted(missing)}"
+
+
+def test_type_checking_names_are_not_used_at_runtime():
+    # Names imported only under `if TYPE_CHECKING:` (#81) exist for the annotations, which are
+    # postponed (from __future__ import annotations); used in code, e.g. isinstance(x, Mapping),
+    # they raise NameError at run time, which neither ruff nor mypy reports.
+    problems = []
+    for path in sorted((REPO / "swmmbuilder").rglob("*.py")):
+        tree = ast.parse(path.read_text())
+        checking, runtime, skip = set(), set(), set()
+        for node in tree.body:
+            if isinstance(node, ast.If) and getattr(node.test, "id", None) == "TYPE_CHECKING":
+                skip |= {id(n) for n in ast.walk(node)}
+                for stmt in node.body:
+                    if isinstance(stmt, ast.Import | ast.ImportFrom):
+                        checking |= {a.asname or a.name.split(".")[0] for a in stmt.names}
+                    elif isinstance(stmt, ast.Assign):
+                        checking |= {t.id for t in stmt.targets if isinstance(t, ast.Name)}
+            elif isinstance(node, ast.Import | ast.ImportFrom):
+                runtime |= {a.asname or a.name.split(".")[0] for a in node.names}
+        for node in ast.walk(tree):
+            annotations = []
+            if isinstance(node, ast.FunctionDef):
+                a = node.args
+                params = [*a.posonlyargs, *a.args, *a.kwonlyargs, a.vararg, a.kwarg]
+                annotations = [p.annotation for p in params if p is not None] + [node.returns]
+            elif isinstance(node, ast.AnnAssign):
+                annotations = [node.annotation]
+            for annotation in annotations:
+                if annotation is not None:
+                    skip |= {id(n) for n in ast.walk(annotation)}
+        only_checking = checking - runtime
+        problems += [
+            f"{path.relative_to(REPO)}:{node.lineno} {node.id}"
+            for node in ast.walk(tree)
+            if isinstance(node, ast.Name) and node.id in only_checking and id(node) not in skip
+        ]
+    assert not problems

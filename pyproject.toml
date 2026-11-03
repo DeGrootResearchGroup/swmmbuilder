@@ -30,6 +30,8 @@ simulate = ["pyswmm"]
 # `lint` pins the linter (same series as aquakin) so a new ruff release cannot turn the gate red
 # without a deliberate bump.
 lint = ["ruff>=0.15,<0.16"]
+# `typecheck` pins mypy's series too, for the same reason.
+typecheck = ["mypy>=2.3,<2.4"]
 test = [
   "pytest>=7",
   "pytest-timeout>=2",
@@ -45,11 +47,20 @@ include = ["swmmbuilder*"]
 
 [tool.setuptools.package-data]
 # The default .inp template and the schema presets, loaded with importlib.resources.
-swmmbuilder = ["templates/*.inp", "schemas/*.toml"]
+swmmbuilder = ["templates/*.inp", "schemas/*.toml", "py.typed"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = [".", "tests"]
+
+[tool.mypy]
+# The public API is annotated (#81); the private helpers mostly are not, and mypy skips their
+# bodies. geopandas, networkx, shapely and the plotting libraries ship no type stubs. No
+# python_version: dependencies' stubs may use newer syntax (numpy 2.5's need 3.12), so mypy checks
+# as the Python it runs on; the 3.11 test job and ruff's target-version cover 3.11.
+ignore_missing_imports = true
+warn_unused_ignores = true
+warn_redundant_casts = true
 
 [tool.ruff]
 line-length = 100
