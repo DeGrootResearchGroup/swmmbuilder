@@ -1,0 +1,44 @@
+site_name: swmmbuilder
+site_description: GIS sewer networks to SWMM .inp files
+repo_url: https://github.com/DeGrootResearchGroup/SewerNetworkx
+edit_uri: ""
+strict: true
+
+theme:
+  name: material
+  features:
+    - navigation.sections
+    - content.code.copy
+
+nav:
+  - Overview: index.md
+  - API reference:
+      - Network and Subnetwork: api/network.md
+      - Schemas: api/schema.md
+      - SWMM model: api/swmm.md
+      - Pumps and design rules: api/pumps.md
+      - Data gaps: api/gaps.md
+      - Diagnostics: api/diagnostics.md
+      - Maps: api/maps.md
+  - Changelog: https://github.com/DeGrootResearchGroup/SewerNetworkx/blob/main/CHANGELOG.md
+
+markdown_extensions:
+  - admonition
+  - pymdownx.highlight
+  - pymdownx.superfences
+
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          options:
+            docstring_style: numpy
+            show_source: false
+            show_root_heading: true
+            show_root_full_path: false
+            members_order: source
+            filters: ["!^_"]
+            merge_init_into_class: true
+            separate_signature: true
+            show_signature_annotations: true

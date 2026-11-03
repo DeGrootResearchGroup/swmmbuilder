@@ -518,6 +518,15 @@ signatures, and `import pyswmm` is killed (exit 137). Re-sign them ad hoc:
 codesign --force --sign - "$(python -c 'import swmm.toolkit, os; print(os.path.dirname(swmm.toolkit.__file__))')"/{libomp,libswmm-output}.dylib
 ```
 
+## API reference
+
+The API reference is generated from the docstrings with MkDocs (`mkdocs.yml`, `docs/`):
+
+```bash
+pip install -e ".[docs]"
+mkdocs serve            # http://127.0.0.1:8000, rebuilt on save; or mkdocs build --strict
+```
+
 ## CI
 
 `.github/workflows/ci.yml` runs ruff (`ruff check` and `ruff format --check`, rules in

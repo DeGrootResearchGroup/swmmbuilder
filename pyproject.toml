@@ -32,6 +32,8 @@ simulate = ["pyswmm"]
 lint = ["ruff>=0.15,<0.16"]
 # `typecheck` pins mypy's series too, for the same reason.
 typecheck = ["mypy>=2.3,<2.4"]
+# The API reference (mkdocs.yml, docs/). mkdocstrings 1.x is needed with pymdown-extensions 12.
+docs = ["mkdocs>=1.6,<1.7", "mkdocstrings[python]>=1.0,<2", "mkdocs-material>=9.6,<10"]
 test = [
   "pytest>=7",
   "pytest-timeout>=2",
