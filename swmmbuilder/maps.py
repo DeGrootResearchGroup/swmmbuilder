@@ -378,7 +378,23 @@ _AXES_STATE = weakref.WeakKeyDictionary()
 
 
 def _state(ax):
-    return _AXES_STATE.setdefault(ax, {"key_top": 1.0, "decorations": []})
+    """The state of ``ax``, started afresh if ``ax`` was cleared since (its decorations and
+    keys are then gone, and the column of keys is empty)."""
+    state = _AXES_STATE.get(ax)
+    if state is None or _cleared(ax, state):
+        state = _AXES_STATE[ax] = {"key_top": 1.0, "decorations": [], "keys": []}
+    return state
+
+
+def _cleared(ax, state):
+    """True if an artist or key axes recorded in ``state`` is no longer on ``ax`` (e.g. after
+    ``ax.clear()``, which detaches artists and drops inset axes)."""
+    for artist in [*state["decorations"], *state["keys"]]:
+        if artist in ax.figure.axes:  # a colour bar's inset axes
+            continue
+        if isinstance(artist, mpl.axes.Axes) or artist.axes is not ax:
+            return True
+    return False
 
 
 def _nice_length(length):
@@ -468,6 +484,7 @@ def add_legends(ax, *layers, x=1.02, colorbar_height=0.3):
         if layer.mappable is not None:
             top = state["key_top"]
             cax = ax.inset_axes([x, top - colorbar_height, 0.03, colorbar_height])
+            state["keys"].append(cax)
             layer.colorbar = fig.colorbar(layer.mappable, cax=cax)
             layer.colorbar.set_label(layer.title or "", size=8)
             layer.colorbar.ax.tick_params(labelsize=7)
@@ -498,6 +515,7 @@ def add_legends(ax, *layers, x=1.02, colorbar_height=0.3):
                 alignment="left",
             )
             ax.add_artist(legend)
+            state["keys"].append(legend)
             legend.set_clip_on(False)  # outside the axes, and in a tight bounding box
             layer.legend = legend
             renderer = _renderer(fig)
@@ -597,9 +615,12 @@ def _stems(graph, pipe_ids, widths=None):
     for key in starts:
         if key in seen:
             continue
-        chain = [key]
-        while following.get(chain[-1]) not in seen | set(chain) | {None}:
-            chain.append(following[chain[-1]])
+        chain, members = [key], {key}
+        while (after := following.get(chain[-1])) is not None and not (
+            after in seen or after in members
+        ):
+            chain.append(after)
+            members.add(after)
         seen.update(chain)
         chains.append(chain)
     return chains
@@ -1059,19 +1080,26 @@ def node_group_polygons(
                     )
         seeds = [shapely.Point(xy) for xy in owner]
         groups_of_seeds = list(owner.values())
+        tiles = {g: [] for g in points}
         if len(seeds) == 1:
-            cells = [clip_to]
+            # The whole area, even if the one node is outside it.
+            tiles[groups_of_seeds[0]].append(clip_to)
         else:
             cells = list(shapely.voronoi_polygons(MultiPoint(seeds), extend_to=clip_to).geoms)
-        tree = shapely.STRtree(seeds)
-        cell_index, seed_index = tree.query(cells, predicate="contains")
-        tiles = {g: [] for g in points}
-        for c, s in zip(cell_index, seed_index, strict=True):
-            tiles[groups_of_seeds[s]].append(cells[c])
+            tree = shapely.STRtree(seeds)
+            cell_index, seed_index = tree.query(cells, predicate="contains")
+            for c, i in zip(cell_index, seed_index, strict=True):
+                tiles[groups_of_seeds[i]].append(cells[c])
         polygons = {g: shapely.union_all(t).intersection(clip_to) for g, t in tiles.items()}
     else:
         raise ValueError(f"method must be 'voronoi' or 'concave_hull', not {method!r}.")
 
+    empty = [str(g) for g, polygon in polygons.items() if polygon.is_empty]
+    if empty:
+        logger.warning(
+            "Groups with an empty polygon (their nodes are outside clip_to or the footprint): %s",
+            ", ".join(empty),
+        )
     return gpd.GeoDataFrame(
         {"geometry": list(polygons.values())},
         index=pd.Index(list(polygons), name="group"),
@@ -1165,7 +1193,8 @@ def plot_groups(
     elif color is not None:
         shaded.set_facecolor(color)
     else:
-        palette = category_colors(ids, colors)
+        # Over every group, drawn or not, so that a list of colours keeps its order.
+        palette = category_colors(list(polygons.index), colors)
         shaded.set_facecolor([palette[g] for g in ids])
         handles = [
             Patch(facecolor=palette[g], alpha=min(1.0, 2 * alpha), label=str(g)) for g in ids
@@ -1458,11 +1487,12 @@ def _add_pipes(m, folium, net, layer):
     colours, norm = _value_colours(values, layer, layer.color)
     data["_colour"] = colours
     group = folium.FeatureGroup(name=layer.name, show=layer.show)
-    folium.GeoJson(
-        data.to_json(na="null"),
-        style_function=lambda f: {"color": f["properties"]["_colour"], "weight": layer.weight},
-        tooltip=folium.GeoJsonTooltip(fields=fields, aliases=aliases),
-    ).add_to(group)
+    if len(data):  # folium's tooltip fails on no features
+        folium.GeoJson(
+            data.to_json(na="null"),
+            style_function=lambda f: {"color": f["properties"]["_colour"], "weight": layer.weight},
+            tooltip=folium.GeoJsonTooltip(fields=fields, aliases=aliases),
+        ).add_to(group)
     group.add_to(m)
     if norm is not None:
         _colour_legend(m, layer.cmap, norm, layer.name)
@@ -1481,16 +1511,17 @@ def _add_groups(m, folium, layer):
     colours, norm = _value_colours(values, layer, layer.color)
     data["_colour"] = colours
     group = folium.FeatureGroup(name=layer.name, show=layer.show)
-    folium.GeoJson(
-        data.to_json(na="null"),
-        style_function=lambda f: {
-            "fillColor": f["properties"]["_colour"],
-            "color": "#444444",
-            "weight": 1,
-            "fillOpacity": layer.opacity,
-        },
-        tooltip=folium.GeoJsonTooltip(fields=fields, aliases=aliases),
-    ).add_to(group)
+    if len(data):  # folium's tooltip fails on no features
+        folium.GeoJson(
+            data.to_json(na="null"),
+            style_function=lambda f: {
+                "fillColor": f["properties"]["_colour"],
+                "color": "#444444",
+                "weight": 1,
+                "fillOpacity": layer.opacity,
+            },
+            tooltip=folium.GeoJsonTooltip(fields=fields, aliases=aliases),
+        ).add_to(group)
     group.add_to(m)
     if norm is not None:
         _colour_legend(m, layer.cmap, norm, layer.name)
@@ -1499,10 +1530,11 @@ def _add_groups(m, folium, layer):
 def _add_markers(m, folium, net, layer):
     _check_nodes(net, layer.node_ids)
     nodes = _with_crs(net.to_geodataframe("nodes")).to_crs(WGS84).geometry
+    unplaced = [str(n) for n in layer.node_ids if n not in nodes.index or nodes[n] is None]
+    if unplaced:  # as plot_markers
+        raise ValueError(f"Nodes with no position: {', '.join(unplaced)}")
     group = folium.FeatureGroup(name=layer.name, show=layer.show)
     for node in layer.node_ids:
-        if node not in nodes.index:
-            continue
         folium.CircleMarker(
             location=[nodes[node].y, nodes[node].x],
             radius=layer.radius,
@@ -1542,8 +1574,10 @@ def to_leaflet(net, path, layers=None, *, tiles="OpenStreetMap"):
     folium = _optional("folium")
     layers = [PipeLayer()] if layers is None else layers
     m = folium.Map(tiles=tiles, control_scale=True)
-    xmin, ymin, xmax, ymax = _with_crs(net.to_geodataframe("pipes")).to_crs(WGS84).total_bounds
-    m.fit_bounds([[ymin, xmin], [ymax, xmax]])
+    bounds = _with_crs(net.to_geodataframe("nodes")).to_crs(WGS84).total_bounds
+    if np.isfinite(bounds).all():  # nodes with no position (or no nodes) have none
+        xmin, ymin, xmax, ymax = bounds
+        m.fit_bounds([[ymin, xmin], [ymax, xmax]])
     for layer in layers:
         if isinstance(layer, PipeLayer):
             _add_pipes(m, folium, net, layer)
