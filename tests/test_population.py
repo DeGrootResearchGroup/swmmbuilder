@@ -69,13 +69,13 @@ def approx(d):
 
 
 def test_shared_by_weight_at_upstream_nodes(net):
-    # Rates per metre of the valid weights: 2/50, 6/30 and 2/40; median 0.05, so pipe 3 weighs
-    # 0.05 x 60 = 3 and pipe 5 weighs 3. P (weights 2 and 6) and Q (3 and 2).
+    # Q's only valid weight per metre is pipe 4's, 2/40, so pipe 3 weighs 0.05 x 60 = 3. Pipe 5
+    # is in no polygon, so has no rate: weight 0. P (weights 2 and 6) and Q (3 and 2).
     alloc = allocate(net)
     assert alloc.nodes == approx({"N1": 20, "N2": 60, "N3": 60, "N4": 40, "N5": 0})
     assert alloc.pipes["polygon"].tolist()[:4] == ["P", "P", "Q", "Q"]
     assert pd.isna(alloc.pipes.loc[5, "polygon"])
-    assert alloc.pipes["weight"].tolist() == approx([2, 6, 3, 2, 3])
+    assert alloc.pipes["weight"].tolist() == approx([2, 6, 3, 2, 0])
     assert alloc.pipes["weight_imputed"].tolist() == [False, False, True, False, True]
     assert alloc.total == pytest.approx(180)
     assert alloc.unallocated == pytest.approx(30)
@@ -114,32 +114,28 @@ def test_callable_weight(net):
     assert alloc.nodes == approx({"N1": 20, "N2": 60, "N3": 60, "N4": 40, "N5": 0})
 
 
-def test_rate_total(net):
-    # (2 + 6 + 2) / (50 + 30 + 40) per metre: pipe 3 weighs 5, against 2 for pipe 4.
-    alloc = allocate(net, rate="total")
-    assert alloc.pipes.loc[3, "weight"] == pytest.approx(5)
-    assert alloc.nodes["N3"] == pytest.approx(100 * 5 / 7)
+def test_imputed_from_the_pipes_own_polygon():
+    # P: pipe 1 has 3 / 30 per metre, so pipe 2 (20 m, missing) weighs 2; the network median
+    # (of 0.1 and Q's 0.05) would give it 1.5.
+    pipes = [
+        (1, "N1", "N2", 10, 40, 3),
+        (2, "N2", "N3", 40, 60, None),
+        (3, "N4", "N5", 110, 150, 2),
+    ]
+    alloc = allocate(make_network(pipes))
+    assert alloc.pipes["weight"].tolist() == approx([3, 2, 2])
+    assert alloc.nodes == approx({"N1": 48, "N2": 32, "N4": 100})
 
 
-def test_rate_groups_layer(net):
-    # The group covering x 50-200 holds the midpoints of pipes 2-4: median of 6/30 and 2/40.
-    groups = squares({"G": (50, 200, 0.0), "H": (200, 300, 0.0)})
-    alloc = allocate(net, rate_groups=groups)
-    assert alloc.pipes.loc[3, "weight"] == pytest.approx(0.125 * 60)
-    assert alloc.pipes.loc[3, "rate_group"] == "G"
-    # Pipe 5's group has no valid weight: weight 0.
-    assert alloc.pipes.loc[5, "weight"] == 0
-
-
-def test_rate_groups_polygons(net):
-    # Q's only valid weight is pipe 4's, 2/40 per metre.
-    assert allocate(net, rate_groups="polygons").pipes.loc[3, "weight"] == pytest.approx(3)
-
-
-def test_pipe_in_no_rate_group_weighs_zero(net):
-    alloc = allocate(net, rate_groups=squares({"P": (0, 100, 0.0)}))
+def test_polygon_with_no_valid_weight_is_reported():
+    # Q's only pipe has no count: nothing to impute from, so Q's people are not allocated.
+    pipes = [(1, "N1", "N2", 10, 60, 2), (3, "N3", "N4", 110, 150, None)]
+    alloc = allocate(make_network(pipes))
+    assert alloc.no_valid_weight == ["Q"]
+    assert alloc.zero_weight == []
     assert alloc.pipes.loc[3, "weight"] == 0
-    assert alloc.nodes["N4"] == pytest.approx(100)
+    assert alloc.nodes == approx({"N1": 80, "N3": 0})
+    assert alloc.unallocated == pytest.approx(130)
 
 
 def test_impute_zero(net):
@@ -169,8 +165,9 @@ def test_within_counts_only_the_subnetworks_pipes(net):
     alloc = allocate(net)
     sub = net.catchment("N4")  # pipes 1-3
     assert alloc.within(sub) == approx({"N1": 20, "N2": 60, "N3": 60})
-    # Allocating over the subnetwork alone puts all of Q's people on pipe 3.
-    assert allocate(net.catchment("N4")).nodes == approx({"N1": 20, "N2": 60, "N3": 100})
+    # Allocating over the subnetwork alone (here by length) puts all of Q's people on pipe 3.
+    alone = allocate_population(net.catchment("N4"), squares())
+    assert alone.nodes == approx({"N1": 50, "N2": 30, "N3": 100})
 
 
 def test_overlapping_polygons_take_the_first(net):
@@ -187,9 +184,9 @@ def test_reprojects_polygons(net):
 
 def test_invalid_options_listed_together(net):
     with pytest.raises(ValueError) as error:
-        allocate(net, weight="Connections", rate="mean", placement="middle", impute="mean")
+        allocate(net, weight="Connections", placement="middle", impute="mean")
     message = str(error.value)
-    for name in ("weight", "rate", "placement", "impute"):
+    for name in ("weight", "placement", "impute"):
         assert name in message
 
 

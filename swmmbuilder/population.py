@@ -6,11 +6,12 @@ traffic zone, or any other areal unit) is placed on the pipes in it and then on 
 1. each pipe goes to the polygon containing its midpoint;
 2. each polygon's population is shared among its pipes in proportion to a weight per pipe (by
    default the pipe length; e.g. a count of service connections), with invalid or missing weights
-   imputed from a rate per metre of pipe;
+   imputed from the polygon's median weight per metre of pipe;
 3. each pipe's share is placed at its upstream node, its downstream node, or half at each.
 
-A polygon with no pipe contributes no one, and a polygon only partly sewered places all its
-people on the pipes it has. The population left out is reported.
+The same polygons serve for the share and for the imputation. A polygon with no pipe contributes
+no one, and a polygon only partly sewered places all its people on the pipes it has. The
+population left out is reported.
 
 The result's ``nodes`` ({node: population}) is the input of
 :func:`~swmmbuilder.swmm.dwf.dwf_from_population`.
@@ -40,8 +41,6 @@ logger = logging.getLogger(__name__)
 Weight = str | Callable[[gpd.GeoDataFrame], pd.Series] | None
 Placement = Literal["upstream", "downstream", "split"]
 IMPUTATIONS = ("per_length", "zero")
-RATE_GROUPS = ("network", "polygons")
-RATES = ("median", "total")
 PLACEMENTS = ("upstream", "downstream", "split")
 
 
@@ -58,8 +57,7 @@ class PopulationAllocation:
     pipes : pandas.DataFrame
         One row per pipe, indexed by pipe_id, with ``from_node``, ``to_node``, ``length``,
         ``polygon`` (ID of the polygon containing the midpoint, missing if none),
-        ``weight_imputed`` (bool), ``rate_group`` (the group whose rate per metre imputed the
-        weight), ``weight`` (after imputation), and ``population``.
+        ``weight_imputed`` (bool), ``weight`` (after imputation), and ``population``.
 
     polygons : pandas.DataFrame
         One row per polygon, indexed by polygon ID, with ``population`` (as given, a missing value
@@ -67,14 +65,18 @@ class PopulationAllocation:
         ``allocated`` (the population placed on its pipes).
 
     unallocated : float
-        Population placed at no node: that of the polygons with no pipe or whose pipes all weigh
-        0, and the shares of pipes with no node at the end they are placed at.
+        Population placed at no node: that of the polygons of ``no_pipes``, ``no_valid_weight``,
+        and ``zero_weight``, and the shares of pipes with no node at the end they are placed at.
 
     no_pipes : list
         IDs of the polygons with people but no pipe.
 
+    no_valid_weight : list
+        IDs of the polygons with people and pipes, none of whose weights is valid, so that no
+        weight can be imputed (with ``impute='per_length'``).
+
     zero_weight : list
-        IDs of the polygons with people and pipes, whose pipes all weigh 0.
+        IDs of the other polygons with people and pipes, whose pipes all weigh 0.
 
     placement : str
         The ``placement`` the shares were placed with.
@@ -85,6 +87,7 @@ class PopulationAllocation:
     polygons: pd.DataFrame
     unallocated: float
     no_pipes: list = field(default_factory=list)
+    no_valid_weight: list = field(default_factory=list)
     zero_weight: list = field(default_factory=list)
     placement: Placement = "upstream"
 
@@ -159,18 +162,11 @@ def _weights(pipes, weight):
     return pd.to_numeric(values, errors="coerce").astype(float)
 
 
-def _check(pipes, polygons, population, weight, impute, rate_groups, rate, placement):
+def _check(pipes, polygons, population, weight, impute, placement):
     """Raise ValueError listing every invalid option."""
     problems = Problems("Invalid population allocation")
     if impute not in IMPUTATIONS:
         problems.add(f"impute must be one of {', '.join(IMPUTATIONS)}, not {impute!r}")
-    if isinstance(rate_groups, str) and rate_groups not in RATE_GROUPS:
-        problems.add(
-            f"rate_groups must be one of {', '.join(RATE_GROUPS)} or a GeoDataFrame, "
-            f"not {rate_groups!r}"
-        )
-    if rate not in RATES:
-        problems.add(f"rate must be one of {', '.join(RATES)}, not {rate!r}")
     if placement not in PLACEMENTS:
         problems.add(f"placement must be one of {', '.join(PLACEMENTS)}, not {placement!r}")
     if isinstance(weight, str) and weight not in pipes.columns:
@@ -180,10 +176,7 @@ def _check(pipes, polygons, population, weight, impute, rate_groups, rate, place
     repeated = polygons.index[polygons.index.duplicated()].unique()
     if len(repeated):
         problems.add(f"polygon IDs (the index of polygons) repeated: {list(repeated)[:20]}")
-    layers = [("the network", pipes), ("polygons", polygons)]
-    if not isinstance(rate_groups, str):
-        layers.append(("rate_groups", rate_groups))
-    for name, layer in layers:
+    for name, layer in (("the network", pipes), ("polygons", polygons)):
         if layer.crs is None:
             problems.add(f"{name} has no CRS")
     problems.raise_if_any()
@@ -196,8 +189,6 @@ def allocate_population(
     weight: Weight = None,
     max_weight: float | None = None,
     impute: Literal["per_length", "zero"] = "per_length",
-    rate_groups: gpd.GeoDataFrame | Literal["network", "polygons"] = "network",
-    rate: Literal["median", "total"] = "median",
     placement: Placement = "upstream",
 ) -> PopulationAllocation:
     """Allocate the population of each polygon to the nodes of ``network``.
@@ -232,18 +223,10 @@ def allocate_population(
         Weights above this are invalid. Missing, non-numeric, and negative weights always are.
 
     impute : {'per_length', 'zero'}
-        What an invalid weight becomes: the pipe's length times the rate per metre of its group
-        (``rate_groups``, ``rate``), or 0. With ``'per_length'``, a pipe in no group, or in a
-        group with no valid weight, gets 0.
-
-    rate_groups : {'network', 'polygons'} or geopandas.GeoDataFrame
-        The pipes each rate per metre is taken over: all of them (default), those of the pipe's
-        own polygon, or those of the area of this GeoDataFrame containing the pipe's midpoint
-        (e.g. a coarser areal unit than ``polygons``; the first area if more than one does).
-
-    rate : {'median', 'total'}
-        The rate per metre of a group: the median of weight / length over its pipes with valid
-        weights (default), or their total weight over their total length.
+        What an invalid weight becomes: the pipe's length times the median weight per metre
+        (weight / length) of the pipes of its polygon with valid weights (default), or 0. A
+        polygon with pipes but no valid weight gets no imputed weight; it is reported in
+        ``no_valid_weight``, and its people are not allocated.
 
     placement : {'upstream', 'downstream', 'split'}
         Where a pipe's share is placed: at its upstream node (``from_node``, default), at its
@@ -269,16 +252,14 @@ def allocate_population(
     Examples
     --------
     London's census dissemination areas, shared by private drain connections, with invalid
-    counts imputed from each forward sortation area's median connections per metre::
+    counts imputed from each area's median connections per metre::
 
-        alloc = allocate_population(
-            net, das, population="pop", weight="PDC_Count", max_weight=100, rate_groups=fsas
-        )
+        alloc = allocate_population(net, das, population="pop", weight="PDC_Count", max_weight=100)
         sub = net.catchment("OUT")
         dwf = dwf_from_population(alloc.within(sub), per_capita=230, unit="L/d")
     """
     pipes = _pipes_of(network)
-    _check(pipes, polygons, population, weight, impute, rate_groups, rate, placement)
+    _check(pipes, polygons, population, weight, impute, placement)
     people = polygons[population] if isinstance(population, str) else population
     people = pd.to_numeric(pd.Series(people).reindex(polygons.index), errors="coerce")
     negative = people.index[people < 0]
@@ -299,31 +280,12 @@ def allocate_population(
         invalid |= given > max_weight
     table["weight_imputed"] = invalid
     if impute == "zero":
-        table["rate_group"] = pd.NA
         table["weight"] = given.where(~invalid, 0.0)
     else:
-        if not isinstance(rate_groups, str):
-            group = _polygon_of(midpoints, rate_groups.to_crs(pipes.crs))
-        elif rate_groups == "polygons":
-            group = table["polygon"]
-        else:
-            group = pd.Series("network", index=pipes.index)
-        table["rate_group"] = group
-        valid = given.where(~invalid)
-        if rate == "median":
-            per_metre = (valid / table["length"]).groupby(group).median()
-        else:
-            length = table["length"].where(~invalid)
-            per_metre = valid.groupby(group).sum() / length.groupby(group).sum()
-        imputed = group.map(per_metre).astype(float).fillna(0.0) * table["length"]
-        table["weight"] = given.where(~invalid, imputed)
-        no_rate = int((invalid & (imputed == 0)).sum())
-        if no_rate:
-            logger.info(
-                "%d pipes with invalid weights have no rate per metre (no group, or no valid "
-                "weight in it); weight 0",
-                no_rate,
-            )
+        per_metre = (given.where(~invalid) / table["length"]).groupby(table["polygon"]).median()
+        imputed = table["polygon"].map(per_metre).astype(float) * table["length"]
+        table["weight"] = given.where(~invalid, imputed.fillna(0.0))
+    no_valid = table.loc[~invalid, "polygon"].dropna().unique()
     logger.info(
         "%d of %d pipe weights invalid; imputed (%s)", int(invalid.sum()), len(table), impute
     )
@@ -346,10 +308,22 @@ def allocate_population(
     )
     with_people = summary["population"] > 0
     no_pipes = list(summary.index[with_people & (summary["pipes"] == 0)])
+    sewered = with_people & (summary["pipes"] > 0)
+    no_valid_weight = (
+        list(summary.index[sewered & ~summary.index.isin(no_valid)])
+        if impute == "per_length"
+        else []
+    )
     zero_weight = list(
-        summary.index[with_people & (summary["pipes"] > 0) & (summary["weight"] == 0)]
+        summary.index[sewered & (summary["weight"] == 0) & ~summary.index.isin(no_valid_weight)]
     )
     unallocated = float(people.sum() - placed)
+    if no_valid_weight:
+        logger.warning(
+            "%d polygons have pipes but no valid weight to impute from; not allocated: %s",
+            len(no_valid_weight),
+            no_valid_weight[:20],
+        )
     if no_pipes or zero_weight:
         logger.warning(
             "%d polygons with no pipe and %d whose pipes all weigh 0 are not allocated",
@@ -369,6 +343,7 @@ def allocate_population(
         polygons=summary,
         unallocated=unallocated,
         no_pipes=no_pipes,
+        no_valid_weight=no_valid_weight,
         zero_weight=zero_weight,
         placement=placement,
     )
