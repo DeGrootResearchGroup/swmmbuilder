@@ -874,7 +874,9 @@ class Network:
         missing = sorted(n for n in nodes if n not in self.graph)
         if missing:
             split = [
-                f"{n} (split into {', '.join(map(str, self.splits[n]))})" for n in missing if n in self.splits
+                f"{n} (split into {', '.join(map(str, self.splits[n]))})"
+                for n in missing
+                if n in self.splits
             ]
             raise ValueError(
                 f"Nodes not in the network: {', '.join(map(str, missing))}"
