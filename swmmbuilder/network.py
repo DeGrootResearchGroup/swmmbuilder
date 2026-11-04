@@ -11,11 +11,12 @@ from typing import TYPE_CHECKING
 
 import geopandas as gpd
 import networkx as nx
+import numpy as np
 import pandas as pd
 from shapely import Point
 
 from .gaps import lowest_inverts
-from .geometry import is_disjoint, node_positions, to_geodataframe
+from .geometry import is_disjoint, line_coords, node_positions, to_geodataframe
 from .schema import LONDON_ON, NODE_COLUMNS, as_schema
 from .subnetwork import Subnetwork
 
@@ -95,6 +96,36 @@ def _read(layer):
     return layer if isinstance(layer, gpd.GeoDataFrame) else gpd.read_file(Path(layer))
 
 
+def _letters(i):
+    """The suffix of the ``i``-th structure of a reused ID: 'a', 'b', ..., 'z', 'aa', 'ab', ..."""
+    suffix = ""
+    i += 1
+    while i:
+        i, r = divmod(i - 1, 26)
+        suffix = chr(ord("a") + r) + suffix
+    return suffix
+
+
+def _clusters(points, tolerance):
+    """Single-linkage clusters of ``points`` (an (n, 2) array, in m): lists of point indices, each
+    cluster's points joined by a chain of steps of at most ``tolerance``."""
+    parent = list(range(len(points)))
+
+    def root(i):
+        while parent[i] != i:
+            parent[i] = parent[parent[i]]
+            i = parent[i]
+        return i
+
+    distance = np.hypot(*(points[:, None, :] - points[None, :, :]).transpose(2, 0, 1))
+    for i, j in zip(*np.nonzero(np.triu(distance <= tolerance, 1)), strict=True):
+        parent[root(int(i))] = root(int(j))
+    clusters: dict[int, list[int]] = {}
+    for i in range(len(points)):
+        clusters.setdefault(root(i), []).append(i)
+    return list(clusters.values())
+
+
 class Network:
     """A city's sewer network.
 
@@ -146,6 +177,23 @@ class Network:
     max_invert_difference : float, optional
         See :meth:`snap_nodes`.
 
+    split_tolerance : float, optional
+        If set, node IDs used for more than one structure are split on loading, before any
+        snapping: the pipe ends that carry one ID are grouped into structures, and two ends
+        more than ``split_tolerance`` apart (in m) belong to different structures unless a chain
+        of ends at most ``split_tolerance`` apart joins them. An ID with more than one structure
+        becomes one node per structure, named by appending 'a', 'b', 'c', ... to the ID in the
+        order of each structure's smallest pipe ID, so that rebuilds give the same names. A
+        pipe whose geometry runs from its downstream node to its upstream node (each end is
+        more than ``split_tolerance`` from the other points of its own ID, and within it of the
+        other ID's) has its ends matched the other way round, so that it does not split its
+        nodes. Each node-layer point with a split ID goes to the nearest of its structures,
+        which takes the point's position and attributes (node type, invert, rim); a structure
+        with no point takes them from its pipes, as a node in no layer does. An ID whose pipes
+        include one with no geometry is not split. Every split is logged as a warning and
+        listed in ``split_report``. Must exceed ``snap_tolerance``, so that snapping cannot
+        merge the structures again.
+
     Attributes
     ----------
     full_data : geopandas.GeoDataFrame
@@ -180,6 +228,18 @@ class Network:
     snap_report : pandas.DataFrame or None
         The report of :meth:`snap_nodes` if ``snap_tolerance`` was given.
 
+    splits : dict
+        {node ID: [the node IDs it was split into]} by ``split_tolerance``. The original IDs are
+        no longer nodes: :meth:`check_nodes` names their split IDs.
+
+    split_report : pandas.DataFrame or None
+        If ``split_tolerance`` was given, one row per node made by splitting a reused ID:
+        ``node_id`` (the ID in the data), ``new_id``, ``pipes`` (the pipe IDs of the structure),
+        ``separation`` (distance to the nearest end of another structure of the ID, in m),
+        ``layer`` (the node layer whose point it took, or None), ``point_distance`` (from that
+        point to the nearest of its pipe ends, in m) and ``attributes`` ('node layer', or
+        'pipes' for a structure with no point).
+
     version : int
         Bumped each time the graph is rebuilt (by :meth:`snap_nodes`); subnetworks made from
         an older version raise when used.
@@ -200,11 +260,24 @@ class Network:
         normalize_ids: Callable[[Any], Any] | None = None,
         snap_tolerance: float | None = None,
         max_invert_difference: float | None = None,
+        split_tolerance: float | None = None,
     ) -> None:
         self.schema = schema = as_schema(schema)
         self.normalize_ids = normalize_ids
         self.aliases: dict[NodeId, NodeId] = {}
         self.snap_report: pd.DataFrame | None = None
+        self.splits: dict[NodeId, list[NodeId]] = {}
+        self._split_points: dict[NodeId, Point] = {}
+        self.split_report: pd.DataFrame | None = None
+        if (
+            split_tolerance is not None
+            and snap_tolerance is not None
+            and not split_tolerance > snap_tolerance
+        ):
+            raise ValueError(
+                f"split_tolerance ({split_tolerance} m) must exceed snap_tolerance "
+                f"({snap_tolerance} m)."
+            )
         self.full_data = schema.normalize(_read(source))
         if normalize_ids is not None:
             for column in ("from_node", "to_node"):
@@ -241,6 +314,8 @@ class Network:
                 other_nodes=other_nodes,
             )
         )
+        if split_tolerance is not None:
+            self.split_report = self._split_reused_ids(split_tolerance)
         self._build()
         if snap_tolerance is not None:
             self.snap_report = self.snap_nodes(snap_tolerance, max_invert_difference)
@@ -309,6 +384,190 @@ class Network:
             return None
         return pd.concat(frames, ignore_index=True)
 
+    def _split_reused_ids(self, tolerance):
+        """Split the node IDs used for more than one structure (see ``split_tolerance``),
+        renaming them in ``full_data`` and the node layers, and return the report."""
+        data = self.full_data
+        if data.crs is None:
+            raise ValueError("Cannot split reused node IDs: the data have no CRS.")
+        geometry = data.geometry
+        layers = self._layers
+        if not data.crs.is_projected:
+            utm = geometry.estimate_utm_crs()
+            geometry = geometry.to_crs(utm)
+            if layers is not None:
+                layers = layers.to_crs(utm)
+        metres = geometry.crs.axis_info[0].unit_conversion_factor
+
+        ids = (data["from_node"].to_numpy(), data["to_node"].to_numpy())
+        pipe_ids = data["pipe_id"].to_numpy()
+        # ends[i] = [upstream end, downstream end] of pipe i (by position), in m, from its
+        # geometry; ends_of[node] = [(i, side)], side 0 for a pipe leaving the node, 1 entering.
+        ends: dict[int, list[np.ndarray]] = {}
+        drawn: dict[int, list[tuple]] = {}  # the same ends in the data's coordinates
+        ends_of: dict[NodeId, list[tuple[int, int]]] = {}
+        no_geometry: set[NodeId] = set()
+        for i, (g, g_data) in enumerate(zip(geometry, data.geometry, strict=True)):
+            coords = line_coords(g)
+            for side in (0, 1):
+                node = ids[side][i]
+                if pd.isna(node):
+                    continue
+                if not coords:
+                    no_geometry.add(node)
+                    continue
+                ends_of.setdefault(node, []).append((i, side))
+            if coords:
+                ends[i] = [np.array(coords[0]) * metres, np.array(coords[-1]) * metres]
+                coords = line_coords(g_data)
+                drawn[i] = [coords[0], coords[-1]]
+        points_of: dict[NodeId, list[tuple[int, np.ndarray]]] = {}
+        if layers is not None:
+            for j, (node, point) in enumerate(zip(layers["node_id"], layers.geometry, strict=True)):
+                if pd.notna(node) and point is not None and not point.is_empty:
+                    points_of.setdefault(node, []).append((j, np.array(point.coords[0]) * metres))
+
+        def extent(node):
+            xy = np.array([ends[i][side] for i, side in ends_of[node]])
+            return float(np.hypot(*(xy.max(axis=0) - xy.min(axis=0))))
+
+        candidates = {n for n in ends_of if len(ends_of[n]) > 1 and extent(n) > tolerance}
+
+        def near(node, xy, pipe):
+            """True if ``xy`` is within tolerance of a point of ``node`` other than ``pipe``'s."""
+            others = [ends[i][side] for i, side in ends_of.get(node, ()) if i != pipe]
+            others += [p for _, p in points_of.get(node, ())]
+            return any(np.hypot(*(xy - p)) <= tolerance for p in others)
+
+        # Pipes drawn from their downstream node to their upstream node: match their ends the
+        # other way round, so that the drawing direction does not split their nodes.
+        backwards = []
+        for i in sorted({i for n in candidates for i, _ in ends_of[n]}):
+            up, down = ids[0][i], ids[1][i]
+            first, last = ends[i]
+            if (
+                up != down
+                and not near(up, first, i)
+                and not near(down, last, i)
+                and near(up, last, i)
+                and near(down, first, i)
+            ):
+                ends[i] = [last, first]
+                drawn[i] = drawn[i][::-1]
+                backwards.append(pipe_ids[i])
+        if backwards:
+            logger.info(
+                "%d pipes are drawn from their downstream node to their upstream node; their ends "
+                "were matched to their node IDs the other way round: %s",
+                len(backwards),
+                _ids(sorted(backwards)),
+            )
+
+        taken = {n for column in ids for n in column if pd.notna(n)} | set(points_of)
+        renamed = [ids[0].copy(), ids[1].copy()]
+        layer_ids = None if layers is None else self._layers["node_id"].to_numpy().copy()
+        rows, clashes, unsplit = [], [], []
+        for node in sorted(candidates, key=str):
+            members = ends_of[node]
+            xy = np.array([ends[i][side] for i, side in members])
+            clusters = _clusters(xy, tolerance)
+            if len(clusters) == 1:
+                continue
+            if node in no_geometry:
+                unsplit.append(node)
+                continue
+            clusters.sort(
+                key=lambda c: (
+                    sorted(pipe_ids[members[k][0]] for k in c),
+                    *xy[c].mean(axis=0).round(3),
+                )
+            )
+            new_ids = [f"{node}{_letters(k)}" for k in range(len(clusters))]
+            clashes += [n for n in new_ids if n in taken]
+            # Each node-layer point goes to its nearest structure; the first in layer order wins.
+            point: dict[int, tuple[str, float]] = {}
+            for j, p in points_of.get(node, ()):
+                gaps = [float(np.hypot(*(xy[c] - p).T).min()) for c in clusters]
+                k = int(np.argmin(gaps))
+                layer_ids[j] = new_ids[k]
+                point.setdefault(k, (layers["layer"].iloc[j], gaps[k]))
+            for k, cluster in enumerate(clusters):
+                for m in cluster:
+                    i, side = members[m]
+                    renamed[side][i] = new_ids[k]
+                others = [m for m in range(len(members)) if m not in cluster]
+                separation = float(
+                    np.hypot(*(xy[cluster][:, None, :] - xy[others][None, :, :]).T).min()
+                )
+                layer, distance = point.get(k, (None, np.nan))
+                if layer is None:
+                    # No point: the node is at its pipe end nearest the structure's centre.
+                    centre = xy[cluster].mean(axis=0)
+                    m = cluster[int(np.argmin(np.hypot(*(xy[cluster] - centre).T)))]
+                    i, side = members[m]
+                    self._split_points[new_ids[k]] = Point(drawn[i][side])
+                rows.append(
+                    (
+                        node,
+                        new_ids[k],
+                        tuple(sorted({pipe_ids[members[m][0]] for m in cluster})),
+                        separation,
+                        layer,
+                        distance,
+                        "pipes" if layer is None else "node layer",
+                    )
+                )
+            self.splits[node] = new_ids
+            logger.warning(
+                "Node ID %s is used for %d structures, at least %.0f m apart; split into %s",
+                node,
+                len(clusters),
+                min(r[3] for r in rows[-len(clusters) :]),
+                "; ".join(
+                    f"{r[1]} (pipes {_ids(r[2])}; "
+                    + (
+                        f"{r[4]} point {r[5]:.1f} m away)"
+                        if r[4] is not None
+                        else "no node-layer point: attributes from its pipes)"
+                    )
+                    for r in rows[-len(clusters) :]
+                ),
+            )
+        if clashes:
+            raise ValueError(
+                f"Cannot split reused node IDs: the new IDs are already in use: {_ids(clashes)}"
+            )
+        if unsplit:
+            logger.warning(
+                "%d node IDs have pipe ends more than %s m apart but a pipe with no geometry, "
+                "so they are not split: %s",
+                len(unsplit),
+                tolerance,
+                _ids(unsplit),
+            )
+        if self.splits:
+            self.full_data = data.assign(from_node=renamed[0], to_node=renamed[1])
+            if layer_ids is not None:
+                self._layers = self._layers.assign(node_id=layer_ids)
+        logger.info(
+            "Split %d reused node IDs into %d nodes (structures more than %s m apart)",
+            len(self.splits),
+            len(rows),
+            tolerance,
+        )
+        return pd.DataFrame(
+            rows,
+            columns=[
+                "node_id",
+                "new_id",
+                "pipes",
+                "separation",
+                "layer",
+                "point_distance",
+                "attributes",
+            ],
+        )
+
     def _build(self):
         """(Re)build ``graph`` and ``nodes`` from ``full_data`` and the node layers.
 
@@ -374,6 +633,8 @@ class Network:
             .astype(float)
             .fillna(nodes["invert"] + nodes["depth"].astype(float))
         )
+        split_points = pd.Series(self._split_points, dtype=object).reindex(nodes.index)
+        geometry = geometry.where(geometry.notna(), split_points)
         missing = geometry.isna()
         if missing.any():
             ends = pipe_end_points(data, set(nodes.index[missing]))
@@ -396,8 +657,9 @@ class Network:
         there. Each group of nodes within ``tolerance`` (in m; geographic coordinates are
         projected to the local UTM zone) is merged into one ID, preferring an ID in the
         maintenance-hole layer, then one in another node layer, then the smallest. Pairs whose
-        inverts differ by more than ``max_invert_difference`` (pipes that cross rather than join)
-        and pairs already joined by a pipe are not merged. Since merging is transitive, both
+        inverts differ by more than ``max_invert_difference`` (pipes that cross rather than join),
+        pairs already joined by a pipe, and pairs split from one reused ID (see
+        ``split_tolerance``) are not merged. Since merging is transitive, both
         rules hold for each merged group as a whole: a pair is not merged if that would put two
         nodes joined by a pipe, or two inverts more than ``max_invert_difference`` apart, into
         one group. Merged IDs are kept in ``aliases``, so either ID can be used.
@@ -450,6 +712,8 @@ class Network:
         def group(node):
             return members.get(root(node), {node})
 
+        split_from = {new: node for node, new_ids in self.splits.items() for new in new_ids}
+
         def neighbours(node):
             return set(self.graph.successors(node)) | set(self.graph.predecessors(node))
 
@@ -462,6 +726,8 @@ class Network:
             reason = None
             if self.graph.has_edge(a, b) or self.graph.has_edge(b, a):
                 reason = "joined by a pipe"
+            elif a in split_from and split_from[a] == split_from.get(b):
+                reason = "split from one node ID"
             elif max_invert_difference is not None and not difference <= max_invert_difference:
                 reason = f"inverts differ by more than {max_invert_difference} m"
             elif root(a) != root(b):
@@ -607,7 +873,13 @@ class Network:
         """Raise ValueError listing the ``nodes`` that are not in the network."""
         missing = sorted(n for n in nodes if n not in self.graph)
         if missing:
-            raise ValueError(f"Nodes not in the network: {', '.join(map(str, missing))}")
+            split = [
+                f"{n} (split into {', '.join(map(str, self.splits[n]))})" for n in missing if n in self.splits
+            ]
+            raise ValueError(
+                f"Nodes not in the network: {', '.join(map(str, missing))}"
+                + (f"; reused IDs that were split: {'; '.join(split)}" if split else "")
+            )
 
     _check_nodes = check_nodes  # the former name
 
