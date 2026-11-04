@@ -128,9 +128,10 @@ def test_imputed_from_the_pipes_own_polygon():
 
 
 def test_polygon_with_no_valid_weight_is_reported():
-    # Q's only pipe has no count: nothing to impute from, so Q's people are not allocated.
+    # Q's only pipe has no count: with no fallback, nothing to impute from, so Q's people are not
+    # allocated.
     pipes = [(1, "N1", "N2", 10, 60, 2), (3, "N3", "N4", 110, 150, None)]
-    alloc = allocate(make_network(pipes))
+    alloc = allocate(make_network(pipes), fallback_weight=None)
     assert alloc.no_valid_weight == ["Q"]
     assert alloc.zero_weight == []
     assert alloc.pipes.loc[3, "weight"] == 0
@@ -147,10 +148,56 @@ def test_impute_zero(net):
 def test_partly_sewered_and_zero_weight_polygons():
     # S holds only pipe 4, whose weight is 0; Q is only partly sewered (its east half has no pipe).
     pipes = [(1, "N1", "N2", 110, 140, 3), (4, "N4", "N5", 210, 240, 0)]
-    alloc = allocate(make_network(pipes), squares({"Q": (100, 200, 50.0), "S": (200, 300, 7.0)}))
+    alloc = allocate(
+        make_network(pipes),
+        squares({"Q": (100, 200, 50.0), "S": (200, 300, 7.0)}),
+        fallback_weight=None,
+    )
     assert alloc.nodes == approx({"N1": 50, "N4": 0})
     assert alloc.zero_weight == ["S"]
     assert alloc.unallocated == pytest.approx(7)
+
+
+def test_fallback_where_the_median_is_zero():
+    # P: counts 0, 0 and 2 (median per metre 0), and pipe 4 missing: it gets one connection.
+    pipes = [
+        (1, "N1", "N2", 0, 20, 0),
+        (2, "N2", "N3", 20, 40, 0),
+        (3, "N3", "N4", 40, 60, 2),
+        (4, "N4", "N5", 60, 90, None),
+    ]
+    alloc = allocate(make_network(pipes), squares({"P": (0, 100, 30.0)}))
+    assert alloc.pipes["weight"].tolist() == approx([0, 0, 2, 1])
+    assert alloc.pipes["weight_fallback"].tolist() == [False, False, False, True]
+    assert alloc.nodes == approx({"N1": 0, "N2": 0, "N3": 20, "N4": 10})
+    assert alloc.fallback == ["P"]
+
+
+def test_fallback_in_a_polygon_with_no_connections():
+    # Every count in P is 0: each pipe gets one connection, so P is shared equally.
+    pipes = [(1, "N1", "N2", 0, 20, 0), (2, "N2", "N3", 20, 80, 0), (3, "N3", "N4", 80, 90, 0)]
+    alloc = allocate(make_network(pipes), squares({"P": (0, 100, 30.0)}))
+    assert alloc.pipes["weight"].tolist() == approx([1, 1, 1])
+    assert alloc.nodes == approx({"N1": 10, "N2": 10, "N3": 10})
+    assert alloc.zero_weight == [] and alloc.unallocated == pytest.approx(0)
+
+
+def test_fallback_with_no_valid_weight():
+    # Zero valid counts and two missing ones: the missing get one connection each, the zeros
+    # keep 0.
+    pipes = [
+        (1, "N1", "N2", 0, 20, 0),
+        (2, "N2", "N3", 20, 80, None),
+        (3, "N3", "N4", 80, 90, None),
+    ]
+    alloc = allocate(make_network(pipes), squares({"P": (0, 100, 30.0)}))
+    assert alloc.pipes["weight"].tolist() == approx([0, 1, 1])
+    assert alloc.nodes == approx({"N1": 0, "N2": 15, "N3": 15})
+    # Only missing counts: every pipe gets one.
+    pipes = [(2, "N2", "N3", 20, 80, None), (3, "N3", "N4", 80, 90, None)]
+    alloc = allocate(make_network(pipes), squares({"P": (0, 100, 30.0)}), fallback_weight=2)
+    assert alloc.pipes["weight"].tolist() == approx([2, 2])
+    assert alloc.no_valid_weight == []
 
 
 def test_missing_population_counts_as_zero(net):

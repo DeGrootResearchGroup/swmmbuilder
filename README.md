@@ -467,14 +467,18 @@ dwf = dwf_from_population(alloc.within(sub), per_capita=230, unit="L/d")
 - `impute` is `"per_length"` (default: an invalid weight becomes the pipe's length times the
   median weight per metre of the valid pipes of its own polygon) or `"zero"`. The polygons passed
   serve for both the share and the imputation.
+- `fallback_weight` (default 1, e.g. one connection) is given to an invalid weight where the
+  polygon's median is 0 or there is no valid weight, and then to every pipe of a polygon whose
+  pipes still weigh nothing, so its people are shared equally; `None` leaves such polygons
+  unallocated.
 - `placement` is `"upstream"`, `"downstream"`, or `"split"` (half at each end).
 
 A polygon with no pipe contributes no one, and a partly sewered polygon places all its people on
 its pipes. `alloc.unallocated` is the population left out, and `alloc.no_pipes`,
-`alloc.no_valid_weight` (pipes, but no valid weight to impute from), and `alloc.zero_weight` name
-the polygons it comes from. `alloc.pipes` and `alloc.polygons` hold the per-pipe and per-polygon
-shares. `alloc.within(sub)` keeps the shares of the subnetwork's own pipes, so people on a pipe
-leaving it are not counted.
+`alloc.no_valid_weight`, and `alloc.zero_weight` (the last two only with no fallback) name the
+polygons it comes from; `alloc.fallback` names those given the fallback weight. `alloc.pipes` and
+`alloc.polygons` hold the per-pipe and per-polygon shares. `alloc.within(sub)` keeps the shares
+of the subnetwork's own pipes, so people on a pipe leaving it are not counted.
 
 ## Conduit geometry
 

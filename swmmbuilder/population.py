@@ -6,7 +6,8 @@ traffic zone, or any other areal unit) is placed on the pipes in it and then on 
 1. each pipe goes to the polygon containing its midpoint;
 2. each polygon's population is shared among its pipes in proportion to a weight per pipe (by
    default the pipe length; e.g. a count of service connections), with invalid or missing weights
-   imputed from the polygon's median weight per metre of pipe;
+   imputed from the polygon's median weight per metre of pipe, and a fallback weight (one
+   connection, say) where that median is 0 or the polygon's pipes would weigh nothing;
 3. each pipe's share is placed at its upstream node, its downstream node, or half at each.
 
 The same polygons serve for the share and for the imputation. A polygon with no pipe contributes
@@ -57,7 +58,8 @@ class PopulationAllocation:
     pipes : pandas.DataFrame
         One row per pipe, indexed by pipe_id, with ``from_node``, ``to_node``, ``length``,
         ``polygon`` (ID of the polygon containing the midpoint, missing if none),
-        ``weight_imputed`` (bool), ``weight`` (after imputation), and ``population``.
+        ``weight_imputed`` (bool), ``weight_fallback`` (bool: the weight is ``fallback_weight``),
+        ``weight`` (after imputation), and ``population``.
 
     polygons : pandas.DataFrame
         One row per polygon, indexed by polygon ID, with ``population`` (as given, a missing value
@@ -72,11 +74,15 @@ class PopulationAllocation:
         IDs of the polygons with people but no pipe.
 
     no_valid_weight : list
-        IDs of the polygons with people and pipes, none of whose weights is valid, so that no
-        weight can be imputed (with ``impute='per_length'``).
+        IDs of the polygons with people and pipes, none of whose weights is valid, left
+        unallocated because there is no ``fallback_weight`` (with ``impute='per_length'``).
 
     zero_weight : list
-        IDs of the other polygons with people and pipes, whose pipes all weigh 0.
+        IDs of the other polygons with people and pipes, whose pipes all weigh 0, left
+        unallocated because there is no ``fallback_weight``.
+
+    fallback : list
+        IDs of the polygons some of whose pipes were given ``fallback_weight``.
 
     placement : str
         The ``placement`` the shares were placed with.
@@ -89,6 +95,7 @@ class PopulationAllocation:
     no_pipes: list = field(default_factory=list)
     no_valid_weight: list = field(default_factory=list)
     zero_weight: list = field(default_factory=list)
+    fallback: list = field(default_factory=list)
     placement: Placement = "upstream"
 
     @property
@@ -189,6 +196,7 @@ def allocate_population(
     weight: Weight = None,
     max_weight: float | None = None,
     impute: Literal["per_length", "zero"] = "per_length",
+    fallback_weight: float | None = 1.0,
     placement: Placement = "upstream",
 ) -> PopulationAllocation:
     """Allocate the population of each polygon to the nodes of ``network``.
@@ -224,9 +232,15 @@ def allocate_population(
 
     impute : {'per_length', 'zero'}
         What an invalid weight becomes: the pipe's length times the median weight per metre
-        (weight / length) of the pipes of its polygon with valid weights (default), or 0. A
-        polygon with pipes but no valid weight gets no imputed weight; it is reported in
-        ``no_valid_weight``, and its people are not allocated.
+        (weight / length) of the pipes of its polygon with valid weights (default), or 0.
+
+    fallback_weight : float or None
+        The weight of a pipe that would otherwise have none to share by (default 1, e.g. one
+        connection). With ``impute='per_length'``, an invalid weight in a polygon whose median
+        weight per metre is 0, or which has no valid weight, becomes ``fallback_weight``; then
+        every pipe of a polygon whose pipes still weigh 0 in all gets it, so that the polygon's
+        people are shared equally among its pipes. None leaves such polygons unallocated, and
+        reports them in ``no_valid_weight`` and ``zero_weight``.
 
     placement : {'upstream', 'downstream', 'split'}
         Where a pipe's share is placed: at its upstream node (``from_node``, default), at its
@@ -252,7 +266,8 @@ def allocate_population(
     Examples
     --------
     London's census dissemination areas, shared by private drain connections, with invalid
-    counts imputed from each area's median connections per metre::
+    counts imputed from each area's median connections per metre (one connection where that
+    median is 0, and one per pipe in an area with no connections)::
 
         alloc = allocate_population(net, das, population="pop", weight="PDC_Count", max_weight=100)
         sub = net.catchment("OUT")
@@ -279,15 +294,31 @@ def allocate_population(
     if max_weight is not None:
         invalid |= given > max_weight
     table["weight_imputed"] = invalid
+    in_polygon = table["polygon"].notna()
+    fallen_back = pd.Series(False, index=table.index)
     if impute == "zero":
         table["weight"] = given.where(~invalid, 0.0)
     else:
         per_metre = (given.where(~invalid) / table["length"]).groupby(table["polygon"]).median()
-        imputed = table["polygon"].map(per_metre).astype(float) * table["length"]
-        table["weight"] = given.where(~invalid, imputed.fillna(0.0))
+        rate = table["polygon"].map(per_metre).astype(float)
+        table["weight"] = given.where(~invalid, (rate * table["length"]).fillna(0.0))
+        if fallback_weight is not None:
+            # No rate to impute from: the median is 0, or the polygon has no valid weight.
+            fallen_back = invalid & in_polygon & (rate.isna() | (rate == 0))
+            table["weight"] = table["weight"].where(~fallen_back, float(fallback_weight))
+    if fallback_weight is not None:
+        weightless = table["polygon"].map(table.groupby("polygon")["weight"].sum()) == 0
+        weightless &= in_polygon
+        table["weight"] = table["weight"].where(~weightless, float(fallback_weight))
+        fallen_back |= weightless
+    table["weight_fallback"] = fallen_back
     no_valid = table.loc[~invalid, "polygon"].dropna().unique()
     logger.info(
-        "%d of %d pipe weights invalid; imputed (%s)", int(invalid.sum()), len(table), impute
+        "%d of %d pipe weights invalid; imputed (%s); %d pipes given the fallback weight",
+        int(invalid.sum()),
+        len(table),
+        impute,
+        int(fallen_back.sum()),
     )
 
     totals = table.groupby("polygon")["weight"].sum()
@@ -311,12 +342,13 @@ def allocate_population(
     sewered = with_people & (summary["pipes"] > 0)
     no_valid_weight = (
         list(summary.index[sewered & ~summary.index.isin(no_valid)])
-        if impute == "per_length"
+        if impute == "per_length" and fallback_weight is None
         else []
     )
     zero_weight = list(
         summary.index[sewered & (summary["weight"] == 0) & ~summary.index.isin(no_valid_weight)]
     )
+    fallback = list(table.loc[fallen_back, "polygon"].unique())
     unallocated = float(people.sum() - placed)
     if no_valid_weight:
         logger.warning(
@@ -345,5 +377,6 @@ def allocate_population(
         no_pipes=no_pipes,
         no_valid_weight=no_valid_weight,
         zero_weight=zero_weight,
+        fallback=fallback,
         placement=placement,
     )

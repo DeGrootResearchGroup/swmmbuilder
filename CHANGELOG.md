@@ -17,9 +17,9 @@ earlier history is in the git log.
   areas, or any other areal units) at network nodes. Each pipe goes to the polygon containing its
   midpoint, a polygon's people are shared among its pipes by a weight (a column such as a count of
   service connections, a function, or the length), with invalid weights imputed from the
-  polygon's median weight per metre, and each share is placed at the pipe's upstream node,
-  downstream node, or both. The result reports the population of polygons with no pipe or no
-  valid weight, and its `nodes` feed `dwf_from_population`.
+  polygon's median weight per metre (or a fallback weight, by default one, where there is none to
+  share by), and each share is placed at the pipe's upstream node,
+  downstream node, or both. The result reports the population of polygons with no pipe, and its `nodes` feed `dwf_from_population`.
 
 ## [0.1.0] - 2026-11-03
 
