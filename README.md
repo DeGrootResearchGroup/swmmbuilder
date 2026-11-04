@@ -56,9 +56,11 @@ net = Network(
     normalize_ids=strip_leading_zeros,         # 'OK0329' (older exports, node lists) -> 'OK329'
     snap_tolerance=0.5,                        # merge node IDs within 0.5 m ...
     max_invert_difference=1.0,                 # ... unless their inverts differ by more than 1 m
+    split_tolerance=50.0,                      # split IDs reused for structures > 50 m apart
 )
 net.nodes            # GeoDataFrame: node_type, name, invert, rim_elevation, depth, ...
 net.snap_report      # merged pairs: both IDs, distance, both inverts, kept ID or why not merged
+net.split_report     # split IDs: new ID, its pipes, distance to the other structures, attributes
 sub = net.catchment("WT6011")
 sub.validate()       # dead ends classified as capped / outfall / pump_station / unexplained
 sub.to_inp("model.inp")  # outfalls default to the outfall nodes of the subnetwork
@@ -84,6 +86,19 @@ sub.to_inp("model.inp")  # outfalls default to the outfall nodes of the subnetwo
   `max_invert_difference` (pipes crossing rather than joining) and pairs already joined by a pipe
   are not merged. The merged IDs are kept in `net.aliases`, and every method that takes node IDs
   accepts either one. Geographic coordinates are projected to the local UTM zone for this.
+- **Reused IDs.** One ID is sometimes used for two structures far apart (a newer subdivision
+  given the IDs of an older one, or a mistyped ID), which joins the two in the graph and can make
+  false cycles. `split_tolerance=` on loading groups the pipe ends that carry each ID into
+  structures (ends more than the tolerance apart, with no chain of closer ends between them,
+  are different structures) and gives each structure its own node, named by appending `a`, `b`,
+  `c`, ... in the order of its smallest pipe ID. A pipe drawn from its downstream node to its
+  upstream node has its ends matched the other way round, so it does not split its nodes. A
+  node-layer point with a split ID goes to the nearest structure; a structure with no point takes
+  its type and invert from its pipes. Each split is logged as a warning and listed in
+  `net.split_report`, and `net.splits` maps each original ID to its new IDs. Splitting runs
+  before snapping, and the tolerance must exceed `snap_tolerance`: a mistyped end that lies on
+  another structure is then merged into it by the snap, and the structures of one ID are never
+  merged again.
 - **ID normalisation.** `normalize_ids` is applied to the node IDs of the pipes, the node layers,
   and those passed to `catchment`, `subnetwork` and `Subnetwork.from_node_list`.
 - **Validation.** `TopologyReport` also has `dead_end_types`, `force_mains`, and

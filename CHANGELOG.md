@@ -23,6 +23,12 @@ earlier history is in the git log.
   to share by. Each share is placed at the pipe's upstream node, downstream node, or both. The
   result reports the population of polygons with no pipe, and its `nodes` feed
   `dwf_from_population`.
+- **Reused node IDs**: `Network(split_tolerance=...)` splits a node ID used for structures far
+  apart into one node per structure (`FH207a`, `FH207b`, ...), so that the network is not joined
+  where the data are not. Pipe ends are grouped into structures by distance, pipes drawn against
+  their direction are matched by their other end, and each node-layer point goes to the nearest
+  structure. Every split is logged and listed in `Network.split_report`, and snapping never
+  merges the structures of one ID again.
 
 ## [0.1.0] - 2026-11-03
 
