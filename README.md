@@ -468,7 +468,8 @@ dwf = dwf_from_population(alloc.within(sub), per_capita=230, unit="L/d")
   small units such as census blocks, whose edges follow the streets the sewers run under: a pipe
   then serves the blocks on both sides. A polygon with no pipe that close contributes no one,
   unless it is flagged in `sewered` (a column of booleans, e.g. residential zoning): a flagged
-  polygon left with no pipe, such as a development on private sewers, is given its nearest pipe.
+  polygon left with no pipe, such as a development on private sewers, is given its nearest pipe,
+  up to `max_nearest_distance` away (no limit by default).
 - Force mains take no service connections: they serve no polygon and weigh 0, unless
   `serve_force_mains=True`.
 - `weight` is a pipe column, a function of the pipes, or None for the length.

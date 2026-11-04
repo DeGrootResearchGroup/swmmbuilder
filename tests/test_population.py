@@ -358,3 +358,19 @@ def test_sewered_polygons_go_to_the_nearest_pipe():
     assert alloc.nearest.to_dict() == approx({"S": 5})
     assert alloc.no_pipes == ["N", "E"]
     assert alloc.unallocated == pytest.approx(69)
+
+
+def test_nearest_pipe_within_a_cap():
+    # S's nearest pipe is 5 m away, E's 210 m: with a 100 m cap E still contributes no one.
+    polygons = blocks(STREET).assign(residential=[False, True, True])
+    net = make_network(STREET_PIPES)
+    capped = allocate(
+        net, polygons, max_distance=3, sewered="residential", max_nearest_distance=100
+    )
+    assert capped.nearest.to_dict() == approx({"S": 5})
+    assert capped.no_pipes == ["N", "E"]
+    free = allocate(net, polygons, max_distance=3, sewered="residential")
+    assert free.nearest.to_dict() == approx({"S": 5, "E": 210})
+    assert free.no_pipes == ["N"]
+    with pytest.raises(ValueError, match="max_nearest_distance must be"):
+        allocate(net, polygons, max_nearest_distance=-5)

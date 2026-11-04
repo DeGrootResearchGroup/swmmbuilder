@@ -75,7 +75,8 @@ class PopulationAllocation:
         and ``zero_weight``, and the shares of pipes with no node at the end they are placed at.
 
     no_pipes : list
-        IDs of the polygons with people but no pipe (and not flagged ``sewered``).
+        IDs of the polygons with people but no pipe: not flagged ``sewered``, or flagged but
+        farther than ``max_nearest_distance`` from any pipe.
 
     nearest : pandas.Series
         {polygon ID: distance} of the polygons flagged ``sewered`` that had no pipe and were given
@@ -235,9 +236,23 @@ def _weights(pipes, weight):
     return pd.to_numeric(values, errors="coerce").astype(float)
 
 
-def _check(pipes, polygons, population, max_distance, sewered, weight, impute, placement):
+def _check(
+    pipes,
+    polygons,
+    population,
+    max_distance,
+    sewered,
+    max_nearest_distance,
+    weight,
+    impute,
+    placement,
+):
     """Raise ValueError listing every invalid option."""
     problems = Problems("Invalid population allocation")
+    if max_nearest_distance is not None and not max_nearest_distance >= 0:
+        problems.add(
+            f"max_nearest_distance must be a distance >= 0 or None, not {max_nearest_distance!r}"
+        )
     if isinstance(sewered, str) and sewered not in polygons.columns:
         problems.add(f"sewered: polygons has no column {sewered!r}")
     if max_distance is not None and not max_distance >= 0:
@@ -265,6 +280,7 @@ def allocate_population(
     population: str | pd.Series = "population",
     max_distance: float | None = None,
     sewered: str | pd.Series | None = None,
+    max_nearest_distance: float | None = None,
     serve_force_mains: bool = False,
     weight: Weight = None,
     max_weight: float | None = None,
@@ -308,8 +324,13 @@ def allocate_population(
         Polygons known to be sewered (e.g. residentially zoned): a column of booleans of
         ``polygons``, or a Series with the same index. A flagged polygon left with no pipe by the
         midpoint or distance rule (a development on private sewers, say) is given its nearest
-        pipe, at any distance; an unflagged one contributes no one. By default no polygon is
-        flagged.
+        pipe, within ``max_nearest_distance``; an unflagged one contributes no one. By default no
+        polygon is flagged.
+
+    max_nearest_distance : float, optional
+        The farthest a flagged ``sewered`` polygon may be from its nearest pipe, in the CRS's
+        units (default None: no limit). A flagged polygon farther than this contributes no one,
+        and is reported in ``no_pipes``.
 
     serve_force_mains : bool
         Let force mains serve polygons (default False: they take no service connections, so they
@@ -374,7 +395,17 @@ def allocate_population(
         )
     """
     pipes = _pipes_of(network)
-    _check(pipes, polygons, population, max_distance, sewered, weight, impute, placement)
+    _check(
+        pipes,
+        polygons,
+        population,
+        max_distance,
+        sewered,
+        max_nearest_distance,
+        weight,
+        impute,
+        placement,
+    )
     people = polygons[population] if isinstance(population, str) else population
     people = pd.to_numeric(pd.Series(people).reindex(polygons.index), errors="coerce")
     negative = people.index[people < 0]
@@ -405,19 +436,29 @@ def allocate_population(
         unserved = flag & ~polygons.index.isin(rows["polygon"].dropna())
         if unserved.any():
             found = _nearest(pipes, polygons[unserved], serving)
+            if max_nearest_distance is not None:
+                too_far = found["distance"] > max_nearest_distance
+                if too_far.any():
+                    logger.info(
+                        "%d polygons flagged sewered are more than %g from any pipe; not allocated",
+                        int(too_far.sum()),
+                        max_nearest_distance,
+                    )
+                found = found[~too_far]
             nearest = found["distance"]
             added = pd.DataFrame({"pipe": found["pipe"].to_numpy(), "polygon": found.index})
             # A pipe that served no polygon loses its empty row.
             empty = rows["polygon"].isna() & rows["pipe"].isin(added["pipe"])
             rows = pd.concat([rows[~empty], added], ignore_index=True)
             rows = rows.sort_values("pipe", kind="stable", ignore_index=True)
-            logger.info(
-                "%d polygons flagged sewered had no pipe; given their nearest (median %.0f, "
-                "max %.0f away)",
-                len(found),
-                float(nearest.median()),
-                float(nearest.max()),
-            )
+            if len(found):
+                logger.info(
+                    "%d polygons flagged sewered had no pipe; given their nearest (median %.0f, "
+                    "max %.0f away)",
+                    len(found),
+                    float(nearest.median()),
+                    float(nearest.max()),
+                )
     # One row per pipe and polygon, positional until the end.
     position = rows["pipe"].to_numpy()
     table = pipes[["pipe_id", "from_node", "to_node", "length"]].iloc[position]
