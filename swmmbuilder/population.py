@@ -12,9 +12,10 @@ traffic zone, or any other areal unit) is placed on the pipes in it and then on 
    connection, say) where that median is 0 or the polygon's pipes would weigh nothing;
 3. each pipe's share is placed at its upstream node, its downstream node, or half at each.
 
-The same polygons serve for the share and for the imputation. A polygon with no pipe contributes
-no one, and a polygon only partly sewered places all its people on the pipes it has. The
-population left out is reported.
+The same polygons serve for the share and for the imputation. Force mains, which take no service
+connections, serve no polygon unless asked. A polygon with no pipe contributes no one, unless it is
+flagged as sewered (e.g. by its zoning), when its people go to the nearest pipe; a polygon only
+partly sewered places all its people on the pipes it has. The population left out is reported.
 
 The result's ``nodes`` ({node: population}) is the input of
 :func:`~swmmbuilder.swmm.dwf.dwf_from_population`.
@@ -74,7 +75,11 @@ class PopulationAllocation:
         and ``zero_weight``, and the shares of pipes with no node at the end they are placed at.
 
     no_pipes : list
-        IDs of the polygons with people but no pipe.
+        IDs of the polygons with people but no pipe (and not flagged ``sewered``).
+
+    nearest : pandas.Series
+        {polygon ID: distance} of the polygons flagged ``sewered`` that had no pipe and were given
+        their nearest pipe.
 
     no_valid_weight : list
         IDs of the polygons with people and pipes, none of whose weights is valid, left
@@ -96,6 +101,7 @@ class PopulationAllocation:
     polygons: pd.DataFrame
     unallocated: float
     no_pipes: list = field(default_factory=list)
+    nearest: pd.Series = field(default_factory=lambda: pd.Series(dtype=float))
     no_valid_weight: list = field(default_factory=list)
     zero_weight: list = field(default_factory=list)
     fallback: list = field(default_factory=list)
@@ -174,6 +180,42 @@ def _near(pipes, polygons, distance):
     return pd.DataFrame({"pipe": found["pipe"].to_numpy(), "polygon": found["_id"].to_numpy()})
 
 
+def _assign(pipes, polygons, max_distance, serving):
+    """Rows (pipe: position in ``pipes``, polygon: ID) assigning the ``serving`` pipes to
+    polygons by the midpoint or distance rule; every other pipe, and a serving pipe with no
+    polygon, has one row with no polygon. Rows are in the order of the pipes."""
+    index = np.flatnonzero(serving)
+    subset = pipes.iloc[index]
+    if max_distance is None:
+        midpoints = subset.geometry.interpolate(0.5, normalized=True)
+        polygon = _polygon_of(midpoints, polygons).to_numpy()
+        rows = pd.DataFrame({"pipe": np.arange(len(subset)), "polygon": polygon})
+    else:
+        rows = _near(subset, polygons, max_distance)
+    rows["pipe"] = index[rows["pipe"].to_numpy()]
+    rest = pd.DataFrame({"pipe": np.flatnonzero(~serving), "polygon": None})
+    rows = pd.concat([rows, rest], ignore_index=True)
+    return rows.sort_values("pipe", kind="stable", ignore_index=True)
+
+
+def _nearest(pipes, polygons, serving):
+    """(pipe position, distance) of the nearest ``serving`` pipe to each polygon of
+    ``polygons``, as a DataFrame indexed like ``polygons`` (the first pipe on a tie)."""
+    index = np.flatnonzero(serving & pipes.geometry.notna().to_numpy())
+    lines = gpd.GeoDataFrame(
+        {"pipe": index}, geometry=pipes.geometry.iloc[index].to_numpy(), crs=pipes.crs
+    )
+    found = gpd.GeoDataFrame(geometry=polygons.geometry.to_numpy(), crs=polygons.crs).sjoin_nearest(
+        lines, distance_col="distance"
+    )
+    found = found.sort_values("pipe", kind="stable")
+    found = found[~found.index.duplicated()].sort_index()
+    return pd.DataFrame(
+        {"pipe": found["pipe"].to_numpy(), "distance": found["distance"].to_numpy()},
+        index=polygons.index[found.index],
+    )
+
+
 def _pipes_of(network):
     """The pipes of a Network, or of a Subnetwork, indexed by pipe_id."""
     from . import subnetwork
@@ -193,9 +235,11 @@ def _weights(pipes, weight):
     return pd.to_numeric(values, errors="coerce").astype(float)
 
 
-def _check(pipes, polygons, population, max_distance, weight, impute, placement):
+def _check(pipes, polygons, population, max_distance, sewered, weight, impute, placement):
     """Raise ValueError listing every invalid option."""
     problems = Problems("Invalid population allocation")
+    if isinstance(sewered, str) and sewered not in polygons.columns:
+        problems.add(f"sewered: polygons has no column {sewered!r}")
     if max_distance is not None and not max_distance >= 0:
         problems.add(f"max_distance must be a distance >= 0 or None, not {max_distance!r}")
     if impute not in IMPUTATIONS:
@@ -220,6 +264,8 @@ def allocate_population(
     polygons: gpd.GeoDataFrame,
     population: str | pd.Series = "population",
     max_distance: float | None = None,
+    sewered: str | pd.Series | None = None,
+    serve_force_mains: bool = False,
     weight: Weight = None,
     max_weight: float | None = None,
     impute: Literal["per_length", "zero"] = "per_length",
@@ -256,7 +302,18 @@ def allocate_population(
         polygon within that distance of it (the pipe line meets the polygon buffered by the
         distance), so a polygon is served by the pipes in it and along its edges, and a pipe may
         serve several polygons, with its whole weight in each. Polygons with no pipe that close
-        contribute no one.
+        contribute no one, unless flagged ``sewered``.
+
+    sewered : str or pandas.Series, optional
+        Polygons known to be sewered (e.g. residentially zoned): a column of booleans of
+        ``polygons``, or a Series with the same index. A flagged polygon left with no pipe by the
+        midpoint or distance rule (a development on private sewers, say) is given its nearest
+        pipe, at any distance; an unflagged one contributes no one. By default no polygon is
+        flagged.
+
+    serve_force_mains : bool
+        Let force mains serve polygons (default False: they take no service connections, so they
+        get weight 0, even from ``fallback_weight``, and no population).
 
     weight : str, callable or None
         Weight of each pipe in its polygon's share: a column of the pipes (``full_data``), e.g. a
@@ -317,7 +374,7 @@ def allocate_population(
         )
     """
     pipes = _pipes_of(network)
-    _check(pipes, polygons, population, max_distance, weight, impute, placement)
+    _check(pipes, polygons, population, max_distance, sewered, weight, impute, placement)
     people = polygons[population] if isinstance(population, str) else population
     people = pd.to_numeric(pd.Series(people).reindex(polygons.index), errors="coerce")
     negative = people.index[people < 0]
@@ -328,12 +385,12 @@ def allocate_population(
     people = people.astype(float).fillna(0.0)
     polygons = polygons.to_crs(pipes.crs)
 
-    if max_distance is None:
-        midpoints = pipes.geometry.interpolate(0.5, normalized=True)
-        polygon = _polygon_of(midpoints, polygons).to_numpy()
-        rows = pd.DataFrame({"pipe": np.arange(len(pipes)), "polygon": polygon})
+    if serve_force_mains or "structure_type" not in pipes.columns:
+        serving = np.ones(len(pipes), dtype=bool)
     else:
-        rows = _near(pipes, polygons, max_distance)
+        serving = (pipes["structure_type"] != "force_main").to_numpy()
+    rows = _assign(pipes, polygons, max_distance, serving)
+    if max_distance is not None:
         served = rows.dropna().groupby("pipe").size()
         logger.info(
             "pipes within %g of a polygon: %d, of which %d serve more than one",
@@ -341,6 +398,26 @@ def allocate_population(
             len(served),
             int((served > 1).sum()),
         )
+    nearest = pd.Series(dtype=float)
+    if sewered is not None:
+        flag = polygons[sewered] if isinstance(sewered, str) else sewered
+        flag = pd.Series(flag).reindex(polygons.index).fillna(False).astype(bool)
+        unserved = flag & ~polygons.index.isin(rows["polygon"].dropna())
+        if unserved.any():
+            found = _nearest(pipes, polygons[unserved], serving)
+            nearest = found["distance"]
+            added = pd.DataFrame({"pipe": found["pipe"].to_numpy(), "polygon": found.index})
+            # A pipe that served no polygon loses its empty row.
+            empty = rows["polygon"].isna() & rows["pipe"].isin(added["pipe"])
+            rows = pd.concat([rows[~empty], added], ignore_index=True)
+            rows = rows.sort_values("pipe", kind="stable", ignore_index=True)
+            logger.info(
+                "%d polygons flagged sewered had no pipe; given their nearest (median %.0f, "
+                "max %.0f away)",
+                len(found),
+                float(nearest.median()),
+                float(nearest.max()),
+            )
     # One row per pipe and polygon, positional until the end.
     position = rows["pipe"].to_numpy()
     table = pipes[["pipe_id", "from_node", "to_node", "length"]].iloc[position]
@@ -370,6 +447,8 @@ def allocate_population(
         table["weight"] = table["weight"].where(~weightless, float(fallback_weight))
         fallen_back |= weightless
     table["weight_fallback"] = fallen_back
+    # A pipe that serves no polygon by rule (a force main) takes no connections.
+    table.loc[~serving[position], "weight"] = 0.0
     no_valid = table.loc[~invalid, "polygon"].dropna().unique()
     logger.info(
         "%d of %d pipe weights invalid; imputed (%s); %d pipes given the fallback weight",
@@ -434,6 +513,7 @@ def allocate_population(
         polygons=summary,
         unallocated=unallocated,
         no_pipes=no_pipes,
+        nearest=nearest,
         no_valid_weight=no_valid_weight,
         zero_weight=zero_weight,
         fallback=fallback,

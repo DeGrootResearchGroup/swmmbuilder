@@ -32,8 +32,9 @@ def make_network(pipes=PIPES):
     unless y is given."""
     template = gpd.read_file(FIXTURE).iloc[[0]].drop(columns="geometry")
     rows = []
-    for pipe, up, down, x_up, x_down, pdc, *y in pipes:
-        y = y[0] if y else 50
+    for pipe, up, down, x_up, x_down, pdc, *rest in pipes:
+        y = rest[0] if rest else 50
+        structure = rest[1] if len(rest) > 1 else "SL"
         row = template.iloc[0].to_dict()
         row.update(
             OBJECTID=pipe,
@@ -41,6 +42,7 @@ def make_network(pipes=PIPES):
             DownstreamID=down,
             Length=float(x_down - x_up),
             PDC_Count=pdc,
+            StructureType=structure,
             geometry=LineString([(X0 + x_up, Y0 + y), (X0 + x_down, Y0 + y)]),
         )
         rows.append(row)
@@ -318,3 +320,41 @@ def test_distance_rule_imputes_from_each_blocks_own_pipes():
 def test_negative_distance(net):
     with pytest.raises(ValueError, match="max_distance must be a distance"):
         allocate(net, max_distance=-1)
+
+
+def test_force_mains_take_no_connections():
+    # Pipe 2 is a force main with a count of 6, in the street between N and S: it gets weight 0
+    # and no one, so both blocks go to pipe 1.
+    pipes = [(1, "N1", "N2", 10, 60, 2), (2, "N2", "N3", 60, 90, 6, 50, "FM")]
+    net = make_network(pipes)
+    assert net.full_data.set_index("pipe_id").loc[2, "structure_type"] == "force_main"
+    alloc = allocate(net, blocks(STREET), max_distance=10)
+    assert alloc.by_pipe().to_dict() == approx({1: 100, 2: 0})
+    assert alloc.pipes.loc[2, "weight"] == 0 and pd.isna(alloc.pipes.loc[2, "polygon"])
+    # Nor from the fallback: a block next to a force main alone gets no one.
+    alone = allocate(
+        make_network([(2, "N2", "N3", 60, 90, None, 50, "FM")]), blocks(STREET), max_distance=10
+    )
+    assert alone.pipes["weight"].tolist() == [0] and alone.total == 0
+    assert alone.no_pipes == ["N", "S", "E"]
+    # Unless asked.
+    both = allocate(net, blocks(STREET), max_distance=10, serve_force_mains=True)
+    assert both.nodes == approx({"N1": 25, "N2": 75})
+
+
+def test_sewered_polygons_go_to_the_nearest_pipe():
+    # N and S have no pipe within 3 m. S is flagged sewered and goes to its nearest pipe: the
+    # street pipes are 5 m away (pipe 1 on the tie), pipe 3 is 15 m below it, and the force main
+    # inside it does not count. N and E are not flagged, and contribute no one.
+    pipes = [
+        (1, "N1", "N2", 10, 60, 2),
+        (2, "N2", "N3", 60, 90, 6),
+        (3, "M1", "M2", 20, 40, 1, -15),
+        (4, "F1", "F2", 0, 100, 0, 44, "FM"),
+    ]
+    polygons = blocks(STREET).assign(residential=[False, True, False])
+    alloc = allocate(make_network(pipes), polygons, max_distance=3, sewered="residential")
+    assert alloc.nodes == approx({"N1": 40, "N2": 0, "M1": 0, "F1": 0})
+    assert alloc.nearest.to_dict() == approx({"S": 5})
+    assert alloc.no_pipes == ["N", "E"]
+    assert alloc.unallocated == pytest.approx(69)
