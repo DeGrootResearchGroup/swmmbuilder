@@ -1,6 +1,7 @@
 from ._types import NodeId, PipeId
 from .diagnostics import DataWarning, DesignWarning, OptionWarning, SwmmBuilderWarning
 from .network import Network, strip_leading_zeros
+from .population import PopulationAllocation, allocate_population
 from .schema import LAZY_PRESETS, LONDON_ON, Schema
 from .subnetwork import Subnetwork, TopologyReport
 from .swmm import Derived, Pump, PumpStation, SwmmModel, WetWell, dwf_from_population
@@ -21,6 +22,7 @@ __all__ = [
     "NodeId",
     "OptionWarning",
     "PipeId",
+    "PopulationAllocation",
     "Pump",
     "PumpStation",
     "Schema",
@@ -29,6 +31,7 @@ __all__ = [
     "SwmmModel",
     "TopologyReport",
     "WetWell",
+    "allocate_population",
     "dwf_from_population",
     "strip_leading_zeros",
 ]

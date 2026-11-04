@@ -439,9 +439,57 @@ Nodes must be in the subnetwork and not outfalls, flows non-negative and finite,
 defined, of the right length and positive; otherwise `ValueError` is raised before anything is
 written. An hourly pattern whose mean is not 1 gives a warning, since it scales the base flows.
 The total base flow and the number of loaded nodes are logged, for comparison with the plant's
-measured dry-weather flow. How population is allocated to nodes is left to the study.
-`dwf_from_population` converts a per-capita flow (`unit` `L/d`, `m3/d`, `L/s` or `m3/s`) to the
-template's `flow_units` (default `LPS`).
+measured dry-weather flow. `dwf_from_population` converts a per-capita flow (`unit` `L/d`,
+`m3/d`, `L/s`, or `m3/s`) to the template's `flow_units` (default `LPS`).
+
+### Population from polygons
+
+`allocate_population` places the population of areal units (census areas, postal code areas, or
+any polygons) at nodes. Each pipe goes to the polygon containing its midpoint, each polygon's
+population is shared among its pipes in proportion to a weight, and each pipe's share is placed at
+its upstream node:
+
+```python
+from swmmbuilder import allocate_population
+
+alloc = allocate_population(
+    net,                 # the whole Network, not the catchment (see `within` below)
+    das,                 # GeoDataFrame indexed by polygon ID
+    population="pop",
+    weight="PDC_Count",  # London's private drain connections per pipe; default: length
+    max_weight=100,      # larger counts are invalid, as are missing and negative ones
+)
+sub = net.catchment("OUT")
+dwf = dwf_from_population(alloc.within(sub), per_capita=230, unit="L/d")
+```
+
+- `max_distance` replaces the midpoint rule with a distance rule: each polygon is served by every
+  pipe within that distance of it (in the CRS's units), with each pipe's whole weight. This suits
+  small units such as census blocks, whose edges follow the streets the sewers run under: a pipe
+  then serves the blocks on both sides. A polygon with no pipe that close contributes no one,
+  unless it is flagged in `sewered` (a column of booleans, e.g. residential zoning): a flagged
+  polygon left with no pipe, such as a development on private sewers, is given its nearest pipe,
+  up to `max_nearest_distance` away (no limit by default).
+- Force mains take no service connections: they serve no polygon and weigh 0, unless
+  `serve_force_mains=True`.
+- `weight` is a pipe column, a function of the pipes, or None for the length.
+- `impute` is `"per_length"` (default: an invalid weight becomes the pipe's length times the
+  median weight per metre of the valid pipes of its own polygon) or `"zero"`. The polygons passed
+  serve for both the share and the imputation.
+- `fallback_weight` (default 1, e.g. one connection) is given to an invalid weight where the
+  polygon's median is 0 or there is no valid weight, and then to every pipe of a polygon whose
+  pipes still weigh nothing, so its people are shared equally; `None` leaves such polygons
+  unallocated.
+- `placement` is `"upstream"`, `"downstream"`, or `"split"` (half at each end).
+
+A polygon with no pipe contributes no one, and a partly sewered polygon places all its people on
+its pipes. `alloc.unallocated` is the population left out, and `alloc.no_pipes`,
+`alloc.no_valid_weight`, and `alloc.zero_weight` (the last two only with no fallback) name the
+polygons it comes from; `alloc.nearest` gives the flagged polygons sent to their nearest pipe,
+with the distance, and `alloc.fallback` those given the fallback weight. `alloc.pipes` has
+one row per pipe and polygon it serves, `alloc.by_pipe()` sums each pipe's shares, and
+`alloc.polygons` has one row per polygon. `alloc.within(sub)` keeps the shares of the
+subnetwork's own pipes, so people on a pipe leaving it are not counted.
 
 ## Conduit geometry
 

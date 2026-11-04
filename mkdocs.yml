@@ -16,6 +16,7 @@ nav:
       - Network and Subnetwork: api/network.md
       - Schemas: api/schema.md
       - SWMM model: api/swmm.md
+      - Population: api/population.md
       - Pumps and design rules: api/pumps.md
       - Data gaps: api/gaps.md
       - Diagnostics: api/diagnostics.md
