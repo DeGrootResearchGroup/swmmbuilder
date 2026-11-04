@@ -15,13 +15,14 @@ earlier history is in the git log.
   README installs from PyPI.
 - **Population allocation**: `allocate_population` places the population of polygons (census
   areas, or any other areal units) at network nodes. Each pipe goes to the polygon containing its
-  midpoint or, with `max_distance`, to every polygon within that distance (for census blocks);
-  a polygon flagged `sewered` with no pipe goes to its nearest pipe, and force mains take no
-  connections. A polygon's people are shared among its pipes by a weight (a column such as a count of service
-  connections, a function, or the length). Invalid weights are imputed from the polygon's median
-  weight per metre, with a fallback weight (by default one) where there is none to share by. Each
-  share is placed at the pipe's upstream node, downstream node, or both. The result reports the
-  population of polygons with no pipe, and its `nodes` feed `dwf_from_population`.
+  midpoint or, with `max_distance`, to every polygon within that distance (for census blocks). A
+  polygon flagged `sewered` with no pipe goes to its nearest pipe, and force mains take no
+  connections. A polygon's people are shared among its pipes by a weight (a column such as a
+  count of service connections, a function, or the length). Invalid weights are imputed from the
+  polygon's median weight per metre, with a fallback weight (by default one) where there is none
+  to share by. Each share is placed at the pipe's upstream node, downstream node, or both. The
+  result reports the population of polygons with no pipe, and its `nodes` feed
+  `dwf_from_population`.
 
 ## [0.1.0] - 2026-11-03
 
