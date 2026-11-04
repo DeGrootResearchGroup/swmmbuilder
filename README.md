@@ -439,9 +439,41 @@ Nodes must be in the subnetwork and not outfalls, flows non-negative and finite,
 defined, of the right length and positive; otherwise `ValueError` is raised before anything is
 written. An hourly pattern whose mean is not 1 gives a warning, since it scales the base flows.
 The total base flow and the number of loaded nodes are logged, for comparison with the plant's
-measured dry-weather flow. How population is allocated to nodes is left to the study.
-`dwf_from_population` converts a per-capita flow (`unit` `L/d`, `m3/d`, `L/s` or `m3/s`) to the
-template's `flow_units` (default `LPS`).
+measured dry-weather flow. `dwf_from_population` converts a per-capita flow (`unit` `L/d`,
+`m3/d`, `L/s`, or `m3/s`) to the template's `flow_units` (default `LPS`).
+
+### Population from polygons
+
+`allocate_population` places the population of areal units (census areas, postal code areas, or
+any polygons) at nodes. Each pipe goes to the polygon containing its midpoint, each polygon's
+population is shared among its pipes in proportion to a weight, and each pipe's share is placed at
+its upstream node:
+
+```python
+from swmmbuilder import allocate_population
+
+alloc = allocate_population(
+    net,                    # the whole Network, not the catchment (see `within` below)
+    das,                    # GeoDataFrame indexed by polygon ID
+    population="pop",
+    weight="PDC_Count",     # London's private drain connections per pipe; default: length
+    max_weight=100,         # larger counts are invalid, as are missing and negative ones
+    rate_groups=fsas,       # invalid weights: length x the median connections per metre of the FSA
+)
+sub = net.catchment("OUT")
+dwf = dwf_from_population(alloc.within(sub), per_capita=230, unit="L/d")
+```
+
+- `weight` is a pipe column, a function of the pipes, or None for the length.
+- `impute` is `"per_length"` (the length times a rate per metre; `rate="median"` of the valid
+  weight / length, or `"total"` weight over total length, taken over `rate_groups`: `"network"`,
+  each pipe's own `"polygons"`, or a GeoDataFrame of coarser areas) or `"zero"`.
+- `placement` is `"upstream"`, `"downstream"`, or `"split"` (half at each end).
+
+A polygon with no pipe contributes no one, and a partly sewered polygon places all its people on
+its pipes. `alloc.unallocated`, `alloc.no_pipes`, and `alloc.zero_weight` report what was left out,
+and `alloc.pipes` and `alloc.polygons` hold the per-pipe and per-polygon shares. `alloc.within(sub)`
+keeps the shares of the subnetwork's own pipes, so people on a pipe leaving it are not counted.
 
 ## Conduit geometry
 

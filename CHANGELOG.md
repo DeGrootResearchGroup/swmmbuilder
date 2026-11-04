@@ -13,6 +13,13 @@ earlier history is in the git log.
 
 - Releases are published to PyPI from GitHub releases (`publish.yml`, trusted publishing), and the
   README installs from PyPI.
+- **Population allocation**: `allocate_population` places the population of polygons (census
+  areas, or any other areal units) at network nodes. Each pipe goes to the polygon containing its
+  midpoint, a polygon's people are shared among its pipes by a weight (a column such as a count of
+  service connections, a function, or the length), with invalid weights imputed from a rate per
+  metre over the network, the polygon, or a coarser layer, and each share is placed at the pipe's
+  upstream node, downstream node, or both. The result reports the population of polygons with no
+  pipe, and its `nodes` feed `dwf_from_population`.
 
 ## [0.1.0] - 2026-11-03
 
