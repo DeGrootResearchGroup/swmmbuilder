@@ -28,9 +28,12 @@ POLYGONS = {"P": (0, 100, 80.0), "Q": (100, 200, 100.0), "R": (300, 400, 30.0)}
 
 
 def make_network(pipes=PIPES):
+    """The network of ``pipes``: (pipe, up, down, x_up, x_down, PDC_Count[, y]), along y = 50 m
+    unless y is given."""
     template = gpd.read_file(FIXTURE).iloc[[0]].drop(columns="geometry")
     rows = []
-    for pipe, up, down, x_up, x_down, pdc in pipes:
+    for pipe, up, down, x_up, x_down, pdc, *y in pipes:
+        y = y[0] if y else 50
         row = template.iloc[0].to_dict()
         row.update(
             OBJECTID=pipe,
@@ -38,7 +41,7 @@ def make_network(pipes=PIPES):
             DownstreamID=down,
             Length=float(x_down - x_up),
             PDC_Count=pdc,
-            geometry=LineString([(X0 + x_up, Y0 + 50), (X0 + x_down, Y0 + 50)]),
+            geometry=LineString([(X0 + x_up, Y0 + y), (X0 + x_down, Y0 + y)]),
         )
         rows.append(row)
     return Network(gpd.GeoDataFrame(rows, crs=CRS))
@@ -258,3 +261,60 @@ def test_shares_sum_to_each_polygon(net):
     sewered = alloc.polygons[alloc.polygons["pipes"] > 0]
     assert sewered["allocated"].tolist() == approx(sewered["population"].tolist())
     assert math.isclose(alloc.total + alloc.unallocated, squares()["population"].sum())
+
+
+def blocks(spec):
+    """Rectangles {name: (x0, x1, y0, y1, population)}, in m from (X0, Y0)."""
+    return gpd.GeoDataFrame(
+        {"population": [b[4] for b in spec.values()]},
+        geometry=[box(X0 + x0, Y0 + y0, X0 + x1, Y0 + y1) for x0, x1, y0, y1, _ in spec.values()],
+        index=list(spec),
+        crs=CRS,
+    )
+
+
+# Two blocks either side of the street the pipes run under (y = 50), and one far away.
+STREET = {"N": (0, 100, 55, 100, 60.0), "S": (0, 100, 0, 45, 40.0), "E": (300, 400, 0, 100, 9.0)}
+STREET_PIPES = [(1, "N1", "N2", 10, 60, 2), (2, "N2", "N3", 60, 90, 6)]
+
+
+def test_distance_rule_serves_the_blocks_on_both_sides():
+    net = make_network(STREET_PIPES)
+    alloc = allocate(net, blocks(STREET), max_distance=10)
+    # Each block shares by 2 : 6 over both pipes: N 15 and 45, S 10 and 30.
+    assert alloc.nodes == approx({"N1": 25, "N2": 75})
+    assert alloc.pipes.loc[1, "polygon"].tolist() == ["N", "S"]
+    assert alloc.by_pipe().to_dict() == approx({1: 25, 2: 75})
+    assert alloc.polygons.loc[["N", "S"], "pipes"].tolist() == [2, 2]
+    assert alloc.no_pipes == ["E"]
+    assert alloc.unallocated == pytest.approx(9)
+
+
+def test_distance_rule_leaves_blocks_with_no_pipe_that_close():
+    net = make_network(STREET_PIPES)
+    alloc = allocate(net, blocks(STREET), max_distance=3)
+    assert alloc.no_pipes == ["N", "S", "E"]
+    assert alloc.total == 0
+    # The midpoint rule finds no pipe in the blocks either.
+    assert allocate(net, blocks(STREET)).no_pipes == ["N", "S", "E"]
+
+
+def test_distance_rule_imputes_from_each_blocks_own_pipes():
+    # Pipe 2 has no count and serves N (with pipe 1: 2 / 50 per metre) and S (with pipe 1 and pipe
+    # 3, 9 / 30 per metre, at y = 20: median 0.17), so it weighs 0.04 x 30 in N and 0.17 x 30 in S.
+    pipes = [
+        (1, "N1", "N2", 10, 60, 2),
+        (2, "N2", "N3", 60, 90, None),
+        (3, "M1", "M2", 60, 90, 9, 20),
+    ]
+    net = make_network(pipes)
+    alloc = allocate(net, blocks(STREET), max_distance=10)
+    weights = alloc.pipes.reset_index().set_index(["pipe_id", "polygon"])["weight"]
+    assert weights[(2, "N")] == pytest.approx(1.2)
+    assert weights[(2, "S")] == pytest.approx(5.1)
+    assert weights[(3, "S")] == 9 and (3, "N") not in weights.index
+
+
+def test_negative_distance(net):
+    with pytest.raises(ValueError, match="max_distance must be a distance"):
+        allocate(net, max_distance=-1)

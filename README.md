@@ -463,6 +463,10 @@ sub = net.catchment("OUT")
 dwf = dwf_from_population(alloc.within(sub), per_capita=230, unit="L/d")
 ```
 
+- `max_distance` replaces the midpoint rule with a distance rule: each polygon is served by every
+  pipe within that distance of it (in the CRS's units), with each pipe's whole weight. This suits
+  small units such as census blocks, whose edges follow the streets the sewers run under: a pipe
+  then serves the blocks on both sides. A polygon with no pipe that close contributes no one.
 - `weight` is a pipe column, a function of the pipes, or None for the length.
 - `impute` is `"per_length"` (default: an invalid weight becomes the pipe's length times the
   median weight per metre of the valid pipes of its own polygon) or `"zero"`. The polygons passed
@@ -476,9 +480,10 @@ dwf = dwf_from_population(alloc.within(sub), per_capita=230, unit="L/d")
 A polygon with no pipe contributes no one, and a partly sewered polygon places all its people on
 its pipes. `alloc.unallocated` is the population left out, and `alloc.no_pipes`,
 `alloc.no_valid_weight`, and `alloc.zero_weight` (the last two only with no fallback) name the
-polygons it comes from; `alloc.fallback` names those given the fallback weight. `alloc.pipes` and
-`alloc.polygons` hold the per-pipe and per-polygon shares. `alloc.within(sub)` keeps the shares
-of the subnetwork's own pipes, so people on a pipe leaving it are not counted.
+polygons it comes from; `alloc.fallback` names those given the fallback weight. `alloc.pipes` has
+one row per pipe and polygon it serves, `alloc.by_pipe()` sums each pipe's shares, and
+`alloc.polygons` has one row per polygon. `alloc.within(sub)` keeps the shares of the
+subnetwork's own pipes, so people on a pipe leaving it are not counted.
 
 ## Conduit geometry
 

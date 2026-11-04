@@ -3,7 +3,9 @@
 The population of each polygon (a census tract or dissemination area, a postal code area, a
 traffic zone, or any other areal unit) is placed on the pipes in it and then on their nodes:
 
-1. each pipe goes to the polygon containing its midpoint;
+1. each pipe goes to the polygon containing its midpoint or, with a distance rule, to every
+   polygon within that distance of it (for small areal units such as city blocks, whose edges
+   follow the streets the sewers run under, so that the pipe serves the blocks on both sides);
 2. each polygon's population is shared among its pipes in proportion to a weight per pipe (by
    default the pipe length; e.g. a count of service connections), with invalid or missing weights
    imputed from the polygon's median weight per metre of pipe, and a fallback weight (one
@@ -56,14 +58,15 @@ class PopulationAllocation:
         carry no one), to pass to :func:`~swmmbuilder.swmm.dwf.dwf_from_population`.
 
     pipes : pandas.DataFrame
-        One row per pipe, indexed by pipe_id, with ``from_node``, ``to_node``, ``length``,
-        ``polygon`` (ID of the polygon containing the midpoint, missing if none),
+        One row per pipe and polygon it serves (one row per pipe with the midpoint rule), indexed
+        by pipe_id, with ``from_node``, ``to_node``, ``length``, ``polygon`` (missing for a pipe
+        that serves none),
         ``weight_imputed`` (bool), ``weight_fallback`` (bool: the weight is ``fallback_weight``),
         ``weight`` (after imputation), and ``population``.
 
     polygons : pandas.DataFrame
         One row per polygon, indexed by polygon ID, with ``population`` (as given, a missing value
-        as 0), ``pipes`` (the number of pipes in it), ``weight`` (their total weight), and
+        as 0), ``pipes`` (the number of pipes serving it), ``weight`` (their total weight), and
         ``allocated`` (the population placed on its pipes).
 
     unallocated : float
@@ -102,6 +105,10 @@ class PopulationAllocation:
     def total(self) -> float:
         """Population placed at the nodes."""
         return float(sum(self.nodes.values()))
+
+    def by_pipe(self) -> pd.Series:
+        """Population of each pipe, summed over the polygons it serves, indexed by pipe_id."""
+        return self.pipes.groupby(level=0, sort=False)["population"].sum()
 
     def within(self, sub: Subnetwork) -> dict[NodeId, float]:
         """{node: population} placed by the pipes of ``sub``, e.g. a catchment of the network the
@@ -150,6 +157,23 @@ def _polygon_of(points: gpd.GeoSeries, polygons: gpd.GeoDataFrame) -> pd.Series:
     return pd.Series(ids.to_numpy(), index=points.index)
 
 
+def _near(pipes, polygons, distance):
+    """Rows (pipe: position in ``pipes``, polygon: ID) of each pipe within ``distance`` of each
+    polygon, in the order of the pipes and then of the polygons; a pipe near no polygon (or with
+    no geometry) has one row with no polygon."""
+    right = gpd.GeoDataFrame(
+        {"_id": polygons.index, "_order": np.arange(len(polygons))},
+        geometry=polygons.geometry.buffer(distance).to_numpy(),
+        crs=polygons.crs,
+    )
+    left = gpd.GeoDataFrame(
+        {"pipe": np.arange(len(pipes))}, geometry=pipes.geometry.to_numpy(), crs=pipes.crs
+    )
+    found = left.sjoin(right, how="left", predicate="intersects")
+    found = found.sort_values(["pipe", "_order"], kind="stable")
+    return pd.DataFrame({"pipe": found["pipe"].to_numpy(), "polygon": found["_id"].to_numpy()})
+
+
 def _pipes_of(network):
     """The pipes of a Network, or of a Subnetwork, indexed by pipe_id."""
     from . import subnetwork
@@ -169,9 +193,11 @@ def _weights(pipes, weight):
     return pd.to_numeric(values, errors="coerce").astype(float)
 
 
-def _check(pipes, polygons, population, weight, impute, placement):
+def _check(pipes, polygons, population, max_distance, weight, impute, placement):
     """Raise ValueError listing every invalid option."""
     problems = Problems("Invalid population allocation")
+    if max_distance is not None and not max_distance >= 0:
+        problems.add(f"max_distance must be a distance >= 0 or None, not {max_distance!r}")
     if impute not in IMPUTATIONS:
         problems.add(f"impute must be one of {', '.join(IMPUTATIONS)}, not {impute!r}")
     if placement not in PLACEMENTS:
@@ -193,6 +219,7 @@ def allocate_population(
     network: Network | Subnetwork,
     polygons: gpd.GeoDataFrame,
     population: str | pd.Series = "population",
+    max_distance: float | None = None,
     weight: Weight = None,
     max_weight: float | None = None,
     impute: Literal["per_length", "zero"] = "per_length",
@@ -201,8 +228,9 @@ def allocate_population(
 ) -> PopulationAllocation:
     """Allocate the population of each polygon to the nodes of ``network``.
 
-    Each pipe is assigned to the polygon containing its midpoint, each polygon's population is
-    shared among its pipes in proportion to ``weight``, and each pipe's share is placed at its
+    Each pipe is assigned to the polygon containing its midpoint (or to every polygon within
+    ``max_distance`` of it), each polygon's population is shared among its pipes in proportion to
+    ``weight``, and each pipe's share is placed at its
     upstream node (or as ``placement`` says). See :mod:`swmmbuilder.population`.
 
     Parameters
@@ -221,6 +249,14 @@ def allocate_population(
     population : str or pandas.Series
         Population of each polygon: a column of ``polygons``, or a Series with the same index.
         A missing or non-numeric value counts as 0.
+
+    max_distance : float, optional
+        None (default) assigns each pipe to the polygon containing its midpoint. A distance, in
+        the units of the network's CRS (m for London's), assigns each pipe instead to every
+        polygon within that distance of it (the pipe line meets the polygon buffered by the
+        distance), so a polygon is served by the pipes in it and along its edges, and a pipe may
+        serve several polygons, with its whole weight in each. Polygons with no pipe that close
+        contribute no one.
 
     weight : str, callable or None
         Weight of each pipe in its polygon's share: a column of the pipes (``full_data``), e.g. a
@@ -261,7 +297,8 @@ def allocate_population(
     Warns
     -----
     DataWarning
-        If a pipe midpoint is in more than one polygon (it takes the first).
+        With the midpoint rule, if a pipe midpoint is in more than one polygon (it takes the
+        first).
 
     Examples
     --------
@@ -272,9 +309,15 @@ def allocate_population(
         alloc = allocate_population(net, das, population="pop", weight="PDC_Count", max_weight=100)
         sub = net.catchment("OUT")
         dwf = dwf_from_population(alloc.within(sub), per_capita=230, unit="L/d")
+
+    Census blocks, each served by the pipes within 15 m of it::
+
+        alloc = allocate_population(
+            net, blocks, population="pop", max_distance=15, weight="PDC_Count", max_weight=100
+        )
     """
     pipes = _pipes_of(network)
-    _check(pipes, polygons, population, weight, impute, placement)
+    _check(pipes, polygons, population, max_distance, weight, impute, placement)
     people = polygons[population] if isinstance(population, str) else population
     people = pd.to_numeric(pd.Series(people).reindex(polygons.index), errors="coerce")
     negative = people.index[people < 0]
@@ -285,11 +328,26 @@ def allocate_population(
     people = people.astype(float).fillna(0.0)
     polygons = polygons.to_crs(pipes.crs)
 
-    midpoints = pipes.geometry.interpolate(0.5, normalized=True)
-    table = pipes[["from_node", "to_node", "length"]].copy()
-    table["polygon"] = _polygon_of(midpoints, polygons)
+    if max_distance is None:
+        midpoints = pipes.geometry.interpolate(0.5, normalized=True)
+        polygon = _polygon_of(midpoints, polygons).to_numpy()
+        rows = pd.DataFrame({"pipe": np.arange(len(pipes)), "polygon": polygon})
+    else:
+        rows = _near(pipes, polygons, max_distance)
+        served = rows.dropna().groupby("pipe").size()
+        logger.info(
+            "pipes within %g of a polygon: %d, of which %d serve more than one",
+            max_distance,
+            len(served),
+            int((served > 1).sum()),
+        )
+    # One row per pipe and polygon, positional until the end.
+    position = rows["pipe"].to_numpy()
+    table = pipes[["pipe_id", "from_node", "to_node", "length"]].iloc[position]
+    table = table.reset_index(drop=True)
+    table["polygon"] = rows["polygon"].to_numpy()
 
-    given = _weights(pipes, weight)
+    given = pd.Series(_weights(pipes, weight).to_numpy()[position])
     invalid = given.isna() | (given < 0)
     if max_weight is not None:
         invalid |= given > max_weight
@@ -325,6 +383,7 @@ def allocate_population(
     per_weight = (people / totals.reindex(polygons.index)).replace([np.inf, -np.inf], np.nan)
     table["population"] = (table["weight"] * table["polygon"].map(per_weight)).fillna(0.0)
 
+    table = table.set_index("pipe_id")
     nodes = _place(table, placement)
     placed = sum(nodes.values())
     summary = pd.DataFrame(
@@ -348,7 +407,7 @@ def allocate_population(
     zero_weight = list(
         summary.index[sewered & (summary["weight"] == 0) & ~summary.index.isin(no_valid_weight)]
     )
-    fallback = list(table.loc[fallen_back, "polygon"].unique())
+    fallback = list(table.loc[fallen_back.to_numpy(), "polygon"].unique())
     unallocated = float(people.sum() - placed)
     if no_valid_weight:
         logger.warning(
