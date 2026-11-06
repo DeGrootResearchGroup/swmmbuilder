@@ -11,6 +11,12 @@ earlier history is in the git log.
 
 ### Added
 
+- **Design rules from the schema** (#136): `build_model`, `write_inp`, and `Subnetwork.to_inp`
+  take `design="schema"`, which applies the schema's `force_main_discharge`,
+  `force_main_roughness`, `force_main_checks`, and `default_pump` (those its `[design]` table
+  holds), or a list of rule names, which applies just those (`wet_well_defaults` only by name,
+  since it needs station data). An option passed explicitly wins, and the rules applied are
+  logged. The default, None, applies none.
 - **Node loading** (#138): `NodeLoading` combines the three parts of a dry-weather load, sanitary
   flow from population (`[DWF]` with one diurnal pattern), flows that each follow their own hourly
   pattern such as land uses (`[INFLOWS]` time series), and steady flows such as infiltration (the
