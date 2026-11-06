@@ -819,7 +819,8 @@ def build_model(
     """
     check_options(fills, BUILD_OPTIONS, "build_model")
     defaults = _Defaults(
-        max_depth=max_depth,
+        # A rule ('median' or a function) is resolved once the inverts are known.
+        max_depth=float(max_depth) if isinstance(max_depth, (int, float)) else 0.0,
         init_depth=init_depth,
         surcharge_depth=surcharge_depth,
         ponding_area=ponding_area,
