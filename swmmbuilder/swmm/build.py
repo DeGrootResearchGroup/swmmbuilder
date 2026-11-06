@@ -298,24 +298,35 @@ def _lowest_inlet_inverts(subnetwork, inputs, slope):
     return found, derived
 
 
-def junction_depths(subnetwork, inverts, exclude=()) -> pd.Series:
+def _rims(subnetwork):
+    """{node: rim elevation} of the nodes of ``subnetwork`` that have one recorded."""
+    return {
+        node: rim
+        for node in subnetwork.nodes
+        if (rim := subnetwork.graph.nodes[node].get("rim_elevation")) is not None
+    }
+
+
+def junction_depths(subnetwork, inverts, exclude=(), rims=None) -> pd.Series:
     """Rim - invert of each node of ``subnetwork`` (not in ``exclude``) whose rim elevation is
-    known and above its invert in ``inverts``, rounded as written, indexed by node."""
+    known and above its invert in ``inverts``, rounded as written, indexed by node. ``rims``
+    ({node: rim}, e.g. :attr:`FilledData.rims`) defaults to the recorded rims."""
+    rims = _rims(subnetwork) if rims is None else rims
     depths = {}
     for node in subnetwork.nodes:
         if node in exclude:
             continue
-        rim = subnetwork.graph.nodes[node].get("rim_elevation")
+        rim = rims.get(node)
         if rim is not None and not (isinstance(rim, float) and math.isnan(rim)):
             if rim > inverts[node]:
                 depths[node] = round(rim - inverts[node], 4)
     return pd.Series(depths, dtype=float)
 
 
-def _default_depth(subnetwork, inputs, inverts, rule):
+def _default_depth(subnetwork, inputs, inverts, rule, rims=None):
     """(depth, junctions given it, basis) of a ``max_depth`` given as 'median' or a function."""
     exclude = set(inputs.outfalls) | set(inputs.wet_wells)
-    depths = junction_depths(subnetwork, inverts, exclude)
+    depths = junction_depths(subnetwork, inverts, exclude, rims)
     if rule == "median":
         if depths.empty:
             raise ValueError(
@@ -358,7 +369,7 @@ def _refuse_remaining_gaps(subnetwork, filled):
         )
 
 
-def _apply_design_rules(subnetwork, inputs, pipes, inverts, wet_well_defaults):
+def _apply_design_rules(subnetwork, inputs, pipes, inverts, wet_well_defaults, rims=None):
     """Apply ``wet_well_defaults`` (filling ``inputs.wet_wells`` and the stations), check the
     pumps' wet wells and levels, and return the :class:`Derived` values."""
     stations, wet_wells = inputs.stations, inputs.wet_wells
@@ -379,6 +390,7 @@ def _apply_design_rules(subnetwork, inputs, pipes, inverts, wet_well_defaults):
                 node: [link.name for link in inputs.station_pumps if link.station == node]
                 for node in stations
             },
+            rims=rims,
         )
     wet_wells.update({n: s.wet_well for n, s in stations.items() if s.wet_well is not None})
     problems = [
@@ -403,10 +415,11 @@ def _apply_design_rules(subnetwork, inputs, pipes, inverts, wet_well_defaults):
     return derived
 
 
-def _add_nodes(model, subnetwork, inputs, pipes, inverts, defaults):
+def _add_nodes(model, subnetwork, inputs, pipes, inverts, defaults, rims=None):
     """Add the junctions, outfalls, storage nodes and coordinates of ``subnetwork``, and each
     pump station's discharge node (whose invert is added to ``inverts``) to ``model``. Return
-    {first pipe of a force main: discharge node}."""
+    {first pipe of a force main: discharge node}. ``rims`` defaults to the recorded rims."""
+    rims = _rims(subnetwork) if rims is None else rims
     outfalls, wet_wells, height_correction = (
         inputs.outfalls,
         inputs.wet_wells,
@@ -425,7 +438,7 @@ def _add_nodes(model, subnetwork, inputs, pipes, inverts, defaults):
             model.storage.append(Storage(node, invert, well.max_depth, well.init_depth, well.area))
         else:
             depth = defaults.max_depth
-            rim = subnetwork.graph.nodes[node].get("rim_elevation")
+            rim = rims.get(node)
             if rim is not None and rim > invert:
                 depth = round(rim - invert, 4)
             elif rim is not None:
@@ -577,10 +590,11 @@ def outfall_inlets(model: SwmmModel) -> dict[str, list[str]]:
     return {node: found for node, found in links.items() if len(found) > 1}
 
 
-def _add_outfall_links(model, subnetwork, option, defaults):
+def _add_outfall_links(model, subnetwork, option, defaults, rims=None):
     """Write each outfall of ``model`` with more than one link as a junction draining to a new
     outfall through a dummy conduit (the ``outfall_link`` option of :func:`build_model`). Return
     the junctions given ``defaults.max_depth`` (no usable rim)."""
+    rims = _rims(subnetwork) if rims is None else rims
     params = dict(OUTFALL_LINK_DEFAULTS)
     if isinstance(option, Mapping):
         check_options(option, tuple(OUTFALL_LINK_DEFAULTS), "outfall_link")
@@ -600,7 +614,7 @@ def _add_outfall_links(model, subnetwork, option, defaults):
         outfall = next(o for o in model.outfalls if o.name == node)
         model.outfalls.remove(outfall)
         depth = defaults.max_depth
-        rim = subnetwork.graph.nodes[node].get("rim_elevation")
+        rim = rims.get(node)
         if rim is not None and rim > outfall.invert:
             depth = round(rim - outfall.invert, 4)
         else:
@@ -710,14 +724,16 @@ def build_model(
 
     max_depth, init_depth, surcharge_depth, ponding_area : float
         Junction parameters (default 0.0). A junction whose rim elevation is known (see
-        :attr:`Network.nodes`) and above its invert takes rim - invert as its maximum depth
-        instead of ``max_depth``. With 0, SWMM takes the depth to the crown of the highest pipe
+        :attr:`Network.nodes`, or given by the ``rims`` fill option, e.g. rims estimated from a
+        ground-elevation model by :meth:`Network.estimate_rims`) and above its invert takes
+        rim - invert as its maximum depth instead of ``max_depth``. With 0, SWMM takes the depth to the crown of the highest pipe
         at the junction, so a junction with no usable rim then overflows as soon as a pipe
         joining it runs full.
 
         ``max_depth`` may instead be ``'median'``: the median of rim - invert over the
         subnetwork's junctions whose rim is above their invert (the depths written), given to
-        every junction with no usable rim. A function of those depths (a pandas Series indexed by
+        every junction with no usable rim. Rims given by the ``rims`` option count as usable:
+        they enter the median, and the junctions they fill are not given the default depth. A function of those depths (a pandas Series indexed by
         node) returning one depth also works, e.g. ``lambda d: d.quantile(0.25)``. Each junction
         given that depth, including pump-station discharge nodes and outfalls written as
         junctions by ``outfall_link``, is listed in :attr:`SwmmModel.derived`.
@@ -820,7 +836,8 @@ def build_model(
 
     **fills
         Fill rules for gaps in the data, all off by default: ``size_overrides``, ``shape_codes``,
-        ``size_fill``, ``invert_fill``, ``headwater_slope`` and ``force_main_discharge``; see
+        ``size_fill``, ``invert_fill``, ``headwater_slope``, ``force_main_discharge`` and
+        ``rims`` (e.g. ``rims=estimate.rims`` from :meth:`Network.estimate_rims`); see
         :func:`swmmbuilder.gaps.fill_gaps`.
 
     wet_well_defaults : dict, optional
@@ -924,12 +941,12 @@ def build_model(
         subnetwork, pumps=inputs.pumps, height_correction=inputs.height_correction, **fills
     )
     _refuse_remaining_gaps(subnetwork, filled)
-    pipes, inverts = filled.pipes, filled.inverts
-    derived = _apply_design_rules(subnetwork, inputs, pipes, inverts, wet_well_defaults)
+    pipes, inverts, rims = filled.pipes, filled.inverts, filled.rims
+    derived = _apply_design_rules(subnetwork, inputs, pipes, inverts, wet_well_defaults, rims)
     derived += lowered
     depth_rule = None
     if not _is_real(max_depth):
-        depth, defaulted, basis = _default_depth(subnetwork, inputs, inverts, max_depth)
+        depth, defaulted, basis = _default_depth(subnetwork, inputs, inverts, max_depth, rims)
         defaults = replace(defaults, max_depth=depth)
         rule = "max_depth='median'" if max_depth == "median" else "max_depth function"
         depth_rule = (depth, rule, basis)
@@ -950,14 +967,14 @@ def build_model(
         ),
     )
     model = SwmmModel(data_gaps=filled.report, derived=derived)
-    discharge_of = _add_nodes(model, subnetwork, inputs, pipes, inverts, defaults)
+    discharge_of = _add_nodes(model, subnetwork, inputs, pipes, inverts, defaults, rims)
     adverse = _add_links(
         model, inputs, pipes, inverts, discharge_of, sections, roughness_of, defaults
     )
     _check_ideal_pumps(model)
     linked = []
     if outfall_link:
-        linked = _add_outfall_links(model, subnetwork, outfall_link, defaults)
+        linked = _add_outfall_links(model, subnetwork, outfall_link, defaults, rims)
     if depth_rule is not None:
         # The other junctions given the rule's depth: station discharge nodes, and outfalls
         # written as junctions with no usable rim.
