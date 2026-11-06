@@ -1,5 +1,6 @@
 from ._types import NodeId, PipeId
 from .diagnostics import DataWarning, DesignWarning, OptionWarning, SwmmBuilderWarning
+from .distribute import distribute_flow
 from .land_use import LandUseAllocation, allocate_land_use
 from .network import Network, strip_leading_zeros
 from .population import PopulationAllocation, allocate_population
@@ -46,6 +47,7 @@ __all__ = [
     "WetWell",
     "allocate_land_use",
     "allocate_population",
+    "distribute_flow",
     "dwf_from_population",
     "hourly_series",
     "pattern_inflows",
