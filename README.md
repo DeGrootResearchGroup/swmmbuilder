@@ -64,6 +64,7 @@ net.nodes            # GeoDataFrame: node_type, name, invert, rim_elevation, dep
 net.snap_report      # merged pairs: both IDs, distance, both inverts, kept ID or why not merged
 net.split_report     # split IDs: new ID, its pipes, distance to the other structures, attributes
 sub = net.catchment("WT6011")
+sub.split_report()   # the same, with the node after snapping and whether it is in the catchment
 sub.validate()       # dead ends classified as capped / outfall / pump_station / unexplained
 sub.to_inp("model.inp")  # outfalls default to the outfall nodes of the subnetwork
 ```
@@ -100,7 +101,10 @@ sub.to_inp("model.inp")  # outfalls default to the outfall nodes of the subnetwo
   `net.split_report`, and `net.splits` maps each original ID to its new IDs. Splitting runs
   before snapping, and the tolerance must exceed `snap_tolerance`: a mistyped end that lies on
   another structure is then merged into it by the snap, and the structures of one ID are never
-  merged again.
+  merged again. For one catchment, `sub.split_report()` adds the node each new ID
+  resolves to after snapping (`node`) and whether that node is in the subnetwork
+  (`in_subnetwork`), and `sub.split_summary()` counts the IDs split, the nodes made, and the IDs
+  with at least one structure in the subnetwork.
 - **ID normalisation.** `normalize_ids` is applied to the node IDs of the pipes, the node layers,
   and those passed to `catchment`, `subnetwork` and `Subnetwork.from_node_list`.
 - **Validation.** `TopologyReport` also has `dead_end_types`, `force_mains`, and
@@ -199,6 +203,28 @@ printed. To see it:
 ```python
 import logging
 logging.basicConfig(level=logging.INFO)
+```
+
+### Summaries
+
+The results of the main steps reduce to the numbers a report cites with `summary()`, a flat
+dict of counts and totals under stable keys, documented in each method's docstring:
+
+- `PopulationAllocation.summary(sub=None)`: population and loaded nodes (within a catchment if
+  given), connections, and polygons served, given their nearest pipe, or with no pipe;
+- `LandUseAllocation.summary()`: polygons, area, flow, and nodes per land use, nearest-pipe
+  distances, and the scale;
+- `TopologyReport.summary()`: nodes, pipes, splits, cycles, and force mains;
+- `SwmmModel.summary()`: gaps found and filled, derived values by rule, the default depth,
+  stations, and outfall links.
+
+The values are plain numbers, NaN where there is nothing to measure, so they go straight into
+f-strings. The wording stays with the caller:
+
+```python
+s = alloc.summary(net.catchment("OUT"))
+print(f"{s['population']:,.0f} people at {s['nodes']} nodes; "
+      f"{s['nearest']} polygons given their nearest pipe (up to {s['nearest_max_distance']:.0f} m)")
 ```
 
 ### Capturing the log of a build
@@ -310,6 +336,45 @@ geometry, which must then be in a projected CRS (set `crs`). Shape codes that ar
 give a warning on loading, and those pipes are rejected if they are written to an .inp.
 `flow_types=` filters on canonical flow types (`{'sanitary'}` by default); source codes such as
 `'SAN'` are translated too.
+
+### Corrections
+
+Every export needs a few corrections that a model should record. Pass them to `Network` instead
+of editing the data first, so that each is logged at INFO with its reason and listed in
+`network.corrections_report` (`pipe_id`, `action`, `column`, `old`, `new`, `reason`):
+
+```python
+network = Network(
+    "Sewer_Pipes.geojson",
+    corrections=dict(
+        drop={112216: "force main taken as gravity pass-through"},
+        set={328065: {"status": "built", "reason": "Proposed in GIS, built"}},
+        swap_nodes={144019: "IDs recorded the wrong way round; drawing and inverts agree"},
+    ),
+)
+```
+
+Pipe IDs are those of the source data (London's `OBJECTID`), matched exactly or by text, and an
+ID that is not in the data raises `ValueError`. Corrections are applied after the schema has
+normalized the data and `normalize_ids` has been applied, and before any pipe is filtered out, so
+the `status` set above lets the pipe through the status filter. `set` takes canonical columns
+and values (`'built'`, not the source code `'Built'`; inverts and sizes in m). `swap_nodes`
+swaps only `from_node` and `to_node`; the inverts and geometry stay as recorded, so the
+upstream invert stays at the pipe's drawn upstream end, which becomes its `from_node`. Dropped
+pipes are counted in `network.removed['corrections']`. The same corrections can be kept in a
+TOML file and passed as its path:
+
+```toml
+[drop]
+112216 = "force main taken as gravity pass-through"
+
+[set.328065]
+status = "built"
+reason = "Proposed in GIS, built"
+
+[swap_nodes]
+144019 = "IDs recorded the wrong way round; drawing and inverts agree"
+```
 
 ## SWMM template
 
@@ -507,7 +572,19 @@ dwf = dwf_from_population(alloc.within(sub), per_capita=230, unit="L/d")
   then serves the blocks on both sides. A polygon with no pipe that close contributes no one,
   unless it is flagged in `sewered` (a column of booleans, e.g. residential zoning): a flagged
   polygon left with no pipe, such as a development on private sewers, is given its nearest pipe,
-  up to `max_nearest_distance` away (no limit by default).
+  up to `max_nearest_distance` away (no limit by default). `dominant_category` gives such a
+  flag from a zoning layer, the category covering the largest area of each polygon:
+
+  ```python
+  from swmmbuilder import dominant_category
+
+  use = dominant_category(blocks, zoning, "GeneralizedLandUse")  # category, share
+  blocks["residential"] = use["category"] == "RESIDENTIAL"
+  ```
+
+  The zoning is reprojected to the polygons' CRS (projected in metres), a tie goes to the
+  category that sorts first, and a polygon meeting no zoning has a missing category (so its flag
+  is False).
 - Force mains take no service connections: they serve no polygon and weigh 0, unless
   `serve_force_mains=True`.
 - `weight` is a pipe column, a function of the pipes, or None for the length.

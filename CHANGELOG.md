@@ -21,6 +21,30 @@ earlier history is in the git log.
   `require_unit_mean` (True, or a tolerance) to refuse a pattern whose mean is not 1. The new
   `examples/loaded_catchment.py`, and a README section, build a loaded catchment model from the
   example pipes, from `Network` to `.inp`.
+- **Pipe corrections** (#133): `Network(..., corrections=...)` applies documented corrections
+  keyed by the source pipe ID (matched exactly or by text), after schema normalization and
+  `normalize_ids` and before the invalid-pipe, flow-type, status, and overflow filters. `drop`
+  removes pipes, `set` replaces canonical column values (e.g. `{'status': 'built'}` for a built
+  pipe still marked proposed), and `swap_nodes` swaps `from_node` and `to_node` while keeping the
+  inverts and geometry as recorded. Each takes a reason, is logged at INFO, and is listed in
+  `Network.corrections_report`; dropped pipes are counted in `Network.removed['corrections']`.
+  Corrections can be a mapping, a `PipeCorrections`, or a TOML file. Unknown pipe IDs, unknown
+  columns, and conflicting entries raise `ValueError`.
+- **Summaries** (#137): `summary()` on `PopulationAllocation` (with an optional `sub`),
+  `LandUseAllocation`, `TopologyReport`, and `SwmmModel` returns a flat dict of the counts and
+  totals a report cites, under stable, documented keys, as plain numbers (NaN where undefined).
+  The population summary counts a pipe serving several polygons once, with the mean of its
+  imputed weights. The model summary counts derived values by element, attribute, and rule, so
+  new design rules are covered as they are added. `TopologyReport` gains `nodes` and `pipes`.
+- **Splits in a subnetwork** (#134): `Subnetwork.split_report()` returns the network's
+  `split_report` with two more columns, `node` (the node each new ID resolves to after snapping)
+  and `in_subnetwork`. `Subnetwork.split_summary()` returns `ids_split`, `nodes_made`, and
+  `ids_in_subnetwork`. Without `split_tolerance` both are empty (no rows, zero counts).
+- **Dominant category** (#139): `dominant_category(polygons, layer, column)` gives, for each
+  polygon, the category of a layer (such as zoning) covering its largest area, and that area's
+  share of the polygon. It is the usual source of `allocate_population`'s `sewered` flag, e.g.
+  census blocks that are mostly zoned residential. A tie goes to the category that sorts first,
+  and a polygon meeting no feature of the layer has a missing category.
 - **Capturing the log of a build** (#140): `swmmbuilder.capture_log(level="INFO", path=None)` is
   a context manager that collects the `swmmbuilder` log and the `SwmmBuilderWarning` warnings
   raised in its block as text (`captured.text`), and optionally writes it to a file. It attaches

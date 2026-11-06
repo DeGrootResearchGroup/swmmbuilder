@@ -122,6 +122,64 @@ class LandUseAllocation:
         table = self.pipes[self.pipes.index.isin(keys)]
         return _place_by_use(table, self.placement, list(self.nodes.columns))
 
+    def summary(self) -> dict[str, float | int]:
+        """Counts and totals of the allocation, to cite in a report.
+
+        Returns
+        -------
+        dict
+            Plain Python numbers (``int`` for counts, ``float`` for totals, NaN where there is
+            nothing to measure). For each land use with a rate, under its name as given (e.g.
+            ``COMMERCIAL``):
+
+            - ``<use>_polygons``: its polygons served by at least one pipe.
+            - ``<use>_area_ha``: their area counted, in ha.
+            - ``<use>_flow``: its flow placed at the nodes, in :attr:`flow_units`.
+            - ``<use>_nodes``: nodes given a flow above 0 from it.
+
+            And over all land uses:
+
+            - ``polygons``: polygons with a rate.
+            - ``polygons_served``: those served by at least one pipe.
+            - ``area_ha``: area counted of the polygons served, in ha.
+            - ``nearest``: polygons given their nearest pipe (:attr:`nearest`).
+            - ``nearest_median_distance``, ``nearest_max_distance``: the median and the
+              farthest of their distances to it (NaN if none).
+            - ``no_pipes``: polygons with a flow and no pipe (:attr:`no_pipes`).
+            - ``unallocated``: their design flow, placed nowhere (:attr:`unallocated`).
+            - ``scale``: the factor applied to every flow (:attr:`scale`).
+            - ``total``: flow placed at the nodes (:attr:`total`).
+
+        Examples
+        --------
+        ::
+
+            s = land.summary()
+            print(f"commercial: {s['COMMERCIAL_flow']:.1f} L/s at {s['COMMERCIAL_nodes']} nodes")
+        """
+        served = self.polygons[self.polygons["pipes"] > 0]
+        result: dict[str, float | int] = {}
+        for use in self.nodes.columns:
+            mine = served["land_use"] == use
+            result[f"{use}_polygons"] = int(mine.sum())
+            result[f"{use}_area_ha"] = float(served.loc[mine, "area_ha"].sum())
+            result[f"{use}_flow"] = float(self.nodes[use].sum())
+            result[f"{use}_nodes"] = int((self.nodes[use] > 0).sum())
+        nearest = self.nearest
+        result.update(
+            polygons=len(self.polygons),
+            polygons_served=len(served),
+            area_ha=float(served["area_ha"].sum()),
+            nearest=len(nearest),
+            nearest_median_distance=float(nearest.median()) if len(nearest) else math.nan,
+            nearest_max_distance=float(nearest.max()) if len(nearest) else math.nan,
+            no_pipes=len(self.no_pipes),
+            unallocated=float(self.unallocated),
+            scale=float(self.scale),
+            total=self.total,
+        )
+        return result
+
 
 def _place_by_use(table, placement, uses):
     """Nodes x land-use flows of the pipes of ``table`` (the ``pipes`` of a LandUseAllocation)."""
@@ -502,3 +560,97 @@ def _allocate_land_use(
         placement=placement,
         flow_units=flow_units,
     )
+
+
+def dominant_category(
+    polygons: gpd.GeoDataFrame, layer: gpd.GeoDataFrame, column: str
+) -> pd.DataFrame:
+    """The category of a layer (such as zoning) covering the largest area of each polygon.
+
+    A typical use is the ``sewered`` flag of :func:`~swmmbuilder.allocate_population`, true for
+    the census blocks that are mostly zoned residential. The layer is reprojected to the
+    polygons' CRS and cut by them (:func:`geopandas.overlay`, keeping polygon parts only), and
+    the area of each category is summed within each polygon.
+
+    Parameters
+    ----------
+    polygons : geopandas.GeoDataFrame
+        The polygons, indexed by a unique ID, with a CRS projected in metres.
+    layer : geopandas.GeoDataFrame
+        The polygons carrying the categories, with a CRS. Features with a missing category are
+        ignored.
+    column : str
+        The column of ``layer`` holding the category, e.g. ``"GeneralizedLandUse"``.
+
+    Returns
+    -------
+    pandas.DataFrame
+        Indexed like ``polygons``, with ``category`` (the category covering the largest area of
+        the polygon, missing where the polygon meets no feature of the layer) and ``share`` (that
+        area over the polygon's area, from 0 to 1; 0 where the category is missing). A tie goes to
+        the category that sorts first. Where features of the layer overlap, the area of each is
+        counted, so a category's area can exceed what it covers; ``share`` is capped at 1.
+
+    Raises
+    ------
+    ValueError
+        If ``layer`` has no column ``column``, a polygon ID is repeated, a layer has no CRS, or
+        the polygons' CRS is not projected in metres; the message lists every problem.
+
+    Examples
+    --------
+    Census blocks flagged where most of the area is zoned residential::
+
+        use = dominant_category(blocks, zoning, "GeneralizedLandUse")
+        blocks["residential"] = use["category"] == "RESIDENTIAL"
+        alloc = allocate_population(net, blocks, population="population", sewered="residential")
+    """
+    problems = Problems("Invalid dominant category")
+    if column not in layer.columns:
+        problems.add(f"column: the layer has no column {column!r}")
+    repeated = polygons.index[polygons.index.duplicated()].unique()
+    if len(repeated):
+        problems.add(f"polygon IDs (the index of polygons) repeated: {list(repeated)[:20]}")
+    for name, frame in (("polygons", polygons), ("the layer", layer)):
+        if frame.crs is None:
+            problems.add(f"{name} has no CRS")
+    if polygons.crs is not None:
+        crs = CRS.from_user_input(polygons.crs)
+        if not (crs.is_projected and math.isclose(crs.axis_info[0].unit_conversion_factor, 1.0)):
+            problems.add(f"the polygons' CRS must be projected in metres, not {crs.name}")
+    problems.raise_if_any()
+
+    result = pd.DataFrame(
+        {"category": pd.Series(np.nan, index=polygons.index, dtype=object), "share": 0.0}
+    )
+    features = layer[layer[column].notna()]
+    if polygons.empty or features.empty:
+        return result
+    # Positions stand in for the polygon IDs, which may clash with the layer's columns.
+    left = gpd.GeoDataFrame(
+        {"_polygon": np.arange(len(polygons))}, geometry=polygons.geometry.values, crs=polygons.crs
+    )
+    right = gpd.GeoDataFrame(
+        {"_category": features[column].to_numpy()},
+        geometry=features.geometry.values,
+        crs=features.crs,
+    ).to_crs(polygons.crs)
+    parts = gpd.overlay(left, right, how="intersection", keep_geom_type=True)
+    if parts.empty:
+        return result
+    areas = (
+        parts.assign(_area=parts.area)
+        .groupby(["_polygon", "_category"], sort=True)["_area"]
+        .sum()
+        .reset_index()
+    )
+    # Largest area first; a stable sort keeps the categories in sorted order within a tie.
+    areas = areas.sort_values("_area", ascending=False, kind="stable")
+    top = areas.drop_duplicates("_polygon").set_index("_polygon")
+    position = top.index.to_numpy()
+    own_area = polygons.geometry.area.to_numpy()[position]
+    with np.errstate(divide="ignore", invalid="ignore"):
+        share = np.minimum(top["_area"].to_numpy() / own_area, 1.0)
+    result.iloc[position, 0] = top["_category"].to_numpy()
+    result.iloc[position, 1] = np.nan_to_num(share, nan=0.0)
+    return result

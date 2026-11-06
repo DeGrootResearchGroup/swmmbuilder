@@ -132,6 +132,72 @@ class PopulationAllocation:
         keys = {key for _, _, key in sub.graph.edges(keys=True)}
         return _place(self.pipes[self.pipes.index.isin(keys)], self.placement)
 
+    def summary(self, sub: Subnetwork | None = None) -> dict[str, float | int]:
+        """Counts and totals of the allocation, to cite in a report.
+
+        Parameters
+        ----------
+        sub : Subnetwork, optional
+            A subnetwork (e.g. a catchment) of the network the population was allocated over.
+            The keys marked "within ``sub``" count only its pipes and the nodes they place
+            people at (see :meth:`within`); without it, they count every pipe and node.
+
+        Returns
+        -------
+        dict
+            Plain Python numbers (``int`` for counts, ``float`` for totals, NaN where there is
+            nothing to measure), under these keys:
+
+            - ``population``: population placed at the nodes, within ``sub``.
+            - ``nodes``: nodes given a population above 0, within ``sub``.
+            - ``weight``: total weight of the pipes (e.g. service connections), within ``sub``.
+              A pipe serving several polygons may carry a different imputed weight in each, so
+              each pipe counts once, with the mean of its weights.
+            - ``population_total``: population placed at the nodes over the whole allocation.
+            - ``unallocated``: population placed at no node (:attr:`unallocated`).
+            - ``polygons``: polygons given.
+            - ``polygons_served``: polygons with at least one pipe.
+            - ``nearest``: polygons given their nearest pipe (:attr:`nearest`).
+            - ``nearest_population``: their population.
+            - ``nearest_max_distance``: the farthest of them from its pipe (NaN if none).
+            - ``no_pipes``: polygons with people and no pipe (:attr:`no_pipes`).
+            - ``no_pipes_population``: their population, not allocated.
+            - ``no_valid_weight``: polygons left unallocated with no valid weight.
+            - ``zero_weight``: polygons left unallocated whose pipes all weigh 0.
+            - ``fallback``: polygons some of whose pipes were given the fallback weight.
+
+        Examples
+        --------
+        ::
+
+            s = alloc.summary(net.catchment("OUT"))
+            print(f"{s['population']:,.0f} people at {s['nodes']} nodes")
+        """
+        pipes = self.pipes
+        nodes = self.nodes
+        if sub is not None:
+            keys = {key for _, _, key in sub.graph.edges(keys=True)}
+            pipes = pipes[pipes.index.isin(keys)]
+            nodes = self.within(sub)
+        population = self.polygons["population"]
+        return {
+            "population": float(sum(nodes.values())),
+            "nodes": sum(1 for p in nodes.values() if p > 0),
+            "weight": float(pipes.groupby(level=0)["weight"].mean().sum()),
+            "population_total": float(self.pipes["population"].sum()),
+            "unallocated": float(self.unallocated),
+            "polygons": len(self.polygons),
+            "polygons_served": int((self.polygons["pipes"] > 0).sum()),
+            "nearest": len(self.nearest),
+            "nearest_population": float(population.loc[self.nearest.index].sum()),
+            "nearest_max_distance": float(self.nearest.max()) if len(self.nearest) else np.nan,
+            "no_pipes": len(self.no_pipes),
+            "no_pipes_population": float(population.loc[list(self.no_pipes)].sum()),
+            "no_valid_weight": len(self.no_valid_weight),
+            "zero_weight": len(self.zero_weight),
+            "fallback": len(self.fallback),
+        }
+
 
 def _place(table, placement):
     """{node: population} of the pipes of ``table`` (the ``pipes`` of a PopulationAllocation)."""
