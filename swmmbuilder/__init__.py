@@ -1,6 +1,14 @@
 from ._types import NodeId, PipeId
-from .diagnostics import DataWarning, DesignWarning, OptionWarning, SwmmBuilderWarning
+from .diagnostics import (
+    CapturedLog,
+    DataWarning,
+    DesignWarning,
+    OptionWarning,
+    SwmmBuilderWarning,
+    capture_log,
+)
 from .distribute import distribute_flow
+from .elevation import RimEstimate
 from .land_use import LandUseAllocation, allocate_land_use, dominant_category
 from .network import Network, strip_leading_zeros
 from .population import PopulationAllocation, allocate_population
@@ -27,6 +35,7 @@ __all__ = [
     "TORONTO_ON",
     "WATERLOO_ON",
     "WINDSOR_ON",
+    "CapturedLog",
     "DataWarning",
     "Derived",
     "DesignWarning",
@@ -40,6 +49,7 @@ __all__ = [
     "Pump",
     "PumpStation",
     "PumpStationReport",
+    "RimEstimate",
     "Schema",
     "Subnetwork",
     "SwmmBuilderWarning",
@@ -49,6 +59,7 @@ __all__ = [
     "WetWell",
     "allocate_land_use",
     "allocate_population",
+    "capture_log",
     "distribute_flow",
     "dominant_category",
     "dwf_from_population",
