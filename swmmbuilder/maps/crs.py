@@ -101,28 +101,75 @@ FOOTPRINT_PIPES = 2.0
 FOOTPRINT_EXTENT = 0.05
 
 
-def network_extent(net: Network | Subnetwork, crs: Any = None) -> float:
-    """The larger side of the bounding box of the pipes of ``net``, in metres of the plot CRS."""
-    xmin, ymin, xmax, ymax = _geodata(net, "pipes", crs).total_bounds
+def _pipes(net, crs=None, pipes=None):
+    """The pipes of ``net`` in the plot CRS, keeping only those of ``pipes`` (see
+    :func:`network_footprint`)."""
+    data = _geodata(net, "pipes", crs)
+    if pipes is None:
+        return data
+    if isinstance(pipes, str):
+        if pipes != "gravity":
+            raise ValueError(
+                f"pipes must be 'gravity', a list of pipe IDs, or a function, not {pipes!r}."
+            )
+        keep = data["structure_type"] != "force_main"
+    elif callable(pipes):
+        keep = np.asarray(pipes(data), dtype=bool)
+    else:
+        wanted = {str(p) for p in pipes}
+        keep = data.index.map(lambda p: str(p) in wanted).to_numpy(dtype=bool)
+    return data[keep]
+
+
+def network_extent(net: Network | Subnetwork, crs: Any = None, pipes: Any = None) -> float:
+    """The larger side of the bounding box of the pipes of ``net`` (or of ``pipes``; see
+    :func:`network_footprint`), in metres of the plot CRS."""
+    xmin, ymin, xmax, ymax = _pipes(net, crs, pipes).total_bounds
     return float(max(xmax - xmin, ymax - ymin))
 
 
-def footprint_distance(net: Network | Subnetwork, crs: Any = None) -> float:
+def footprint_distance(net: Network | Subnetwork, crs: Any = None, pipes: Any = None) -> float:
     """The default :func:`network_footprint` distance of ``net``: twice the median pipe length,
-    at most 5 % of :func:`network_extent`, in metres."""
-    pipes = _geodata(net, "pipes", crs)
-    median = float(np.median(pipes.geometry.length)) if len(pipes) else 0.0
-    return min(FOOTPRINT_PIPES * median, FOOTPRINT_EXTENT * network_extent(net, crs))
+    at most 5 % of :func:`network_extent`, in metres, over the pipes of ``pipes`` (see
+    :func:`network_footprint`)."""
+    data = _pipes(net, crs, pipes)
+    median = float(np.median(data.geometry.length)) if len(data) else 0.0
+    return min(FOOTPRINT_PIPES * median, FOOTPRINT_EXTENT * network_extent(net, crs, pipes))
 
 
 def network_footprint(
-    net: Network | Subnetwork, distance: float | None = None, crs: Any = None
+    net: Network | Subnetwork,
+    distance: float | None = None,
+    crs: Any = None,
+    pipes: Any = None,
 ) -> shapely.Geometry:
     """The area served by the pipes of ``net``: within about ``distance`` metres of a pipe
-    (default :func:`footprint_distance`), with narrow gaps between pipes filled in, as a shapely
-    geometry in the plot CRS."""
+    (default :func:`footprint_distance` of the same pipes), with narrow gaps between pipes
+    filled in, as a shapely geometry in the plot CRS.
+
+    Parameters
+    ----------
+    net : Network or Subnetwork
+        Whose pipes are used.
+
+    distance : float, optional
+        Distance in metres (default :func:`footprint_distance`).
+
+    crs : optional
+        The plot CRS (see :func:`plot_crs`).
+
+    pipes : 'gravity', list of pipe IDs, or callable, optional
+        The pipes to use: every pipe of ``net`` (default None), its gravity pipes
+        (``'gravity'``: every pipe but the force mains, e.g. for a service area, since a force
+        main crossing open land serves no one), the pipes with these IDs, or the pipes for
+        which a function of the pipe rows (a GeoDataFrame indexed by pipe ID) returns True.
+
+    Returns
+    -------
+    shapely.Geometry
+    """
     if distance is None:
-        distance = footprint_distance(net, crs)
-    pipes = _geodata(net, "pipes", crs).geometry.to_numpy()
+        distance = footprint_distance(net, crs, pipes)
+    lines = _pipes(net, crs, pipes).geometry.to_numpy()
     smooth = distance / 3
-    return shapely.union_all(shapely.buffer(pipes, distance + smooth)).buffer(-smooth)
+    return shapely.union_all(shapely.buffer(lines, distance + smooth)).buffer(-smooth)
