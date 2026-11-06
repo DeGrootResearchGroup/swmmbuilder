@@ -59,7 +59,7 @@ if TYPE_CHECKING:
 
     from .._types import Fields, NodeId, Outfalls, PipeId, StrPath
     from ..pumps import Pump, PumpStation, WetWell
-    from ..subnetwork import Subnetwork
+    from ..subnetwork import PumpStationReport, Subnetwork
     from .inflows import Inflow
 
 logger = logging.getLogger(__name__)
@@ -183,6 +183,7 @@ def _resolve_inputs(
     timeseries,
     inflows,
     flow_units,
+    excluded=(),
 ):
     """The :class:`ModelInputs` of the options of :func:`build_model`; raise ValueError for an
     invalid option or two options that contradict each other."""
@@ -195,7 +196,7 @@ def _resolve_inputs(
         height_correction = subnetwork.match_nodes(height_correction, "height_correction")
     wet_wells = resolve_wet_wells(subnetwork, wet_wells, outfalls)
     stations, station_pumps = resolve_pump_stations(
-        subnetwork, pump_stations, outfalls, default_pump
+        subnetwork, pump_stations, outfalls, default_pump, excluded
     )
     both = sorted(str(n) for n, s in stations.items() if s.wet_well is not None and n in wet_wells)
     if both:
@@ -253,6 +254,96 @@ def _resolve_inputs(
         flow_units=flow_units,
         inlets=inlets,
     )
+
+
+def _found_stations(subnetwork, pump_stations, exclude, extra, unlisted, default_pump):
+    """({node: PumpStation or fields}, choices) of ``pump_stations='found'`` (or a
+    :class:`~swmmbuilder.subnetwork.PumpStationReport`) with ``pump_stations_exclude`` and
+    ``pump_stations_extra``, where ``choices`` is the DataFrame of
+    :attr:`SwmmModel.station_choices`. ``pump_stations`` given as a dict is returned as it is,
+    with no choices. Each choice is logged, and a climbing force main left unpumped is warned of
+    (or raised, or ignored) as ``unlisted`` says.
+
+    Raises
+    ------
+    ValueError
+        If an option is invalid, a node is excluded that the report does not list, a node is both
+        excluded and added, or a station has no pump and there is no ``default_pump``.
+    """
+    from .. import subnetwork as reports  # at run time, as subnetwork imports this package
+
+    if unlisted not in ("warn", "raise", "ignore"):
+        raise ValueError(
+            f"pump_stations_unlisted must be 'warn', 'raise', or 'ignore', not {unlisted!r}."
+        )
+    if isinstance(pump_stations, str):
+        if pump_stations != "found":
+            raise ValueError(
+                f"pump_stations must be 'found', a PumpStationReport, or a dict, not "
+                f"{pump_stations!r}."
+            )
+        report = subnetwork.find_pump_stations()
+    elif isinstance(pump_stations, reports.PumpStationReport):
+        report = pump_stations
+    else:
+        if exclude or extra:
+            raise ValueError(
+                "pump_stations_exclude and pump_stations_extra need pump_stations='found' (or a "
+                "PumpStationReport)."
+            )
+        return pump_stations, None
+    exclude = subnetwork.match_nodes(exclude or {}, "pump_stations_exclude")
+    extra = subnetwork.match_nodes(extra or {}, "pump_stations_extra")
+    found = list(report.stations)
+    climbing = {node: rows for node, rows in report.unlisted.groupby("node", sort=False)}
+    problems = [
+        f"{node} is excluded but is not a station or an unlisted node of the report"
+        for node in exclude
+        if node not in {*found, *report.no_force_main, *climbing}
+    ]
+    problems += [f"{node} is both excluded and added" for node in exclude if node in extra]
+    problems += [
+        f"{node}: the reason in pump_stations_exclude must be a string"
+        for node, why in exclude.items()
+        if not isinstance(why, str)
+    ]
+    if problems:
+        raise ValueError(Problems("Invalid pump-station choices", problems).message())
+    stations = {n: {} for n in found if n not in exclude and n not in extra}
+    rows = [(n, "found", "") for n in stations]
+    for node, value in extra.items():
+        stations[node] = {} if isinstance(value, str) else value
+        rows.append((node, "extra", value if isinstance(value, str) else ""))
+    rows += [(n, "excluded", why) for n, why in exclude.items()]
+    if default_pump is None:
+        bare = [str(n) for n, v in stations.items() if v == {}]
+        if bare:
+            raise ValueError(
+                "pump_stations='found': stations given without a pump need a default_pump (or "
+                "the schema's, with design='schema'): " + ", ".join(bare)
+            )
+    for node, source, why in rows:
+        logger.info("Pump station %s: %s%s", node, source, f" ({why})" if why else "")
+    for node in report.no_force_main:
+        if node not in exclude:
+            logger.info("Pump station %s has no force main: written as a junction", node)
+    unpumped = [
+        f"{node} (force main {', '.join(map(str, row.pipes))} climbs {row.rise:g} m)"
+        for node, group in climbing.items()
+        if node not in exclude and node not in extra
+        for row in group.itertuples()
+    ]
+    if unpumped and unlisted != "ignore":
+        message = (
+            "Force mains climb from nodes not in the station layer and are not pumped, so the "
+            "model has them pumped by gravity (add each node to pump_stations_extra, or to "
+            f"pump_stations_exclude with a reason): {'; '.join(unpumped)}."
+        )
+        if unlisted == "raise":
+            raise ValueError(message)
+        warnings.warn(message, DataWarning, stacklevel=3)
+    choices = pd.DataFrame(rows, columns=["node", "source", "reason"])
+    return stations, choices
 
 
 def _lowest_inlet_inverts(subnetwork, inputs, slope):
@@ -739,8 +830,11 @@ def build_model(
     height_correction: Mapping[NodeId, float] | None = None,
     pumps: Mapping[PipeId, Pump | Fields] | None = None,
     wet_wells: Mapping[NodeId, WetWell | Fields] | None = None,
-    pump_stations: Mapping[NodeId, PumpStation | Fields] | None = None,
+    pump_stations: Mapping[NodeId, PumpStation | Fields] | str | PumpStationReport | None = None,
     default_pump: Pump | Fields | None = None,
+    pump_stations_exclude: Mapping[NodeId, str] | None = None,
+    pump_stations_extra: Mapping[NodeId, str | PumpStation | Fields] | None = None,
+    pump_stations_unlisted: str = "warn",
     force_main_roughness: float | Mapping[str, Any] | Callable[..., float | None] | None = None,
     force_main_roughness_by_pipe: Mapping[PipeId, float] | None = None,
     force_main_surcharge_depth: float = 100.0,
@@ -824,7 +918,7 @@ def build_model(
         area=4.0)}``: storage nodes of constant plan area instead of junctions. The inlet of a
         PUMP1 pump must be a wet well.
 
-    pump_stations : dict, optional
+    pump_stations : dict, 'found' or PumpStationReport, optional
         {station node: :class:`PumpStation` or dict of its fields}, e.g. ``{'PS1':
         dict(pump=dict(curve='*'), wet_well=dict(max_depth=3.0, area=4.0))}``. For each station,
         a discharge node ``<node>_D`` is written at the station's coordinates, with the invert of
@@ -835,6 +929,30 @@ def build_model(
         get ``force_main_surcharge_depth``, so that the main can run pressurised under DYNWAVE.
         Other outlets of the station, e.g. overflows, stay conduits. With ``discharge='separate'``
         the pumps and discharge nodes are numbered: ``<node>_P1``, ``<node>_D1``, ...
+
+        ``'found'`` pumps every station of :meth:`Subnetwork.find_pump_stations` (its
+        ``stations``, the station nodes with a force main), each with ``default_pump``, which
+        must then be given or come from the schema by ``design``; a :class:`~swmmbuilder.subnetwork.PumpStationReport` (e.g. of
+        ``find_pump_stations(min_rise=1.0)``) works the same way. The choices are logged and
+        kept in :attr:`SwmmModel.station_choices`.
+
+    pump_stations_exclude : dict, optional
+        With ``pump_stations='found'``: {node: reason} of nodes not to pump, each a station of
+        the report, a station with no force main (written as a junction either way), or a node
+        of its ``unlisted`` force mains (acknowledged, so not warned of). An excluded station's
+        force mains are written as ordinary conduits.
+
+    pump_stations_extra : dict, optional
+        With ``pump_stations='found'``: stations to add, or to give their own pump, as {node:
+        reason} (a station with ``default_pump``) or {node: :class:`PumpStation` or dict of its
+        fields} (used as given), e.g. a lift station missing from the station layer.
+
+    pump_stations_unlisted : {'warn', 'raise', 'ignore'}
+        With ``pump_stations='found'``: what to do about a force main of the report's
+        ``unlisted`` (one that climbs from a node not in the station layer) whose node is neither
+        excluded nor added, since the model would have it pumped by gravity: a
+        :class:`~swmmbuilder.diagnostics.DataWarning` naming its node, pipes, and rise (default),
+        a ``ValueError``, or nothing.
 
     default_pump : Pump or dict, optional
         The pump of the stations in ``pump_stations`` given without one. Not applied unless
@@ -996,6 +1114,14 @@ def build_model(
         max_flow=max_flow,
         barrels=barrels,
     )
+    pump_stations, choices = _found_stations(
+        subnetwork,
+        pump_stations,
+        pump_stations_exclude,
+        pump_stations_extra,
+        pump_stations_unlisted,
+        default_pump,
+    )
     inputs = _resolve_inputs(
         subnetwork,
         outfalls,
@@ -1010,6 +1136,7 @@ def build_model(
         timeseries,
         inflows,
         flow_units,
+        excluded=() if choices is None else choices.loc[choices["source"] == "excluded", "node"],
     )
     lowered = []
     if station_invert is not None:
@@ -1051,7 +1178,7 @@ def build_model(
             force_main_roughness_by_pipe or {}, "force_main_roughness_by_pipe", unknown="ignore"
         ),
     )
-    model = SwmmModel(data_gaps=filled.report, derived=derived)
+    model = SwmmModel(data_gaps=filled.report, derived=derived, station_choices=choices)
     discharge_of = _add_nodes(model, subnetwork, inputs, pipes, inverts, defaults, rims)
     adverse = _add_links(
         model, inputs, pipes, inverts, discharge_of, sections, roughness_of, defaults
