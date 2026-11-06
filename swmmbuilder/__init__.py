@@ -9,7 +9,7 @@ from .diagnostics import (
 )
 from .distribute import distribute_flow
 from .elevation import RimEstimate
-from .land_use import LandUseAllocation, allocate_land_use
+from .land_use import LandUseAllocation, allocate_land_use, dominant_category
 from .network import Network, strip_leading_zeros
 from .population import PopulationAllocation, allocate_population
 from .schema import LAZY_PRESETS, LONDON_ON, Schema
@@ -61,6 +61,7 @@ __all__ = [
     "allocate_population",
     "capture_log",
     "distribute_flow",
+    "dominant_category",
     "dwf_from_population",
     "hourly_series",
     "pattern_inflows",
