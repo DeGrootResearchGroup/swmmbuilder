@@ -15,10 +15,14 @@ The gap kinds (:data:`GAP_KINDS`):
 ``no_us_invert``    pipe with no upstream invert (written at the invert of its upstream node)
 ``no_ds_invert``    pipe with no downstream invert (written at the invert of its downstream node)
 ``no_node_invert``  node with no invert from any pipe
+``no_rim``          node with no usable rim: none recorded, or one at or below the invert
 ==================  =========================================================================
 
 ``unknown_shape``, ``no_size`` and ``no_node_invert`` stop a subnetwork from being written
-(:data:`BLOCKING_GAPS`); a pipe end with no invert is attached to its node with no offset.
+(:data:`BLOCKING_GAPS`); a pipe end with no invert is attached to its node with no offset. A
+junction whose ``no_rim`` gap is not filled (by the ``rims`` option, e.g. rims estimated from a
+ground-elevation model by :meth:`Network.estimate_rims`) takes the default ``max_depth`` of
+:func:`swmmbuilder.swmm.build_model`.
 """
 
 from __future__ import annotations
@@ -27,12 +31,12 @@ import heapq
 import logging
 import warnings
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
 import pandas as pd
 
-from .diagnostics import OptionWarning
+from .diagnostics import DataWarning, OptionWarning
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterable
@@ -43,7 +47,14 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-GAP_KINDS = ("unknown_shape", "no_size", "no_us_invert", "no_ds_invert", "no_node_invert")
+GAP_KINDS = (
+    "unknown_shape",
+    "no_size",
+    "no_us_invert",
+    "no_ds_invert",
+    "no_node_invert",
+    "no_rim",
+)
 BLOCKING_GAPS = frozenset({"unknown_shape", "no_size", "no_node_invert"})
 REPORT_COLUMNS = ("element", "id", "gap", "detail", "filled_from", "value", "source", "order")
 
@@ -110,18 +121,19 @@ def lowest_inverts(pipes, nodes):
     return found
 
 
-def height_corrections(subnetwork, height_correction):
-    """{node: invert} of the ``height_correction`` option for the nodes of ``subnetwork``.
+def height_corrections(subnetwork, height_correction, option="height_correction"):
+    """{node: invert} of the ``height_correction`` option (or another {node: elevation} option,
+    named ``option``) for the nodes of ``subnetwork``.
 
     Keys are matched with :meth:`Subnetwork.match_node`. Nodes of the network outside the
     subnetwork are skipped, so one mapping can serve several subnetworks; keys that name no node
     of the network at all (likely typos) are skipped with an :class:`OptionWarning`.
     """
-    matched = subnetwork.match_nodes(height_correction or {}, "height_correction")
+    matched = subnetwork.match_nodes(height_correction or {}, option)
     unknown = sorted(str(n) for n in matched if not subnetwork.in_network(n))
     if unknown:
         warnings.warn(
-            f"height_correction: nodes not in the network, ignored: {', '.join(unknown)}",
+            f"{option}: nodes not in the network, ignored: {', '.join(unknown)}",
             OptionWarning,
             stacklevel=3,
         )
@@ -185,11 +197,16 @@ class FilledData:
         that filled it, or NaN), ``value`` (the filled value: a shape, an (shape, geom1, geom2)
         cross-section or an invert), ``source`` (what the value came from) and ``order`` (the
         order in which the fills were made).
+
+    rims : dict
+        {node: rim} of every node that has a rim, recorded (usable or not) or given by the
+        ``rims`` option.
     """
 
     pipes: pd.DataFrame
     inverts: dict
     report: pd.DataFrame
+    rims: dict = field(default_factory=dict)
 
     @property
     def remaining(self) -> pd.DataFrame:
@@ -233,13 +250,15 @@ def fill_gaps(
     invert_fill: str | None = None,
     headwater_slope: float | None = None,
     force_main_discharge: Mapping[str, float] | Callable[..., float] | None = None,
+    rims: Mapping[NodeId, float] | None = None,
 ) -> FilledData:
     """Find every gap in a subnetwork's pipes and node inverts, and fill those the rules cover.
 
     The fills are made in this order, each logged and recorded in the report: overrides
     (``size_overrides``, ``height_correction``); ``shape_codes``; the round-pipe inference;
     ``size_fill``; node inverts from ``invert_fill`` and ``headwater_slope``;
-    ``force_main_discharge``. Every rule except the round-pipe inference is off by default.
+    ``force_main_discharge``; ``rims``. Every rule except the round-pipe inference is off by
+    default.
 
     Parameters
     ----------
@@ -278,6 +297,14 @@ def fill_gaps(
         Fill the missing downstream invert of the last force-main pipe before the receiving node
         from the receiving node's invert (see :func:`force_main_discharge_rule`). The receiving
         node's invert must be known or filled.
+
+    rims : dict, optional
+        {node: rim elevation (m)} filling the ``no_rim`` gaps, e.g. the
+        :attr:`~swmmbuilder.elevation.RimEstimate.rims` of :meth:`Network.estimate_rims`
+        (recorded as filled from ``estimate_rims``, with the DEM as the source; other mappings as
+        filled from ``rims``). A given rim also overrides a usable recorded rim. A rim at or
+        below the node's invert (after the invert fills) is not used: it is listed with a
+        :class:`DataWarning`. Keys are matched like ``height_correction``'s.
 
     Returns
     -------
@@ -412,6 +439,8 @@ def fill_gaps(
                 source += f", itself filled by {fills[('node', receiving, 'no_node_invert')][0]}"
             record("pipe", pipe["pipe_id"], "no_ds_invert", "force_main_discharge", value, source)
 
+    node_rims = _fill_rims(subnetwork, inverts, rims, original, record)
+
     details = {
         ("pipe", p["pipe_id"], gap): detail
         for _, p in pipes.iterrows()
@@ -432,7 +461,53 @@ def fill_gaps(
     rows.sort(key=lambda r: (r[0] != "pipe", str(r[1]), rank[r[2]]))
     report = pd.DataFrame(rows, columns=list(REPORT_COLUMNS))
     report["order"] = report["order"].astype("Int64")
-    return FilledData(pipes, inverts, report)
+    return FilledData(pipes, inverts, report, node_rims)
+
+
+def _usable_rim(rim, invert):
+    """True if ``rim`` is known and above ``invert`` (or there is no invert to compare)."""
+    return rim is not None and not pd.isna(rim) and (invert is None or rim > invert)
+
+
+def _fill_rims(subnetwork, inverts, rims, gaps, record):
+    """{node: rim} of the subnetwork's nodes: the recorded rims, with the ``rims`` option's
+    applied. Each node with no usable recorded rim is added to ``gaps`` (gap ``no_rim``), and
+    each rim used to fill one is recorded."""
+    rule = "estimate_rims" if getattr(rims, "source", "") else "rims"
+    source = getattr(rims, "source", "")
+    given = height_corrections(subnetwork, rims, option="rims")
+    found, refused = {}, []
+    for node in subnetwork.nodes:
+        recorded = subnetwork.graph.nodes[node].get("rim_elevation")
+        recorded = None if recorded is None or pd.isna(recorded) else float(recorded)
+        invert = inverts.get(node)
+        usable = _usable_rim(recorded, invert)
+        if recorded is not None:
+            found[node] = recorded
+        if not usable:
+            gaps[("node", node, "no_rim")] = (
+                "no rim recorded"
+                if recorded is None
+                else f"recorded rim {recorded:g} not above the invert {invert:g}"
+            )
+        rim = given.get(node)
+        if rim is None or pd.isna(rim):
+            continue
+        if not _usable_rim(rim, invert):
+            refused.append(f"{node} ({rim:g} m, invert {invert:g} m)")
+            continue
+        found[node] = rim
+        if usable:
+            logger.info("Node %s: rim %s set by %s (recorded %s)", node, rim, rule, recorded)
+        else:
+            record("node", node, "no_rim", rule, rim, source)
+    if refused:
+        warnings.warn(
+            f"rims at or below the node invert, not used: {', '.join(refused)}",
+            DataWarning,
+            stacklevel=4,
+        )
+    return found
 
 
 def _fill_sizes(pipes, size_fill, pumps, record):

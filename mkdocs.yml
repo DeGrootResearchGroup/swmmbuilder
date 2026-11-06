@@ -23,6 +23,7 @@ nav:
       - Spreading a flow: api/distribute.md
       - Pumps and design rules: api/pumps.md
       - Data gaps: api/gaps.md
+      - Rims from a DEM: api/elevation.md
       - Diagnostics: api/diagnostics.md
       - Maps: api/maps.md
   - Changelog: https://github.com/DeGrootResearchGroup/swmmbuilder/blob/main/CHANGELOG.md
