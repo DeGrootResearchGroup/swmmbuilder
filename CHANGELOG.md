@@ -23,6 +23,16 @@ earlier history is in the git log.
   to share by. Each share is placed at the pipe's upstream node, downstream node, or both. The
   result reports the population of polygons with no pipe, and its `nodes` feed
   `dwf_from_population`.
+- **Land-use flows**: `allocate_land_use` places flows given per hectare of each land use (e.g.
+  commercial, institutional, and industrial design allowances) on the nodes of a network (#99).
+  Pipes go to zoning polygons by the rules of `allocate_population`; each rated polygon's area,
+  optionally clipped to a given area such as the network's footprint, times its rate is shared
+  among its pipes by length (or a weight); and the flows can be scaled to a total, so that the
+  rates are only relative weights. With `to_nearest`, a zone with no pipe of its own (a site on
+  private sewers, say) sends its flow to its nearest pipe. The result is a table of nodes by land use, and
+  `pattern_inflows` turns it into `inflows` and `timeseries` with each land use's hourly pattern
+  (a node with several land uses gets one flow-weighted series), plus an optional steady
+  baseline.
 - **External inflows and time series**: the `inflows` and `timeseries` options of `to_inp`
   write [INFLOWS] and [TIMESERIES] (#98). An `Inflow` is a time series times a scale plus a
   baseline, optionally times a pattern, so a node can carry a second time-varying flow (e.g.

@@ -6,7 +6,10 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from itertools import pairwise
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
+
+import numpy as np
+import pandas as pd
 
 from ..diagnostics import Problems
 from ..units import _is_finite_number
@@ -172,3 +175,99 @@ def resolve_inflows(subnetwork, inflows, timeseries, patterns, outfalls=()) -> d
     if problems:
         raise ValueError(Problems("Invalid inflows", problems).message())
     return resolved
+
+
+def pattern_inflows(
+    flows: Mapping[Any, Mapping[NodeId, float]] | pd.DataFrame,
+    patterns: Mapping[Any, Sequence[float]],
+    days: int,
+    baseline: Mapping[NodeId, float] | None = None,
+    prefix: str = "",
+    ramp_minutes: float = 1.0,
+) -> tuple[dict[NodeId, Inflow], dict[str, list[tuple[float, float]]]]:
+    """The ``inflows`` and ``timeseries`` options of :func:`build_model` for mean flows that each
+    follow an hourly pattern, e.g. the land-use flows of :func:`~swmmbuilder.allocate_land_use`.
+
+    Each pattern becomes a time series ``<prefix><name>`` (:func:`hourly_series` over ``days``).
+    A node with flow of one kind gets an :class:`Inflow` of that series scaled by its mean flow.
+    A node with flows of several kinds gets its own series ``<prefix><node>``, the mean of their
+    patterns weighted by their flows, scaled by their sum. ``baseline`` adds a steady flow (e.g.
+    groundwater infiltration) as the inflow's baseline, at nodes with or without a patterned
+    flow.
+
+    Parameters
+    ----------
+    flows : pandas.DataFrame or dict
+        Mean flow at each node by kind: a DataFrame of nodes (index) by kinds (columns), such as
+        :attr:`LandUseAllocation.nodes <swmmbuilder.LandUseAllocation.nodes>`, or {kind: {node:
+        flow}}. Flows in the template's FLOW_UNITS.
+
+    patterns : dict
+        {kind: 24 hourly multipliers, from 00:00}, one for every kind with a flow. The
+        multipliers should have a mean of 1, so that the mean flow is the one given.
+
+    days : int
+        Number of days the time series cover (at least the length of the run).
+
+    baseline : dict, optional
+        {node: steady flow}.
+
+    prefix : str
+        Prefix of the time series names (default none), e.g. 'NR_'.
+
+    ramp_minutes : float
+        See :func:`hourly_series`.
+
+    Returns
+    -------
+    (dict, dict)
+        ``inflows`` ({node: Inflow}, by node in order of their IDs as text) and ``timeseries``
+        ({name: points}, every pattern first, then the mixed nodes).
+
+    Raises
+    ------
+    ValueError
+        If a kind with a flow has no pattern, a pattern is not 24 finite numbers, a flow or
+        baseline is negative or not finite, or a series name would be used twice.
+    """
+    table = flows if isinstance(flows, pd.DataFrame) else pd.DataFrame(flows)
+    table = table.fillna(0.0).astype(float)
+    baseline = dict(baseline or {})
+    problems = Problems("Invalid pattern inflows")
+    used = [k for k in table.columns if (table[k] > 0).any()]
+    missing = [str(k) for k in used if k not in patterns]
+    if missing:
+        problems.add(f"no pattern for {', '.join(missing)}")
+    if not np.isfinite(table.to_numpy()).all() or (table.to_numpy() < 0).any():
+        problems.add("flows must be non-negative and finite")
+    bad = [str(n) for n, q in baseline.items() if not (_is_finite_number(q) and float(q) >= 0)]
+    if bad:
+        problems.add(f"baselines must be non-negative and finite: {', '.join(bad[:20])}")
+    problems.raise_if_any()
+
+    series = {f"{prefix}{k}": hourly_series(p, days, ramp_minutes) for k, p in patterns.items()}
+    multipliers = {k: np.asarray(p, dtype=float) for k, p in patterns.items()}
+    totals = table.sum(axis=1)
+    nodes = set(totals.index[totals > 0]) | {n for n, q in baseline.items() if float(q) > 0}
+    inflows = {}
+    for node in sorted(nodes, key=str):
+        base = float(baseline.get(node, 0.0))
+        total = float(totals.get(node, 0.0))
+        if total <= 0:
+            inflows[node] = Inflow(baseline=base)
+            continue
+        q = table.loc[node]
+        kinds = q[q > 0]
+        if len(kinds) == 1:
+            name = f"{prefix}{kinds.index[0]}"
+        else:
+            name = f"{prefix}{node}"
+            if name in series:
+                raise ValueError(
+                    f"Time series name {name!r} is both a pattern and a node with mixed flows; "
+                    "give another prefix."
+                )
+            mixed = sum(kinds[k] * multipliers[k] for k in kinds.index) / total
+            series[name] = hourly_series(list(mixed), days, ramp_minutes)
+        inflows[node] = Inflow(name, scale=total, baseline=base)
+    return inflows, series

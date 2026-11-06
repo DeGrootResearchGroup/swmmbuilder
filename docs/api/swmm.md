@@ -12,6 +12,8 @@
 
 ::: swmmbuilder.swmm.inflows.hourly_series
 
+::: swmmbuilder.swmm.inflows.pattern_inflows
+
 ::: swmmbuilder.swmm.records.SwmmModel
 
 ::: swmmbuilder.swmm.template
