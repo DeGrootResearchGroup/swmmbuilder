@@ -438,7 +438,9 @@ class Subnetwork:
         PumpStationReport
         """
         types = dict(self.graph.nodes(data="node_type"))
-        stations, no_force_main, rows = [], [], []
+        stations: list[NodeId] = []
+        no_force_main: list[NodeId] = []
+        rows: list[dict[str, Any]] = []
         pipes = self.pipes().set_index("pipe_id")
         for node in self.nodes:
             outlets = self.force_main_outlets(node)
