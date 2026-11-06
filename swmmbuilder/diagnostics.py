@@ -26,9 +26,18 @@ Each problem goes to one of four channels, chosen by what the user can do about 
 ``logger.info``
     An audit trail: values filled or derived by rules, pipes removed by the filters, what was
     read and written.
+
+:func:`capture_log` collects the log and the warnings of one build as text.
 """
 
 import difflib
+import io
+import logging
+import warnings
+from collections.abc import Iterator
+from contextlib import contextmanager
+from pathlib import Path
+from typing import TextIO
 
 
 class SwmmBuilderWarning(UserWarning):
@@ -107,3 +116,114 @@ def check_options(given, known, where):
         f"{where}: unknown option{'s' if len(unknown) > 1 else ''} {', '.join(hints)}. "
         f"Options: {', '.join(known)}."
     )
+
+
+class CapturedLog:
+    """The text collected by :func:`capture_log`."""
+
+    def __init__(self) -> None:
+        self._buffer = io.StringIO()
+
+    @property
+    def text(self) -> str:
+        """The messages captured so far, one per line (final once the ``with`` block exits)."""
+        return self._buffer.getvalue()
+
+
+def _level_number(level: int | str) -> int:
+    if isinstance(level, int):
+        return level
+    number = logging.getLevelName(level.upper())
+    if not isinstance(number, int):
+        raise ValueError(f"capture_log: unknown level {level!r}")
+    return number
+
+
+@contextmanager
+def capture_log(level: int | str = "INFO", path: str | Path | None = None) -> Iterator[CapturedLog]:
+    """Collect swmmbuilder's log and warnings while the ``with`` block runs::
+
+        with swmmbuilder.capture_log(level="INFO", path=out / "build_log.txt") as captured:
+            model = SwmmModel(...)
+        print(captured.text)
+
+    A handler is attached to the ``swmmbuilder`` logger (not the root logger) for the block and
+    removed on exit, even if the block raises. If the logger's level would drop records at
+    ``level``, it is lowered for the block and restored on exit. Unlike
+    ``logging.basicConfig``, which does nothing once the root logger has a handler, each use gets
+    its own text, so repeated builds in one process (a calibration loop, say) each get their log.
+    Other loggers are not captured. Records still propagate to the root logger as usual, so a
+    root handler set up by the user sees the records at ``level`` during the block too.
+
+    Warnings of :class:`SwmmBuilderWarning` and its subclasses shown during the block are added
+    to the text as well, and are still shown (or recorded by ``pytest.warns``) as usual. Python
+    shows a given warning once per location by default, so a warning repeated at the same place
+    appears once; a warning the user's filters ignore or turn into errors does not appear.
+    Other warning categories are not captured.
+
+    Each line has the format of ``logging.basicConfig``, ``LEVEL:logger:message``, e.g.
+    ``INFO:swmmbuilder.gaps:Filled 3 inverts``. A warning has its category in place of the
+    logger, e.g. ``WARNING:DataWarning:P7: adverse slope``.
+
+    Parameters
+    ----------
+    level : int or str, default "INFO"
+        The lowest level captured, as a ``logging`` level or its name (``"DEBUG"``, ``"INFO"``,
+        ``"WARNING"``, ...). Warnings count as ``WARNING``.
+    path : str or Path, optional
+        A file the text is written to (UTF-8) on exit, including after an exception.
+
+    Yields
+    ------
+    CapturedLog
+        Its ``text`` holds the messages captured so far.
+
+    Raises
+    ------
+    ValueError
+        If ``level`` is not a known level name.
+    """
+    number = _level_number(level)
+    captured = CapturedLog()
+    handler = logging.StreamHandler(captured._buffer)
+    handler.setLevel(number)
+    handler.setFormatter(logging.Formatter(logging.BASIC_FORMAT))
+    logger = logging.getLogger("swmmbuilder")
+    old_level = logger.level
+    old_showwarning = warnings.showwarning
+
+    def showwarning(
+        message: Warning | str,
+        category: type[Warning],
+        filename: str,
+        lineno: int,
+        file: TextIO | None = None,
+        line: str | None = None,
+    ) -> None:
+        if issubclass(category, SwmmBuilderWarning) and logging.WARNING >= number:
+            record = logging.makeLogRecord(
+                {
+                    "name": category.__name__,
+                    "levelno": logging.WARNING,
+                    "levelname": "WARNING",
+                    "msg": str(message),
+                }
+            )
+            handler.handle(record)
+        old_showwarning(message, category, filename, lineno, file, line)
+
+    logger.addHandler(handler)
+    if logger.getEffectiveLevel() > number:
+        logger.setLevel(number)
+    warnings.showwarning = showwarning
+    try:
+        yield captured
+    finally:
+        # Restore only our own hook, in case the block replaced it in turn.
+        if warnings.showwarning is showwarning:
+            warnings.showwarning = old_showwarning
+        logger.setLevel(old_level)
+        logger.removeHandler(handler)
+        handler.close()
+        if path is not None:
+            Path(path).write_text(captured.text, encoding="utf-8")

@@ -199,6 +199,26 @@ import logging
 logging.basicConfig(level=logging.INFO)
 ```
 
+### Capturing the log of a build
+
+`logging.basicConfig` does nothing once the root logger has a handler, so a second build in the
+same process gets no log, and it never sees the warnings. `capture_log` collects both for one
+build:
+
+```python
+with swmmbuilder.capture_log(level="INFO", path=out / "build_log.txt") as captured:
+    ...  # build the model
+print(captured.text)
+```
+
+It attaches a handler to the `swmmbuilder` logger only (lowering the logger's level for the block
+if needed) and removes it on exit, even after an error, so each use gets its own text. Warnings of
+`SwmmBuilderWarning` and its subclasses are added to the text and still shown as usual. Python
+shows a given warning once per location by default, so the text holds the warnings that were
+shown. Lines have the `basicConfig` format, `INFO:swmmbuilder.gaps:...`, with the category in
+place of the logger for a warning, `WARNING:DataWarning:...`. With `path=`, the text is written
+to that file (UTF-8) on exit.
+
 ## GIS schema
 
 `Network(path, schema=...)` reads the GeoJSON and converts it to canonical columns (`pipe_id`,
