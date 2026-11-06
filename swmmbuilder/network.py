@@ -288,7 +288,7 @@ class Network:
         raw = _read(source)
         self.full_data = schema.normalize(raw)
         self.invert_report = schema.implausible_inverts(raw)
-        if len(self.invert_report):
+        if len(self.invert_report) and schema.invert_range is not None:
             low, high = schema.invert_range
             for row in self.invert_report.itertuples():
                 logger.info(
