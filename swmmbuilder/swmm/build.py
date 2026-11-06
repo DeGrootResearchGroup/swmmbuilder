@@ -4,14 +4,18 @@ from __future__ import annotations
 
 import inspect
 import logging
+import math
 import warnings
 from collections import Counter
 from collections.abc import Iterable, Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+import pandas as pd
+
 from ..design import (
+    Derived,
     apply_wet_well_defaults,
     check_force_main_equation,
     check_force_mains,
@@ -248,6 +252,52 @@ def _resolve_inputs(
         flow_units=flow_units,
         inlets=inlets,
     )
+
+
+def junction_depths(subnetwork, inverts, exclude=()) -> pd.Series:
+    """Rim - invert of each node of ``subnetwork`` (not in ``exclude``) whose rim elevation is
+    known and above its invert in ``inverts``, rounded as written, indexed by node."""
+    depths = {}
+    for node in subnetwork.nodes:
+        if node in exclude:
+            continue
+        rim = subnetwork.graph.nodes[node].get("rim_elevation")
+        if rim is not None and not (isinstance(rim, float) and math.isnan(rim)):
+            if rim > inverts[node]:
+                depths[node] = round(rim - inverts[node], 4)
+    return pd.Series(depths, dtype=float)
+
+
+def _default_depth(subnetwork, inputs, inverts, rule):
+    """(depth, junctions given it, basis) of a ``max_depth`` given as 'median' or a function."""
+    exclude = set(inputs.outfalls) | set(inputs.wet_wells)
+    depths = junction_depths(subnetwork, inverts, exclude)
+    if rule == "median":
+        if depths.empty:
+            raise ValueError(
+                "max_depth='median': no junction has a rim above its invert to take a median of."
+            )
+        depth = float(depths.median())
+    elif callable(rule):
+        depth = rule(depths)
+    else:
+        raise ValueError(f"max_depth must be a number, 'median', or a function, not {rule!r}.")
+    if not (_is_real(depth) and depth >= 0):
+        raise ValueError(f"max_depth: the rule gave {depth!r}, not a depth >= 0.")
+    depth = round(float(depth), 4)
+    defaulted = [n for n in subnetwork.nodes if n not in exclude and n not in depths.index]
+    basis = (
+        f"median rim - invert of {len(depths)} junctions"
+        if rule == "median"
+        else (f"function of rim - invert of {len(depths)} junctions")
+    )
+    logger.info(
+        "max_depth %s: %.4g m, given to %d junctions with no usable rim",
+        rule if rule == "median" else "function",
+        depth,
+        len(defaulted),
+    )
+    return depth, defaulted, basis
 
 
 def _refuse_remaining_gaps(subnetwork, filled):
@@ -557,7 +607,7 @@ def _check_ideal_pumps(model):
 def build_model(
     subnetwork: Subnetwork,
     outfalls: Outfalls | None = None,
-    max_depth: float = 0.0,
+    max_depth: float | str | Callable[[pd.Series], float] = 0.0,
     init_depth: float = 0.0,
     surcharge_depth: float = 0.0,
     ponding_area: float = 0.0,
@@ -611,7 +661,15 @@ def build_model(
     max_depth, init_depth, surcharge_depth, ponding_area : float
         Junction parameters (default 0.0). A junction whose rim elevation is known (see
         :attr:`Network.nodes`) and above its invert takes rim - invert as its maximum depth
-        instead of ``max_depth``.
+        instead of ``max_depth``. With 0, SWMM takes the depth to the crown of the highest pipe
+        at the junction, so a junction with no usable rim then overflows as soon as a pipe
+        joining it runs full.
+
+        ``max_depth`` may instead be ``'median'``: the median of rim - invert over the
+        subnetwork's junctions whose rim is above their invert (the depths written), given to
+        every junction with no usable rim. A function of those depths (a pandas Series indexed by
+        node) returning one depth also works, e.g. ``lambda d: d.quantile(0.25)``. Each junction
+        given that depth is listed in :attr:`SwmmModel.derived`.
 
     manning_n : float
         Manning's n of every conduit (default 0.01) or, with ``manning_n_by_material``, of those
@@ -761,7 +819,8 @@ def build_model(
     """
     check_options(fills, BUILD_OPTIONS, "build_model")
     defaults = _Defaults(
-        max_depth=max_depth,
+        # A rule ('median' or a function) is resolved once the inverts are known.
+        max_depth=float(max_depth) if isinstance(max_depth, (int, float)) else 0.0,
         init_depth=init_depth,
         surcharge_depth=surcharge_depth,
         ponding_area=ponding_area,
@@ -793,6 +852,13 @@ def build_model(
     _refuse_remaining_gaps(subnetwork, filled)
     pipes, inverts = filled.pipes, filled.inverts
     derived = _apply_design_rules(subnetwork, inputs, pipes, inverts, wet_well_defaults)
+    if not isinstance(max_depth, (int, float)):
+        depth, defaulted, basis = _default_depth(subnetwork, inputs, inverts, max_depth)
+        defaults = replace(defaults, max_depth=depth)
+        rule = "max_depth='median'" if max_depth == "median" else "max_depth function"
+        derived += [
+            Derived("junction", node, "max_depth", depth, rule, basis) for node in defaulted
+        ]
 
     sections = {
         name: xsection(row)
