@@ -11,12 +11,24 @@ earlier history is in the git log.
 
 ### Fixed
 
+- **Topology checks on looped areas** (#159): `Subnetwork.validate()` finds cycles as strongly
+  connected components rather than listing every simple cycle, whose number grows exponentially
+  with the size of a looped area (a 7 × 7 grid of pipes drawn both ways did not finish). It now
+  takes linear time.
+
 - **Polygon allocation option validation** (issue #147): `population`, `sewered`, and
   `land_use` reject unindexed lists/arrays and Series with missing or repeated polygon IDs.
   These problems are reported together with other invalid options before allocation starts.
   Partial `land_use` Series now raise `ValueError`; previously, missing polygons were left
   unrated and contributed no flow. Complete Series remain aligned by ID, and explicitly
   missing or non-numeric population values still count as zero.
+
+### Changed
+
+- **One cycle per loop** (#159): `TopologyReport.cycles` holds one cycle per loop (the shortest
+  through the loop's smallest node) instead of every simple cycle, and `summary()["cycles"]`
+  counts loops. The new `TopologyReport.loops` lists the nodes of each loop, a set of nodes that
+  can all reach one another. A network with no cycles reports the same as before.
 
 ### Added
 
