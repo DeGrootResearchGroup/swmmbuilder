@@ -15,6 +15,11 @@ earlier history is in the git log.
   `split_report` with two more columns, `node` (the node each new ID resolves to after snapping)
   and `in_subnetwork`. `Subnetwork.split_summary()` returns `ids_split`, `nodes_made`, and
   `ids_in_subnetwork`. Without `split_tolerance` both are empty (no rows, zero counts).
+- **Dominant category** (#139): `dominant_category(polygons, layer, column)` gives, for each
+  polygon, the category of a layer (such as zoning) covering its largest area, and that area's
+  share of the polygon. It is the usual source of `allocate_population`'s `sewered` flag, e.g.
+  census blocks that are mostly zoned residential. A tie goes to the category that sorts first,
+  and a polygon meeting no feature of the layer has a missing category.
 - **Capturing the log of a build** (#140): `swmmbuilder.capture_log(level="INFO", path=None)` is
   a context manager that collects the `swmmbuilder` log and the `SwmmBuilderWarning` warnings
   raised in its block as text (`captured.text`), and optionally writes it to a file. It attaches

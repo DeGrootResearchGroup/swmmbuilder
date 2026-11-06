@@ -511,7 +511,19 @@ dwf = dwf_from_population(alloc.within(sub), per_capita=230, unit="L/d")
   then serves the blocks on both sides. A polygon with no pipe that close contributes no one,
   unless it is flagged in `sewered` (a column of booleans, e.g. residential zoning): a flagged
   polygon left with no pipe, such as a development on private sewers, is given its nearest pipe,
-  up to `max_nearest_distance` away (no limit by default).
+  up to `max_nearest_distance` away (no limit by default). `dominant_category` gives such a
+  flag from a zoning layer, the category covering the largest area of each polygon:
+
+  ```python
+  from swmmbuilder import dominant_category
+
+  use = dominant_category(blocks, zoning, "GeneralizedLandUse")  # category, share
+  blocks["residential"] = use["category"] == "RESIDENTIAL"
+  ```
+
+  The zoning is reprojected to the polygons' CRS (projected in metres), a tie goes to the
+  category that sorts first, and a polygon meeting no zoning has a missing category (so its flag
+  is False).
 - Force mains take no service connections: they serve no polygon and weigh 0, unless
   `serve_force_mains=True`.
 - `weight` is a pipe column, a function of the pipes, or None for the length.
