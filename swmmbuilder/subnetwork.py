@@ -3,11 +3,13 @@ them."""
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING
 
 import networkx as nx
+import pandas as pd
 
 from . import gaps, swmm
 from .diagnostics import check_options
@@ -18,7 +20,6 @@ if TYPE_CHECKING:
     from typing import Any, TypeVar
 
     import geopandas as gpd
-    import pandas as pd
 
     from ._types import NodeId, Outfalls, PipeId, StrPath, Values
     from .network import Network
@@ -26,6 +27,36 @@ if TYPE_CHECKING:
     from .swmm.records import SwmmModel
 
     V = TypeVar("V")
+
+
+logger = logging.getLogger(__name__)
+
+
+@dataclass
+class PumpStationReport:
+    """The result of :meth:`Subnetwork.find_pump_stations`.
+
+    Attributes
+    ----------
+    stations : list
+        Nodes of type 'pump_station' with a force main leaving them: the stations to pump, e.g.
+        ``{n: PumpStation(pump=dict(curve='*')) for n in report.stations}``.
+
+    no_force_main : list
+        Nodes of type 'pump_station' with no force main leaving them, which flow on by gravity
+        (or whose force main is missing from the data); they are written as junctions unless
+        given in ``pump_stations``.
+
+    unlisted : pandas.DataFrame
+        Likely lift stations missing from the station layer: one row per force main that starts
+        at a node not of type 'pump_station', with no force main entering it, and climbs by more
+        than ``min_rise``. Columns ``node``, ``pipes`` (the chain, in flow order), ``end``,
+        ``us_invert``, ``ds_invert``, and ``rise`` (m).
+    """
+
+    stations: list = field(default_factory=list)
+    no_force_main: list = field(default_factory=list)
+    unlisted: pd.DataFrame = field(default_factory=pd.DataFrame)
 
 
 @dataclass
@@ -384,6 +415,65 @@ class Subnetwork:
                 return pipes, node, problem
             pipes.append(outlets[0])
             node = self._ends[outlets[0]][1]
+
+    def find_pump_stations(self, min_rise: float = 0.0) -> PumpStationReport:
+        """The pump stations of the subnetwork, and force mains that climb from no station.
+
+        A node of type 'pump_station' (from the node layers) is a station to pump if a force
+        main leaves it; one with no force main is reported apart. A force main that starts at
+        any other node with no force main entering it (so not inside another station's force
+        main) and whose chain (:meth:`force_main_chain`) climbs by more than ``min_rise`` metres
+        from its first upstream invert to its last downstream invert is reported in
+        ``unlisted``: water does not climb a pressurised main without a pump, so the node is
+        likely a lift station missing from the station layer.
+
+        Parameters
+        ----------
+        min_rise : float
+            The rise, in m, above which a force main from a node that is not a station is
+            reported (default 0).
+
+        Returns
+        -------
+        PumpStationReport
+        """
+        types = dict(self.graph.nodes(data="node_type"))
+        stations, no_force_main, rows = [], [], []
+        pipes = self.pipes().set_index("pipe_id")
+        for node in self.nodes:
+            outlets = self.force_main_outlets(node)
+            if types.get(node) == "pump_station":
+                (stations if outlets else no_force_main).append(node)
+                continue
+            entering = [p for _, _, p in self.graph.in_edges(node, keys=True)]
+            if not outlets or any(self._is_force_main(p) for p in entering):
+                continue
+            for first in outlets:
+                chain, end, _ = self.force_main_chain(first)
+                us = gaps._invert(pipes.loc[first, "us_invert"])
+                ds = gaps._invert(pipes.loc[chain[-1], "ds_invert"])
+                if us is None or ds is None or ds - us <= min_rise:
+                    continue
+                rows.append(
+                    {
+                        "node": node,
+                        "pipes": chain,
+                        "end": end,
+                        "us_invert": us,
+                        "ds_invert": ds,
+                        "rise": round(ds - us, 4),
+                    }
+                )
+        columns = ["node", "pipes", "end", "us_invert", "ds_invert", "rise"]
+        unlisted = pd.DataFrame(rows, columns=columns)
+        if len(unlisted):
+            logger.warning(
+                "%d force mains climb from nodes that are not pump stations (likely lift stations "
+                "missing from the station layer): %s",
+                len(unlisted),
+                ", ".join(f"{r.node} ({r.rise:.1f} m)" for r in unlisted.itertuples()),
+            )
+        return PumpStationReport(stations, no_force_main, unlisted)
 
     def validate(self, outfalls: Iterable[NodeId] | None = None) -> TopologyReport:
         """Check the topology before the subnetwork is written to an .inp file.

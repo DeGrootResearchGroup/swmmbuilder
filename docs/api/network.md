@@ -7,3 +7,5 @@
 ::: swmmbuilder.subnetwork.Subnetwork
 
 ::: swmmbuilder.subnetwork.TopologyReport
+
+::: swmmbuilder.subnetwork.PumpStationReport

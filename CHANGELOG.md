@@ -23,6 +23,10 @@ earlier history is in the git log.
   to share by. Each share is placed at the pipe's upstream node, downstream node, or both. The
   result reports the population of polygons with no pipe, and its `nodes` feed
   `dwf_from_population`.
+- **Finding pump stations**: `Subnetwork.find_pump_stations()` lists the station nodes with a
+  force main leaving them (to pass to `pump_stations`), those with none, and, as likely lift
+  stations missing from the station layer, force mains that climb from a node that is not a
+  station (#104).
 - **Wet wells below the arriving sewers**: the opt-in design rule `station_invert='lowest_inlet'`
   lowers a pump station's invert to the lowest end of the pipes arriving at it, extrapolating a
   missing downstream invert at `headwater_slope`, so that a station whose invert would otherwise
