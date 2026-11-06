@@ -11,6 +11,11 @@ earlier history is in the git log.
 
 ### Added
 
+- **Capturing the log of a build** (#140): `swmmbuilder.capture_log(level="INFO", path=None)` is
+  a context manager that collects the `swmmbuilder` log and the `SwmmBuilderWarning` warnings
+  raised in its block as text (`captured.text`), and optionally writes it to a file. It attaches
+  its own handler to the `swmmbuilder` logger and removes it on exit, so repeated builds in one
+  process each get their log, unlike `logging.basicConfig`. Warnings are still shown as usual.
 - **Census polygons** (#128): `swmmbuilder.census.census_polygons` gets the polygons covering a
   network (or any area) from a pluggable source, keeps those meeting the footprint of its gravity
   pipes, and returns them with `population` and `parent` columns for `allocate_population`. A
