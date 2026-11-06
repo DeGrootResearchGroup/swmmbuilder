@@ -25,6 +25,7 @@ from ..design import (
 from ..diagnostics import DataWarning, DesignWarning, Problems, check_options
 from ..gaps import _invert, fill_gaps, height_corrections, lowest_inverts, xsection
 from ..geometry import line_coords
+from ..schema import DESIGN_RULES
 from ..units import _FLOW_UNIT_LPS, _is_real
 from .dwf import resolve_dwf, resolve_dwf_patterns, resolve_patterns
 from .inflows import resolve_inflows, resolve_timeseries
@@ -667,6 +668,62 @@ def _check_ideal_pumps(model):
         )
 
 
+# The design rules of the schema that design='schema' applies: all but wet_well_defaults, which
+# needs a design_flow or a wet well at every station and so raises for a model without them.
+_SCHEMA_DESIGN = (
+    "force_main_discharge",
+    "force_main_roughness",
+    "force_main_checks",
+    "default_pump",
+)
+
+
+def _schema_design(
+    subnetwork: Subnetwork, design: str | Iterable[str] | None, given: Mapping[str, Any]
+) -> dict[str, Any]:
+    """The design rules of ``subnetwork.schema`` that the ``design`` option of
+    :func:`build_model` fills in: {rule: its parameters}, leaving out every rule ``given``
+    ({option: value}) sets to something other than None. Each rule applied is logged.
+
+    Raises
+    ------
+    ValueError
+        If ``design`` names an unknown rule or one the schema does not hold.
+    """
+    if design is None:
+        return {}
+    schema = subnetwork.schema
+    if isinstance(design, str):
+        if design != "schema":
+            raise ValueError(
+                f"design must be 'schema', a list of design rules, or None, not {design!r}."
+            )
+        names = [name for name in _SCHEMA_DESIGN if name in schema.design]
+    else:
+        names = list(design)
+        unknown = [str(n) for n in names if n not in DESIGN_RULES]
+        if unknown:
+            raise ValueError(
+                f"design: unknown design rules {', '.join(unknown)}; the design rules are "
+                f"{', '.join(DESIGN_RULES)}."
+            )
+        missing = [n for n in names if n not in schema.design]
+        if missing:
+            held = ", ".join(schema.design) or "none"
+            raise ValueError(
+                f"design: schema {schema.name!r} has no {', '.join(missing)} rule (it has: {held})."
+            )
+    applied = {n: schema.design[n] for n in names if given.get(n) is None}
+    kept = [n for n in names if n not in applied]
+    logger.info(
+        "Design rules from schema %s: %s%s",
+        schema.name,
+        ", ".join(applied) or "none",
+        f" (given explicitly: {', '.join(kept)})" if kept else "",
+    )
+    return applied
+
+
 def build_model(
     subnetwork: Subnetwork,
     outfalls: Outfalls | None = None,
@@ -697,6 +754,7 @@ def build_model(
     outfall_link: bool | Mapping[str, float] | None = None,
     station_invert: str | None = None,
     flow_units: str = "LPS",
+    design: str | Iterable[str] | None = None,
     **fills: Any,
 ) -> SwmmModel:
     """The :class:`SwmmModel` of a subnetwork.
@@ -886,18 +944,45 @@ def build_model(
         The template's FLOW_UNITS, in which pump curves and ``design_flow`` are given (default
         LPS, the shipped template's; :func:`write_inp` sets it from the template).
 
+    design : 'schema' or list of str, optional
+        Take design rules from the subnetwork's schema (its ``design`` table, see
+        :class:`~swmmbuilder.schema.Schema`) as the values of the options of the same names.
+        ``'schema'`` applies ``force_main_discharge``, ``force_main_roughness``,
+        ``force_main_checks``, and ``default_pump``, those the schema holds;
+        ``wet_well_defaults`` is left out, since it raises for a station with neither a wet well
+        nor a ``design_flow``. A list, e.g. ``['force_main_roughness', 'wet_well_defaults']``,
+        applies just those, and the schema must hold each. An option given explicitly (not
+        None) always wins over the schema's rule. The rules applied are logged. Default None:
+        no rule of the schema is applied.
+
     Raises
     ------
     ValueError
         If an outfall is not in the subnetwork, a gap that stops the model from being written
         remains after the fills (a conduit with no cross-section, a node with no invert; every
         such gap is listed), a pump, wet well, pump station, dry-weather flow, pattern, inflow,
-        time series, or fill rule is invalid, a pipe is both pumped and part of a station's force main, a force main
-        has no roughness or is not circular, a pump's startup depth is not above its shutoff depth
-        or not below its wet well's max depth, a PUMP1 station has no wet well, or an ideal pump
-        is not the only outlet link of its inlet node (SWMM's ERROR 134).
+        time series, fill rule, or ``design`` is invalid, a pipe is both pumped and part of a
+        station's force main, a force main has no roughness or is not circular, a pump's startup
+        depth is not above its shutoff depth or not below its wet well's max depth, a PUMP1
+        station has no wet well, or an ideal pump is not the only outlet link of its inlet node
+        (SWMM's ERROR 134).
     """
     check_options(fills, BUILD_OPTIONS, "build_model")
+    if design is not None:
+        given = dict(
+            default_pump=default_pump,
+            force_main_roughness=force_main_roughness,
+            wet_well_defaults=wet_well_defaults,
+            force_main_checks=force_main_checks,
+            force_main_discharge=fills.get("force_main_discharge"),
+        )
+        rules: dict[str, Any] = {**given, **_schema_design(subnetwork, design, given)}
+        default_pump, force_main_roughness = rules["default_pump"], rules["force_main_roughness"]
+        wet_well_defaults, force_main_checks = (
+            rules["wet_well_defaults"],
+            rules["force_main_checks"],
+        )
+        fills = {**fills, "force_main_discharge": rules["force_main_discharge"]}
     defaults = _Defaults(
         # A rule ('median' or a function) is resolved once the inverts are known.
         max_depth=float(cast(float, max_depth)) if _is_real(max_depth) else 0.0,
@@ -1081,6 +1166,8 @@ def write_inp(
     check_options(options, BUILD_OPTIONS, "write_inp")  # before any other work
     if dead_ends not in ("raise", "outfall"):
         raise ValueError("dead_ends must be 'raise' or 'outfall'.")
+    # The schema's rules are filled in here, so that the roughness rule's equation is checked.
+    options = {**options, **_schema_design(subnetwork, options.pop("design", None), options)}
     template = read_template(template_path)
     check_template(template)
     check_force_main_equation(

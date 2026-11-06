@@ -209,8 +209,9 @@ class Schema:
         only when passed to the .inp writer, e.g.
         ``to_inp(..., force_main_discharge=schema.design['force_main_discharge'])`` or
         ``to_inp(..., force_main_roughness=schema.design['force_main_roughness'])``; likewise
-        ``wet_well_defaults``, ``force_main_checks`` and ``default_pump``. So a schema can map the columns without
-        adopting the standard.
+        ``wet_well_defaults``, ``force_main_checks`` and ``default_pump``, or several at once with
+        ``to_inp(..., design='schema')`` (see :func:`swmmbuilder.swmm.build_model`). So a schema
+        can map the columns without adopting the standard.
     """
 
     name: str
