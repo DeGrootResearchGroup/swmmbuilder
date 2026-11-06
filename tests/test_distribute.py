@@ -1,8 +1,10 @@
 """Spreading a flow over the pipes of a network (swmmbuilder.distribute, #100)."""
 
+import logging
+
 import pandas as pd
 import pytest
-from test_population import make_network
+from test_population import PIPES, make_network
 
 from swmmbuilder import DataWarning, distribute_flow
 from swmmbuilder.distribute import pipe_weights
@@ -94,3 +96,18 @@ def test_feeds_pattern_inflows(net):
     inflows, series = pattern_inflows(pd.DataFrame(), {}, days=1, baseline=infiltration)
     assert {n: i.baseline for n, i in inflows.items()} == approx(infiltration)
     assert series == {}
+
+
+def test_a_pipe_with_a_missing_node_is_left_out(caplog):
+    """The total goes to the other pipes, and the flow the pipe would have taken is logged
+    (#122)."""
+    net = make_network([PIPES[0], (2, "N2", None, 60, 90, 6), *PIPES[2:]])  # 30 m of 240 m
+    with caplog.at_level(logging.WARNING, logger="swmmbuilder.distribute"):
+        flows = distribute_flow(net, total=21.0)
+    assert flows == approx({"N1": 5.0, "N3": 6.0, "N4": 4.0, "N5": 6.0})
+    assert "1 pipes (30 m)" in caplog.text
+    assert "with them they would take 2.625, in no catchment: [2]" in caplog.text
+    caplog.clear()
+    with caplog.at_level(logging.WARNING, logger="swmmbuilder.distribute"):
+        assert distribute_flow(net, rate=0.1)["N1"] == pytest.approx(5.0)
+    assert "with them they would take 3," in caplog.text

@@ -1,5 +1,6 @@
 """Allocation of polygon populations to network nodes (swmmbuilder.population)."""
 
+import logging
 import math
 
 import geopandas as gpd
@@ -374,3 +375,35 @@ def test_nearest_pipe_within_a_cap():
     assert free.no_pipes == ["N"]
     with pytest.raises(ValueError, match="max_nearest_distance must be"):
         allocate(net, polygons, max_nearest_distance=-5)
+
+
+# Pipe 2 (N2 to nowhere, 30 m, 6 connections) is in full_data but not in the graph.
+NO_NODE = [PIPES[0], (2, "N2", None, 60, 90, 6), *PIPES[2:]]
+
+
+def test_a_pipe_with_a_missing_node_is_left_out(caplog):
+    """Its polygon's people go to the polygon's other pipes, and the people it would have taken
+    are logged (#122)."""
+    with caplog.at_level(logging.WARNING, logger="swmmbuilder.population"):
+        alloc = allocate(make_network(NO_NODE))
+    assert 2 not in alloc.pipes.index
+    assert alloc.nodes["N1"] == pytest.approx(80.0)  # all of P, on pipe 1
+    assert alloc.unallocated == pytest.approx(30.0)  # R only
+    assert alloc.total == pytest.approx(180.0)
+    # With pipe 2, P's 80 people go 2:6 to pipes 1 and 2: 60 people to a pipe in no catchment
+    # (placed at N2, its upstream node, so not unallocated).
+    assert "1 pipes (30 m) have a missing from_node or to_node" in caplog.text
+    assert "they would take 60 people, in no catchment" in caplog.text
+    assert "(not allocated: 30 with them, 30 without): [2]" in caplog.text
+    # Placed downstream, pipe 2's share has no node, so it was not allocated.
+    caplog.clear()
+    with caplog.at_level(logging.WARNING, logger="swmmbuilder.population"):
+        down = allocate(make_network(NO_NODE), placement="downstream")
+    assert down.nodes["N2"] == pytest.approx(80.0)
+    assert "(not allocated: 90 with them, 30 without)" in caplog.text
+
+
+def test_no_pipe_is_left_out_of_a_complete_network(net, caplog):
+    with caplog.at_level(logging.WARNING, logger="swmmbuilder.population"):
+        allocate(net)
+    assert "left out" not in caplog.text
