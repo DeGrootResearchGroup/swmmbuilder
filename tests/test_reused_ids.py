@@ -172,6 +172,20 @@ def test_a_pipe_drawn_backwards_does_not_split_its_nodes(caplog):
     assert net.splits == {}
     assert ends(net, 21) == ("P", "Q")
     assert "1 pipes are drawn from their downstream node to their upstream node" in caplog.text
+    # Its geometry is reversed, so P sits at its own end, not at Q (#121).
+    assert net.reversed_pipes == [21]
+    line = net.full_data.set_index("pipe_id").geometry[21]
+    assert line.coords[0] == (X0 + 500, Y0) and line.coords[-1] == (X0 + 560, Y0)
+    positions = net.subnetwork(net.graph.nodes).node_positions()
+    assert positions["P"] == (X0 + 500, Y0)
+    assert positions["Q"] == (X0 + 560, Y0)
+    assert net.nodes.geometry["P"] == Point(X0 + 500, Y0)
+
+
+def test_no_pipe_is_reversed_without_split_tolerance():
+    spec = [(20, "O", "P", [(400, 0), (500, 0)]), (21, "P", "Q", [(560, 0), (500, 0)])]
+    net = Network(pipes(spec))
+    assert net.reversed_pipes == []
 
 
 def test_a_self_loop_across_two_structures_is_split():

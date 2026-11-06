@@ -5,16 +5,28 @@ import shapely
 
 
 def _parts(geometry):
-    """The lines of a pipe geometry: a MultiLineString's parts are first merged where they
-    touch end to start, so a pipe split into connected pieces is one line."""
+    """The lines of a pipe geometry: a MultiLineString whose parts join end to start is merged
+    into one line; otherwise its parts are kept as they are, in their order (line_merge would
+    return the pieces of a partial merge in no set order)."""
     if geometry is None or geometry.is_empty:
         return []
     if geometry.geom_type != "MultiLineString":
         return [geometry]
     merged = shapely.line_merge(geometry, directed=True)
-    if merged.is_empty:  # e.g. degenerate zero-length parts: keep the parts as they are
-        return list(geometry.geoms)
-    return list(merged.geoms) if hasattr(merged, "geoms") else [merged]
+    if merged.geom_type == "LineString" and not merged.is_empty:
+        return [merged]
+    return list(geometry.geoms)
+
+
+def reverse_line(geometry):
+    """A pipe geometry drawn the other way: the vertices of each part reversed and, for a
+    MultiLineString, the parts in reverse order, so that :func:`line_coords` runs backwards.
+    Missing and empty geometries are returned as they are."""
+    if geometry is None or geometry.is_empty:
+        return geometry
+    if geometry.geom_type == "MultiLineString":
+        return shapely.MultiLineString([shapely.reverse(p) for p in reversed(geometry.geoms)])
+    return shapely.reverse(geometry)
 
 
 def is_disjoint(geometry):
@@ -26,10 +38,17 @@ def line_coords(geometry):
     """(x, y) vertices of a pipe geometry, in order from upstream to downstream; [] if the
     geometry is missing or empty.
 
-    The parts of a MultiLineString are merged where they join; parts that do not join (see
-    :func:`is_disjoint`) are concatenated in order. Any z values are dropped.
+    The parts of a MultiLineString are merged if they join into one line; otherwise (see
+    :func:`is_disjoint`) they are concatenated in order, a vertex shared by two touching parts
+    taken once. Any z values are dropped.
     """
-    return [(c[0], c[1]) for part in _parts(geometry) for c in part.coords]
+    coords: list[tuple[float, float]] = []
+    for part in _parts(geometry):
+        for c in part.coords:
+            xy = (c[0], c[1])
+            if not coords or coords[-1] != xy:  # parts that touch share their end vertex
+                coords.append(xy)
+    return coords
 
 
 def node_positions(data, nodes):
