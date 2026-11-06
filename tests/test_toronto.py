@@ -37,6 +37,22 @@ def test_load(toronto):
     assert "Sewer Gravity Location Description" in data.columns
 
 
+def test_structure_types(tmp_path):
+    """Structure types use London's codes: SL is gravity, OVF an overflow pipe (#154); other codes
+    pass through."""
+    assert set(Network(str(TORONTO), schema=TORONTO_ON).full_data["structure_type"]) == {"gravity"}
+    data = gpd.read_file(TORONTO)
+    data.loc[0, "Sewer Gravity Structure Type"] = "OVF"
+    data.loc[1, "Sewer Gravity Structure Type"] = "SP"
+    path = tmp_path / "toronto.geojson"
+    data.to_file(path, driver="GeoJSON")
+    types = Network(str(path), schema=TORONTO_ON).full_data["structure_type"]
+    assert types.value_counts().to_dict() == {"gravity": 29, "overflow": 1, "SP": 1}
+    network = Network(str(path), schema=TORONTO_ON, include_overflows=False)
+    assert network.removed["structure_type"] == {"overflow": 1}
+    assert len(network.full_data) == 30
+
+
 def test_lengths_match_reprojected_geometry(toronto):
     """The measured lengths agree with the lengths of the reprojected geometry (to 10 cm)."""
     data = toronto.full_data

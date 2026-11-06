@@ -20,6 +20,13 @@ earlier history is in the git log.
 
 ### Added
 
+- **Status and structure types for more Ontario presets.** The Barrie, Kitchener, Sarnia,
+  Waterloo, and Windsor presets map their status columns, and Toronto and Waterloo their
+  structure-type columns, so the status filter and `include_overflows=False` work for them (#154).
+  The codes were checked against each city's full layer. Windsor's `TEMP. OUT-NEW CONSTRUCTION`
+  and `PRIVATE` pipes are now dropped by the default status filter, and rarer codes (Toronto's
+  `SP`, `PF`, ..., Waterloo's `WWTP Outfall`) pass through unmapped. Each TOML header says which
+  columns a dataset lacks.
 - **Pipes crossing a subnetwork's boundary** (#152): `Subnetwork.boundary_pipes(values=None)`
   lists the pipes with one end in the subnetwork, which it leaves out, classified as `force_main`,
   `split`, `summit`, or `inflow`, with the nodes (or values) upstream, where a leaving pipe's flow
