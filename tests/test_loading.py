@@ -13,7 +13,7 @@ from shapely.geometry import LineString, MultiLineString, Point
 
 from swmmbuilder import LONDON_ON, Network
 from swmmbuilder.gaps import _fill_node_inverts
-from swmmbuilder.geometry import is_disjoint, line_coords
+from swmmbuilder.geometry import is_disjoint, line_coords, reverse_line
 
 
 @pytest.fixture
@@ -128,3 +128,11 @@ def test_interpolation_between_coincident_known_inverts():
     inverts, records = {"U": 10.0, "D": 9.0}, []
     _fill_node_inverts(graph, ["X"], inverts, "interpolate", None, lambda *a: records.append(a))
     assert inverts["X"] == 9.0  # no ZeroDivisionError; takes the downstream invert
+
+
+def test_reverse_line_reverses_parts_and_their_order():
+    line = LineString([(0, 0), (1, 0), (2, 0)])
+    assert line_coords(reverse_line(line)) == [(2, 0), (1, 0), (0, 0)]
+    multi = MultiLineString([[(0, 0), (1, 0)], [(5, 0), (6, 0)]])  # disjoint parts
+    assert line_coords(reverse_line(multi)) == [(6, 0), (5, 0), (1, 0), (0, 0)]
+    assert reverse_line(None) is None

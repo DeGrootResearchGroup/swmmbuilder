@@ -18,7 +18,7 @@ from shapely import Point
 
 from .diagnostics import DataWarning
 from .gaps import lowest_inverts
-from .geometry import is_disjoint, line_coords, node_positions, to_geodataframe
+from .geometry import is_disjoint, line_coords, node_positions, reverse_line, to_geodataframe
 from .schema import LONDON_ON, NODE_COLUMNS, as_schema
 from .subnetwork import Subnetwork
 
@@ -189,7 +189,8 @@ class Network:
         pipe whose geometry runs from its downstream node to its upstream node (each end is
         more than ``split_tolerance`` from the other points of its own ID, and within it of the
         other ID's) has its ends matched the other way round, so that it does not split its
-        nodes. Each node-layer point with a split ID goes to the nearest of its structures,
+        nodes, and its geometry is reversed (it is listed in ``reversed_pipes``), so that node
+        positions and the .inp vertices run from its upstream node. Each node-layer point with a split ID goes to the nearest of its structures,
         which takes the point's position and attributes (node type, invert, rim); a structure
         with no point takes them from its pipes, as a node in no layer does. An ID whose pipes
         include one with no geometry is not split. Every split is logged as a warning and
@@ -242,6 +243,10 @@ class Network:
         point to the nearest of its pipe ends, in m) and ``attributes`` ('node layer', or
         'pipes' for a structure with no point).
 
+    reversed_pipes : list
+        IDs of the pipes drawn from their downstream node to their upstream node, whose geometry
+        was reversed (found with ``split_tolerance``; empty without it).
+
     invert_report : pandas.DataFrame
         The pipe and drop-structure inverts outside the schema's plausible range
         (``Schema.invert_range``), treated as missing: ``pipe_id``, ``column``,
@@ -276,6 +281,7 @@ class Network:
         self.splits: dict[NodeId, list[NodeId]] = {}
         self._split_points: dict[NodeId, Point] = {}
         self.split_report: pd.DataFrame | None = None
+        self.reversed_pipes: list = []
         if (
             split_tolerance is not None
             and snap_tolerance is not None
@@ -575,6 +581,14 @@ class Network:
             self.full_data = data.assign(from_node=renamed[0], to_node=renamed[1])
             if layer_ids is not None:
                 self._layers = self._layers.assign(node_id=layer_ids)
+        if backwards:
+            # Reverse the geometry itself, so that everything reading it (node positions, the
+            # .inp coordinates and vertices) starts at the upstream node (#121).
+            flip = self.full_data["pipe_id"].isin(backwards).to_numpy()
+            geometry = self.full_data.geometry.copy()
+            geometry[flip] = [reverse_line(g) for g in geometry[flip]]
+            self.full_data = self.full_data.set_geometry(geometry)
+            self.reversed_pipes = sorted(backwards, key=str)
         logger.info(
             "Split %d reused node IDs into %d nodes (structures more than %s m apart)",
             len(self.splits),

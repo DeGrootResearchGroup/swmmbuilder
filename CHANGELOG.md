@@ -87,6 +87,12 @@ earlier history is in the git log.
 - **Pipes with no ID**: two or more pipes with a missing ID (or one of the schema's `null_values`)
   no longer stop the data from loading as duplicates; they are dropped and counted in
   `Network.removed['invalid']['no pipe_id']`, as one such pipe already was (#120).
+- **Pipes drawn backwards**: a pipe that `split_tolerance` finds drawn from its downstream node to
+  its upstream node now has its geometry reversed (and is listed in `Network.reversed_pipes`), so
+  that its upstream node is placed at its own end in `Network.nodes` and the .inp coordinates,
+  and its vertices run downstream (#121).
+- **Disjoint MultiLineStrings**: `line_coords` keeps the parts of a pipe whose parts do not join
+  in their order, as documented; `shapely.line_merge` could reorder them (#121).
 
 ## [0.1.0] - 2026-11-03
 
