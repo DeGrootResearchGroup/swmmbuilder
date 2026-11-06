@@ -1,4 +1,5 @@
 from ._types import NodeId, PipeId
+from .corrections import PipeCorrections
 from .diagnostics import (
     CapturedLog,
     DataWarning,
@@ -44,6 +45,7 @@ __all__ = [
     "Network",
     "NodeId",
     "OptionWarning",
+    "PipeCorrections",
     "PipeId",
     "PopulationAllocation",
     "Pump",
