@@ -9,9 +9,10 @@ reads only the canonical columns:
 ``from_node``      upstream node ID (NaN if missing)
 ``to_node``        downstream node ID (NaN if missing)
 ``length``         pipe length, in m
-``us_invert``      upstream invert, in m (NaN if missing)
-``ds_invert``      downstream invert, in m (NaN if missing)
-``drop_invert``    drop-structure invert at the downstream node, in m (NaN if missing)
+``us_invert``      upstream invert, in m (NaN if missing or implausible)
+``ds_invert``      downstream invert, in m (NaN if missing or implausible)
+``drop_invert``    drop-structure invert at the downstream node, in m (NaN if missing or
+                   implausible: see ``invert_range``)
 ``shape``          SWMM cross-section name (NaN if the shape code is unknown or missing)
 ``shape_code``     the source shape code
 ``diameter``       in m
@@ -178,6 +179,11 @@ class Schema:
         required to read node layers.
     rim_range : tuple of float or None
         (lowest, highest) plausible rim elevation, in m; rims outside it are treated as missing.
+    invert_range : tuple of float or None
+        (lowest, highest) plausible pipe and drop-structure invert, in m; inverts outside it
+        (e.g. 25089.0 for 250.89, or a drop height in the invert column) are treated as missing
+        and listed in :attr:`Network.invert_report`. Not applied unless given (it is independent of
+        ``rim_range``), e.g. ``dataclasses.replace(LONDON_ON, invert_range=LONDON_ON.rim_range)``.
     default_shape : str or None
         SWMM cross-section of every pipe, for data with no shape column (``shape`` must then not
         be mapped); e.g. ``'CIRCULAR'`` where only a diameter is published.
@@ -216,6 +222,7 @@ class Schema:
     node_types: dict = field(default_factory=dict)
     node_columns: dict = field(default_factory=dict)
     rim_range: tuple | None = None
+    invert_range: tuple | None = None
     default_shape: str | None = None
     abandoned: str | None = None
     abandoned_values: frozenset = frozenset()
@@ -306,8 +313,9 @@ class Schema:
         for key in ("abandoned_values", "null_values", "null_nodes"):
             if key in values:
                 values[key] = frozenset(values[key])
-        if "rim_range" in values:
-            values["rim_range"] = tuple(values["rim_range"])
+        for key in ("rim_range", "invert_range"):
+            if key in values:
+                values[key] = tuple(values[key])
         return cls(**values)
 
     def _lengths(self, data, lengths):
@@ -387,10 +395,11 @@ class Schema:
         for node in ("from_node", "to_node"):
             out[node] = source(node).where(~source(node).isin(self.null_nodes))
         out["length"] = self._lengths(data, source("length"))
+        bounds = self.invert_range
         for column in INVERT_COLUMNS:
-            inverts = pd.to_numeric(source(column), errors="coerce") / UNITS[self.invert_unit]
-            if self.nonpositive_inverts_missing:
-                inverts = inverts.where(inverts > 0)
+            inverts = self._inverts(source(column))
+            if bounds is not None:
+                inverts = inverts.where(inverts.isna() | inverts.between(*bounds))
             out[column] = inverts
         codes = source("shape")
         out["shape"] = codes.map(self.shapes)
@@ -433,6 +442,38 @@ class Schema:
         rest = [c for c in data.columns if c not in mapped]
         frame = pd.concat([pd.DataFrame(out, index=data.index), data[[*rest, geometry]]], axis=1)
         return gpd.GeoDataFrame(frame, geometry=geometry, crs=data.crs)
+
+    def _inverts(self, values):
+        """Inverts in m from source values; non-numeric (and, with
+        ``nonpositive_inverts_missing``, non-positive) values are NaN."""
+        inverts = pd.to_numeric(values, errors="coerce").astype(float) / UNITS[self.invert_unit]
+        if self.nonpositive_inverts_missing:
+            inverts = inverts.where(inverts > 0)
+        return inverts
+
+    def implausible_inverts(self, data) -> pd.DataFrame:
+        """The inverts of pipe data (as read, before :meth:`normalize`) outside
+        ``invert_range``, which :meth:`normalize` treats as missing: one row per value,
+        with ``pipe_id``, ``column`` (canonical), ``source_column``, and ``value`` (in m)."""
+        columns = ["pipe_id", "column", "source_column", "value"]
+        bounds = self.invert_range
+        if bounds is None:
+            return pd.DataFrame(columns=columns)
+        rows = []
+        for column in INVERT_COLUMNS:
+            source = self.columns.get(column)
+            if source is None or source not in data.columns:
+                continue
+            values = data[source]
+            if self.null_values:
+                values = values.where(~values.isin(self.null_values))
+            inverts = self._inverts(values)
+            bad = inverts.notna() & ~inverts.between(*bounds)
+            for pipe, value in zip(
+                data.loc[bad, self.columns["pipe_id"]], inverts[bad], strict=True
+            ):
+                rows.append((pipe, column, source, float(value)))
+        return pd.DataFrame(rows, columns=columns)
 
     def normalize_nodes(self, data, node_type=None):
         """Return the canonical node columns of a node layer.
