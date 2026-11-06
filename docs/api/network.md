@@ -4,6 +4,8 @@
 
 ::: swmmbuilder.network.strip_leading_zeros
 
+::: swmmbuilder.corrections.PipeCorrections
+
 ::: swmmbuilder.subnetwork.Subnetwork
 
 ::: swmmbuilder.subnetwork.TopologyReport

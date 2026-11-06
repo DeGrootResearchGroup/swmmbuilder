@@ -289,6 +289,45 @@ give a warning on loading, and those pipes are rejected if they are written to a
 `flow_types=` filters on canonical flow types (`{'sanitary'}` by default); source codes such as
 `'SAN'` are translated too.
 
+### Corrections
+
+Every export needs a few corrections that a model should record. Pass them to `Network` instead
+of editing the data first, so that each is logged at INFO with its reason and listed in
+`network.corrections_report` (`pipe_id`, `action`, `column`, `old`, `new`, `reason`):
+
+```python
+network = Network(
+    "Sewer_Pipes.geojson",
+    corrections=dict(
+        drop={112216: "force main taken as gravity pass-through"},
+        set={328065: {"status": "built", "reason": "Proposed in GIS, built"}},
+        swap_nodes={144019: "IDs recorded the wrong way round; drawing and inverts agree"},
+    ),
+)
+```
+
+Pipe IDs are those of the source data (London's `OBJECTID`), matched exactly or by text, and an
+ID that is not in the data raises `ValueError`. Corrections are applied after the schema has
+normalized the data and `normalize_ids` has been applied, and before any pipe is filtered out, so
+the `status` set above lets the pipe through the status filter. `set` takes canonical columns
+and values (`'built'`, not the source code `'Built'`; inverts and sizes in m). `swap_nodes`
+swaps only `from_node` and `to_node`; the inverts and geometry stay as recorded, so the
+upstream invert stays at the pipe's drawn upstream end, which becomes its `from_node`. Dropped
+pipes are counted in `network.removed['corrections']`. The same corrections can be kept in a
+TOML file and passed as its path:
+
+```toml
+[drop]
+112216 = "force main taken as gravity pass-through"
+
+[set.328065]
+status = "built"
+reason = "Proposed in GIS, built"
+
+[swap_nodes]
+144019 = "IDs recorded the wrong way round; drawing and inverts agree"
+```
+
 ## SWMM template
 
 `.inp` files are written by `swmmbuilder.swmm`. `build_model(subnetwork, ...)` returns a

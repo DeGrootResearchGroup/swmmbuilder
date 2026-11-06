@@ -16,6 +16,7 @@ import numpy as np
 import pandas as pd
 from shapely import Point
 
+from .corrections import REPORT_COLUMNS, PipeCorrections
 from .diagnostics import DataWarning
 from .gaps import lowest_inverts
 from .geometry import is_disjoint, line_coords, node_positions, reverse_line, to_geodataframe
@@ -23,7 +24,7 @@ from .schema import LONDON_ON, NODE_COLUMNS, as_schema
 from .subnetwork import Subnetwork
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Collection
+    from collections.abc import Callable, Collection, Mapping
     from typing import Any
 
     from ._types import NodeId, StrPath, Values
@@ -197,6 +198,20 @@ class Network:
         listed in ``split_report``. Must exceed ``snap_tolerance``, so that snapping cannot
         merge the structures again.
 
+    corrections : PipeCorrections, dict, str or Path, optional
+        Documented corrections to pipes: a :class:`PipeCorrections`, a mapping with its fields
+        as keys (``drop``: {pipe ID: reason}; ``set``: {pipe ID: {canonical column: value, ...,
+        'reason': str}}; ``swap_nodes``: {pipe ID: reason}), or the path to a TOML file of them
+        (see :meth:`PipeCorrections.from_toml`). Pipe IDs are those of the source data, matched
+        exactly or by text. They are applied after the schema has normalized the data and
+        ``normalize_ids`` has been applied to the pipes' node IDs, and before any pipe is
+        dropped by the flow-type, status, and overflow filters (or as invalid), so that e.g.
+        ``set={pid: {'status': 'built'}}`` keeps a pipe the data mark as proposed. Each one is
+        logged at INFO with its reason and listed in ``corrections_report``. ``swap_nodes``
+        swaps only the node IDs (inverts and geometry stay as recorded; see
+        :class:`PipeCorrections`). Raises ValueError naming every pipe ID that is not in the
+        data.
+
     Attributes
     ----------
     full_data : geopandas.GeoDataFrame
@@ -227,6 +242,14 @@ class Network:
         with no flow type are counted under ``'None'``; ``'invalid'`` counts the pipes with
         ``'no pipe_id'`` or ``'no length'`` (none in the data, and no geometry to compute it
         from), which cannot be used. Pipes with no geometry but a length are kept.
+        ``'corrections'`` is ``{'dropped': count}`` for the pipes dropped by ``corrections``
+        (empty if none were).
+
+    corrections_report : pandas.DataFrame
+        One row per correction applied: ``pipe_id`` (as in the data), ``action`` (``'drop'``,
+        ``'set'`` or ``'swap_nodes'``), ``column`` (the column set, else missing), ``old`` and
+        ``new`` (the value before and after; for ``'swap_nodes'``, ``'from_node -> to_node'``;
+        missing for ``'drop'``), and ``reason``. Empty, with these columns, if there were none.
 
     snap_report : pandas.DataFrame or None
         The report of :meth:`snap_nodes` if ``snap_tolerance`` was given.
@@ -273,6 +296,7 @@ class Network:
         snap_tolerance: float | None = None,
         max_invert_difference: float | None = None,
         split_tolerance: float | None = None,
+        corrections: PipeCorrections | Mapping[str, Mapping[Any, Any]] | StrPath | None = None,
     ) -> None:
         self.schema = schema = as_schema(schema)
         self.normalize_ids = normalize_ids
@@ -304,7 +328,9 @@ class Network:
             "status": {},
             "structure_type": {},
             "invalid": {},
+            "corrections": {},
         }
+        self.corrections_report = self._apply_corrections(corrections)
         self._drop_invalid()
 
         if flow_types is not None and "flow_type" in schema.columns:
@@ -324,6 +350,19 @@ class Network:
         # Report only the pipes kept (not, say, the storm sewers filtered out above).
         kept = set(self.full_data["pipe_id"].astype(str))
         self.invert_report = implausible[implausible["pipe_id"].astype(str).isin(kept)]
+        # ... and not the inverts that corrections replaced.
+        corrected = self.corrections_report[self.corrections_report["action"] == "set"]
+        corrected_cells = set(
+            zip(corrected["pipe_id"].astype(str), corrected["column"], strict=True)
+        )
+        self.invert_report = self.invert_report[
+            [
+                (str(p), c) not in corrected_cells
+                for p, c in zip(
+                    self.invert_report["pipe_id"], self.invert_report["column"], strict=True
+                )
+            ]
+        ]
         self.invert_report = self.invert_report.reset_index(drop=True)
         if len(self.invert_report) and schema.invert_range is not None:
             low, high = schema.invert_range
@@ -403,6 +442,89 @@ class Network:
             logger.info(
                 "Removed %d pipes with %s %s (%s)", count, column.replace("_", " "), value, reason
             )
+
+    def _apply_corrections(self, corrections):
+        """Apply ``corrections`` (see :class:`PipeCorrections`) to ``full_data``, logging each
+        one, and return the corrections report."""
+        if corrections is None:
+            return pd.DataFrame(columns=REPORT_COLUMNS)
+        corrections = PipeCorrections.coerce(corrections)
+        data = self.full_data.copy()
+        positions = {p: i for i, p in enumerate(data["pipe_id"]) if pd.notna(p)}
+        by_text = {str(p): p for p in positions}
+
+        missing = set()
+        repeated = set()
+        matched = {}
+        for action in ("drop", "set", "swap_nodes"):
+            entries = {}
+            for key, value in getattr(corrections, action).items():
+                pipe = key if key in positions else by_text.get(str(key))
+                if pipe is None:
+                    missing.add(str(key))
+                elif pipe in entries:
+                    repeated.add(str(pipe))
+                else:
+                    entries[pipe] = value
+            matched[action] = entries
+        if missing:
+            raise ValueError(
+                f"corrections: pipes not in the data: {', '.join(sorted(missing))}. Pipe IDs are "
+                f"those of the source data ({self.schema.columns['pipe_id']!r})."
+            )
+        if repeated:
+            raise ValueError(
+                f"corrections: pipes given more than once: {', '.join(sorted(repeated))}."
+            )
+
+        rows = []
+        for pipe, reason in matched["drop"].items():
+            logger.info("Pipe %s dropped by corrections: %s", pipe, reason)
+            rows.append((pipe, "drop", None, None, None, reason))
+        column_of = data.columns.get_loc
+        for pipe, values in matched["set"].items():
+            i = positions[pipe]
+            reason = values.get("reason")
+            for column, value in values.items():
+                if column == "reason":
+                    continue
+                if column in ("from_node", "to_node") and self.normalize_ids and pd.notna(value):
+                    value = self.normalize_ids(value)
+                old = data.iat[i, column_of(column)]
+                data.iat[i, column_of(column)] = value
+                if column == "status":
+                    data.iat[i, column_of("abandoned")] = value == "abandoned"
+                logger.info(
+                    "Pipe %s: %s set from %r to %r by corrections%s",
+                    pipe,
+                    column,
+                    old,
+                    value,
+                    f": {reason}" if reason else "",
+                )
+                rows.append((pipe, "set", column, old, value, reason))
+        ends = [column_of("from_node"), column_of("to_node")]
+        for pipe, reason in matched["swap_nodes"].items():
+            i = positions[pipe]
+            up, down = data.iat[i, ends[0]], data.iat[i, ends[1]]
+            data.iat[i, ends[0]], data.iat[i, ends[1]] = down, up
+            logger.info(
+                "Pipe %s: node IDs swapped by corrections, %s -> %s is now %s -> %s: %s",
+                pipe,
+                up,
+                down,
+                down,
+                up,
+                reason,
+            )
+            rows.append((pipe, "swap_nodes", None, f"{up} -> {down}", f"{down} -> {up}", reason))
+
+        if matched["drop"]:
+            dropped = data["pipe_id"].isin(list(matched["drop"]))
+            data = data[~dropped]
+            self.removed["corrections"] = {"dropped": int(dropped.sum())}
+        self.full_data = data
+        return pd.DataFrame(rows, columns=REPORT_COLUMNS)
 
     def _read_layers(self, layers):
         """The canonical node layers, in order of precedence, each with a ``layer`` column."""

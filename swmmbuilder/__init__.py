@@ -1,4 +1,5 @@
 from ._types import NodeId, PipeId
+from .corrections import PipeCorrections
 from .diagnostics import DataWarning, DesignWarning, OptionWarning, SwmmBuilderWarning
 from .distribute import distribute_flow
 from .land_use import LandUseAllocation, allocate_land_use
@@ -35,6 +36,7 @@ __all__ = [
     "Network",
     "NodeId",
     "OptionWarning",
+    "PipeCorrections",
     "PipeId",
     "PopulationAllocation",
     "Pump",
