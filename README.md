@@ -241,7 +241,8 @@ dict of counts and totals under stable keys, documented in each method's docstri
   given), connections, and polygons served, given their nearest pipe, or with no pipe;
 - `LandUseAllocation.summary()`: polygons, area, flow, and nodes per land use, nearest-pipe
   distances, and the scale;
-- `TopologyReport.summary()`: nodes, pipes, splits, cycles, and force mains;
+- `TopologyReport.summary()`: nodes, pipes, splits, cycles (counted as loops, sets of nodes
+  that can all reach one another), and force mains;
 - `SwmmModel.summary()`: gaps found and filled, derived values by rule, the default depth,
   stations, and outfall links.
 
@@ -293,16 +294,19 @@ only those (see `swmmbuilder/schema.py`). These schemas ship with the package, a
   .inp coordinates are in metres. Toronto publishes only a diameter, so only circular pipes get a
   cross-section; the other shapes are reported on loading. Flow types other than `SAN`, `Storm`
   and `Combined` (`CSO`, `SCSO`, `FD`, `EO`) pass through unchanged, so e.g.
-  `flow_types={"sanitary", "combined"}` keeps sanitary and combined sewers.
+  `flow_types={"sanitary", "combined"}` keeps sanitary and combined sewers. Structure types
+  use London's codes (`SL` gravity, `OVF` overflow), so `include_overflows=False` works.
 - Six more Ontario cities' open data, each reprojected to its UTM zone 17N CRS:
-  - `WINDSOR_ON`: the SanitarySewer, StormSewer and CombinedSewer layers.
-  - `KITCHENER_ON`: Sanitary Pipes. `CATEGORY` is the structure type.
+  - `WINDSOR_ON`: the SanitarySewer, StormSewer and CombinedSewer layers. `SERV_STAT` is the
+    status; `TEMP. OUT-NEW CONSTRUCTION` and `PRIVATE` pipes are dropped by the default status
+    filter.
+  - `KITCHENER_ON`: Sanitary Pipes. `CATEGORY` is the structure type, `STATUS` the status.
   - `WATERLOO_ON`: Sanitary Sewer Gravity Mains. All pipes are taken as circular, and an invert
-    of 111.111 means none.
+    of 111.111 means none. `TYPE` is the structure type, `LIFECYCLESTATUS` the status.
   - `PETERBOROUGH_ON`: Sanitary (and Storm) Sewer Pipes. Only circular pipes get a cross-section.
-  - `BARRIE_ON`: Sanitary Pipes. `TYPE` is the structure type.
+  - `BARRIE_ON`: Sanitary Pipes. `TYPE` is the structure type, `STATUS` the status.
   - `SARNIA_ON`: Sanitary and Storm Sewers. All pipes are taken as circular; non-circular sizes
-    (`"W x H"`) are rejected if written.
+    (`"W x H"`) are rejected if written. `Lifecycle_Status` is the status.
 
   Each TOML file's header gives the dataset's URL and its quirks. The layers are ArcGIS services
   that return at most 1,000–2,000 pipes per query, so download them from the portal (GeoJSON) or
@@ -418,7 +422,9 @@ sync by a test). It uses SI units, `FLOW_UNITS LPS`, because the GIS lengths, in
 in metres. A custom template (`template_path=`) must use `CMS`, `LPS` or `MLD`, and may only
 contain the `{nodes}`, `{outfalls}`, `{storage}`, `{conduits}`, `{pumps}`, `{xsections}`,
 `{curves}`, `{dwf}`, `{patterns}`, `{coordinates}` and `{vertices}` placeholders; anything else
-(including US units) raises `ValueError`. Node `[COORDINATES]` and pipe `[VERTICES]` are written in
+(including US units) raises `ValueError`. Conduit offsets are written as depths above the node
+invert, so a template must keep `LINK_OFFSETS DEPTH` (SWMM's default); `ELEVATION` raises
+`ValueError`. A `flow_units` option passed to `to_inp` must match the template's `FLOW_UNITS`. Node `[COORDINATES]` and pipe `[VERTICES]` are written in
 the units of the GIS geometry.
 
 ## Pumps
@@ -473,7 +479,8 @@ given, else a junction) to it. The force-main pipes leaving the station (`Struct
 London), followed downstream through every node whose only outlet is a force main
 (`Subnetwork.force_main_chain`), start at `<node>_D` and stay conduits with their GIS lengths and a
 `FORCE_MAIN` cross-section; their interior nodes and `<node>_D` get `force_main_surcharge_depth`
-(default 100 m) so that the main can run pressurised under `DYNWAVE`. Where two stations' force
+(default 100 m) so that the main can run pressurised under `DYNWAVE`. Under any other routing
+SWMM treats a `FORCE_MAIN` as an open channel, so writing force mains gives an `OptionWarning`. Where two stations' force
 mains join, the shared main downstream is a force main of both; a chain stops at the next pump
 station, whose own pump starts its force main. Other outlets of the station, such as overflows,
 stay conduits (`include_overflows=False` drops them). A pump-station node with force mains that
@@ -611,7 +618,8 @@ defined, of the right length and positive; otherwise `ValueError` is raised befo
 written. An hourly pattern whose mean is not 1 gives a warning, since it scales the base flows.
 The total base flow and the number of loaded nodes are logged, for comparison with the plant's
 measured dry-weather flow. `dwf_from_population` converts a per-capita flow (`unit` `L/d`,
-`m3/d`, `L/s`, or `m3/s`) to the template's `flow_units` (default `LPS`).
+`m3/d`, `L/s`, or `m3/s`) to the template's `flow_units` (default `LPS`). Its result carries no
+unit, so pass the same `flow_units` to `to_inp`, or use `NodeLoading`, whose options carry it.
 
 ### Population from polygons
 
@@ -761,7 +769,10 @@ loading.summary()                           # {'sanitary': ..., 'sanitary_nodes'
   are those of the model; `require_unit_mean` sets another tolerance, or `False` turns the check
   off. `pattern` may also name a pattern of `patterns`.
 - `table(columns={"steady": "infiltration_L_s", ...})` renames the columns, to keep a build's own
-  names. Flows are in the template's `FLOW_UNITS` (`flow_units`, default `LPS`).
+  names. Flows are in the template's `FLOW_UNITS` (`flow_units`, default `LPS`). `options()`
+  includes `flow_units`, so `to_inp` refuses a template with other `FLOW_UNITS`. The
+  `patterned` and `steady` flows must already be in that unit (e.g. `allocate_land_use` with the
+  same `flow_units`).
 
 ## Conduit geometry
 

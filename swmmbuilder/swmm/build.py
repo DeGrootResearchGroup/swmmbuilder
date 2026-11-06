@@ -22,7 +22,7 @@ from ..design import (
     force_main_roughnesses,
     pump_level_problem,
 )
-from ..diagnostics import DataWarning, DesignWarning, Problems, check_options
+from ..diagnostics import DataWarning, DesignWarning, OptionWarning, Problems, check_options
 from ..gaps import _invert, fill_gaps, height_corrections, lowest_inverts, xsection
 from ..geometry import line_coords
 from ..schema import DESIGN_RULES
@@ -1274,9 +1274,12 @@ def write_inp(
         :data:`TEMPLATE_PLACEHOLDERS`; {storage}, {pumps} and {curves} are needed only with the
         ``wet_wells``, ``pumps`` and ``pump_stations`` options, {dwf} and {patterns} only with
         ``dwf`` and ``patterns``, and {inflows} and {timeseries} only with ``inflows`` and
-        ``timeseries``. The offsets are depths, so it should set LINK_OFFSETS DEPTH
-        (the default). A ``force_main_roughness`` rule that declares an ``equation`` must match
-        its FORCE_MAIN_EQUATION (SWMM's default: H-W).
+        ``timeseries``. The offsets are depths, so a LINK_OFFSETS other than DEPTH (the
+        default) is refused. A ``flow_units`` option (e.g. from
+        :meth:`NodeLoading.options <swmmbuilder.NodeLoading.options>`) must be the template's
+        FLOW_UNITS. Force mains are written with a warning unless it uses FLOW_ROUTING DYNWAVE.
+        A ``force_main_roughness`` rule that declares an ``equation`` must match its
+        FORCE_MAIN_EQUATION (SWMM's default: H-W).
 
     dead_ends : {'raise', 'outfall'}
         What to do with nodes that have no outlet pipe and are not outfalls: raise a
@@ -1313,6 +1316,15 @@ def write_inp(
             f"flow_units {options['flow_units']!r} is not the template's FLOW_UNITS {flow_units}."
         )
     model = build_model(subnetwork, outfalls, **{**options, "flow_units": flow_units})
+    mains = [x.name for x in model.xsections if x.shape == "FORCE_MAIN"]
+    if mains and template_routing(template) != "DYNWAVE":
+        warnings.warn(
+            f"{len(mains)} force mains (e.g. {mains[0]}) are written under "
+            f"{template_routing(template)} routing, where SWMM treats a FORCE_MAIN as an open "
+            "channel; use a template with FLOW_ROUTING DYNWAVE for pressurized flow.",
+            OptionWarning,
+            stacklevel=2,
+        )
     if template_routing(template) == "DYNWAVE":
         crowded = outfall_inlets(model)
         if crowded:

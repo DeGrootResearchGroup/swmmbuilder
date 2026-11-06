@@ -11,6 +11,17 @@ earlier history is in the git log.
 
 ### Fixed
 
+- **Flow units and link offsets checked against the template** (#158): `NodeLoading.options()` now
+  includes `flow_units`, so `to_inp` refuses a template whose `FLOW_UNITS` differ from the load's
+  (an L/s load in a CMS template was written 1000 times too large). `NodeLoading` refuses an invalid
+  `flow_units` even without a population (upper or lower case is accepted). `check_template` refuses
+  a `LINK_OFFSETS` other than `DEPTH`, since offsets are written as depths. Force mains written
+  under routing other than `DYNWAVE` give an `OptionWarning`, since SWMM then treats them as open
+  channels.
+- **Topology checks on looped areas** (#159): `Subnetwork.validate()` finds cycles as strongly
+  connected components rather than listing every simple cycle, whose number grows exponentially
+  with the size of a looped area (a 7 × 7 grid of pipes drawn both ways did not finish). It now
+  takes linear time.
 - **Census cache and DEM checks** (#163): a `census_polygons` cache read with a source is
   refused if it was fetched with other parameters, naming the one that differs. Before, a cache
   for one dataset or set of regions was returned for another. `CensusMapper` and `PolygonFile`
@@ -29,8 +40,22 @@ earlier history is in the git log.
   unrated and contributed no flow. Complete Series remain aligned by ID, and explicitly
   missing or non-numeric population values still count as zero.
 
+### Changed
+
+- **One cycle per loop** (#159): `TopologyReport.cycles` holds one cycle per loop (the shortest
+  through the loop's smallest node) instead of every simple cycle, and `summary()["cycles"]`
+  counts loops. The new `TopologyReport.loops` lists the nodes of each loop, a set of nodes that
+  can all reach one another. A network with no cycles reports the same as before.
+
 ### Added
 
+- **Status and structure types for more Ontario presets.** The Barrie, Kitchener, Sarnia,
+  Waterloo, and Windsor presets map their status columns, and Toronto and Waterloo their
+  structure-type columns, so the status filter and `include_overflows=False` work for them (#154).
+  The codes were checked against each city's full layer. Windsor's `TEMP. OUT-NEW CONSTRUCTION`
+  and `PRIVATE` pipes are now dropped by the default status filter, and rarer codes (Toronto's
+  `SP`, `PF`, ..., Waterloo's `WWTP Outfall`) pass through unmapped. Each TOML header says which
+  columns a dataset lacks.
 - **Pipes crossing a subnetwork's boundary** (#152): `Subnetwork.boundary_pipes(values=None)`
   lists the pipes with one end in the subnetwork, which it leaves out, classified as `force_main`,
   `split`, `summit`, or `inflow`, with the nodes (or values) upstream, where a leaving pipe's flow
@@ -187,6 +212,8 @@ earlier history is in the git log.
 
 ### Changed
 
+- **`NodeLoading.options()` includes `flow_units`** (#158): the dictionary always has a
+  `flow_units` key, even when there is nothing else to write.
 - **Data-gaps reports list nodes with no usable rim**: `data_gaps()`, `model.data_gaps`, and
   `TopologyReport.data_gaps` now have a `no_rim` row (not blocking) for every node with no rim
   recorded, or one at or below the invert, so existing reports gain rows. Unless the `rims` option

@@ -10,7 +10,7 @@ import pytest
 from conftest import TEMPLATE, read_sections, run_swmm
 from shapely.geometry import LineString
 
-from swmmbuilder import LONDON_ON, Network, PumpStation, Schema, WetWell
+from swmmbuilder import LONDON_ON, Network, OptionWarning, PumpStation, Schema, WetWell
 from swmmbuilder.swmm import build_model, force_main_roughness_rule
 
 # Layout (flow direction; => is a force main, ~> an overflow), in UTM 17N metres:
@@ -183,6 +183,22 @@ def test_force_main_is_not_reported_adverse(sub, tmp_path, recwarn):
         sub, tmp_path, pump_stations={"PS": dict(pump=dict(curve=[(0, 5.0)], curve_type="PUMP2"))}
     )
     assert not [w for w in recwarn if "adverse" in str(w.message)]
+
+
+@pytest.mark.parametrize("routing", ["KINWAVE", "DYNWAVE"])
+def test_force_main_warned_without_dynwave(net, tmp_path, recwarn, routing):
+    # Under KINWAVE, SWMM treats a FORCE_MAIN as an open channel (#158).
+    sub = net.subnetwork(["U1", "PS", "F1", "MH", "OUT"])
+    tpl = template(tmp_path)
+    tpl.write_text(tpl.read_text().replace("DYNWAVE", routing))
+    write(sub, tmp_path, tpl=tpl, pump_stations={"PS": IDEAL})
+    warned = [w for w in recwarn if issubclass(w.category, OptionWarning)]
+    warned = [w for w in warned if "force mains" in str(w.message)]
+    if routing == "DYNWAVE":
+        assert not warned
+    else:
+        (warning,) = warned
+        assert "2 force mains (e.g. 2) are written under KINWAVE routing" in str(warning.message)
 
 
 def test_station_without_wet_well_is_a_junction(net, tmp_path):
