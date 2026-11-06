@@ -1,6 +1,7 @@
 """Messy GIS input on loading (#61): pipes with no geometry or no ID, numeric node-layer
 columns, multi-part pipe geometry, and zero-length invert interpolation."""
 
+import dataclasses
 import logging
 
 import geopandas as gpd
@@ -10,7 +11,7 @@ import pytest
 from conftest import FIXTURE, read_sections, write_inp
 from shapely.geometry import LineString, MultiLineString, Point
 
-from swmmbuilder import Network
+from swmmbuilder import LONDON_ON, Network
 from swmmbuilder.gaps import _fill_node_inverts
 from swmmbuilder.geometry import is_disjoint, line_coords
 
@@ -55,6 +56,34 @@ def test_pipe_with_no_id_is_removed(data):
     assert not net.graph.has_edge("A1", "A2")
     assert all(key == key for _, _, key in net.graph.edges(keys=True))  # no NaN key
     assert net.removed["invalid"] == {"no pipe_id": 1}
+
+
+def test_several_pipes_with_no_id_are_removed_not_duplicates(data):
+    # Missing IDs are not duplicates of each other (#120).
+    data["OBJECTID"] = data["OBJECTID"].astype(float)
+    for pipe in (1000, 1004):
+        data.loc[row(data, pipe), "OBJECTID"] = float("nan")
+    net = Network(data)
+    assert not net.graph.has_edge("A1", "A2")
+    assert net.removed["invalid"] == {"no pipe_id": 2}
+
+
+def test_pipe_ids_that_are_null_values_are_removed_not_duplicates(data):
+    schema = dataclasses.replace(LONDON_ON, null_values=frozenset({"None"}))
+    data["OBJECTID"] = data["OBJECTID"].astype(object)
+    for pipe in (1000, 1004):
+        data.loc[row(data, pipe), "OBJECTID"] = "None"
+    net = Network(data, schema=schema)
+    assert net.removed["invalid"] == {"no pipe_id": 2}
+
+
+def test_real_duplicate_ids_are_still_refused_beside_missing_ones(data):
+    data["OBJECTID"] = data["OBJECTID"].astype(float)
+    data.loc[row(data, 1000), "OBJECTID"] = float("nan")
+    data.loc[row(data, 1004), "OBJECTID"] = float("nan")
+    data.loc[row(data, 1001), "OBJECTID"] = 1002.0
+    with pytest.raises(ValueError, match=r"duplicate OBJECTID values \[1002\.0\]"):
+        Network(data)
 
 
 def test_numeric_node_layer_column_covering_some_nodes(data):
