@@ -241,7 +241,8 @@ dict of counts and totals under stable keys, documented in each method's docstri
   given), connections, and polygons served, given their nearest pipe, or with no pipe;
 - `LandUseAllocation.summary()`: polygons, area, flow, and nodes per land use, nearest-pipe
   distances, and the scale;
-- `TopologyReport.summary()`: nodes, pipes, splits, cycles, and force mains;
+- `TopologyReport.summary()`: nodes, pipes, splits, cycles (counted as loops, sets of nodes
+  that can all reach one another), and force mains;
 - `SwmmModel.summary()`: gaps found and filled, derived values by rule, the default depth,
   stations, and outfall links.
 
