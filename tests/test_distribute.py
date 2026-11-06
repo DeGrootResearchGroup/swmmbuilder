@@ -111,3 +111,34 @@ def test_a_pipe_with_a_missing_node_is_left_out(caplog):
     with caplog.at_level(logging.WARNING, logger="swmmbuilder.distribute"):
         assert distribute_flow(net, rate=0.1)["N1"] == pytest.approx(5.0)
     assert "with them they would take 3," in caplog.text
+
+
+# ---- one weight type and stricter inputs (#157) ------------------------------------------------
+
+
+def test_weight_none_is_length(net):
+    assert distribute_flow(net, total=24.0, weight=None) == distribute_flow(net, total=24.0)
+
+
+def test_max_weight(net):
+    # 999 connections on pipe 5 are invalid, as is pipe 3's missing count.
+    with pytest.warns(DataWarning, match=r"2 pipes have no valid weight.*\[3, 5\]"):
+        flows = distribute_flow(net, total=10.0, weight="PDC_Count", max_weight=100)
+    assert flows == approx({"N1": 2.0, "N2": 6.0, "N4": 2.0})
+    with pytest.raises(ValueError, match="max_weight must be"):
+        distribute_flow(net, total=10.0, max_weight=-1)
+
+
+def test_diameter_length_of_non_circular_pipes(net):
+    pipes = net.full_data.set_index("pipe_id")
+    pipes["shape"] = ["CIRCULAR", "RECT_CLOSED", "EGG", "CIRCULAR", "CIRCULAR"]
+    pipes["diameter"] = [0.2, None, None, 0.4, None]
+    pipes["height"] = [None, 1.0, 0.6, None, None]
+    pipes["width"] = [None, 0.6, None, None, None]
+    w = pipe_weights(pipes, "diameter_length")
+    assert w.iloc[:4].tolist() == approx([10.0, 24.0, 36.0, 16.0]) and pd.isna(w.iloc[4])
+
+
+def test_callable_weight_misaligned_series_refused(net):
+    with pytest.raises(ValueError, match="not indexed exactly like the pipes"):
+        distribute_flow(net, total=1.0, weight=lambda p: pd.Series(p["length"].to_numpy()))

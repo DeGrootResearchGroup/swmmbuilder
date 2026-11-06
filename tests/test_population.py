@@ -2,6 +2,7 @@
 
 import logging
 import math
+import warnings
 
 import geopandas as gpd
 import numpy as np
@@ -458,3 +459,72 @@ def test_polygon_option_types_listed_together(net):
     message = str(error.value)
     assert "population must be a column name or pandas.Series" in message
     assert "sewered must be a column name or pandas.Series" in message
+
+
+# ---- one weight type and stricter inputs (#157) ------------------------------------------------
+
+
+def test_callable_weight_array_in_pipe_order(net):
+    alloc = allocate(net, weight=lambda p: p["PDC_Count"].to_numpy())
+    assert alloc.nodes == approx({"N1": 20, "N2": 60, "N3": 60, "N4": 40, "N5": 0})
+
+
+@pytest.mark.parametrize(
+    "weight, message",
+    [
+        # A Series with a default index would be realigned onto the pipe IDs, so each pipe could
+        # take a neighbour's weight (or, with text IDs, none at all).
+        (lambda p: pd.Series(p["PDC_Count"].to_numpy()), "not indexed exactly like the pipes"),
+        (lambda p: p["PDC_Count"].iloc[::-1], "not indexed exactly like the pipes"),
+        (lambda p: p["PDC_Count"].to_numpy()[:3], "one value per pipe"),
+        (lambda p: p[["PDC_Count", "length"]], "not a DataFrame"),
+    ],
+)
+def test_callable_weight_must_match_the_pipes(net, weight, message):
+    with pytest.raises(ValueError, match=message):
+        allocate(net, weight=weight)
+
+
+def test_length_and_diameter_length_by_name(net):
+    by_name = allocate_population(net, squares(), weight="length")
+    assert by_name.nodes == approx(allocate_population(net, squares()).nodes)
+    # Every pipe has the same diameter, so diameter times length shares as the length does.
+    by_size = allocate_population(net, squares(), weight="diameter_length")
+    assert by_size.nodes == approx(by_name.nodes)
+
+
+def test_invalid_weights_warn(net):
+    # Pipe 3's missing count, in Q; pipe 5's 999 serves no polygon, so it does not matter.
+    with pytest.warns(DataWarning, match=r"1 pipes have no valid weight \(PDC_Count\); imputed"):
+        allocate(net)
+
+
+@pytest.mark.parametrize("flag", ["N", "No", "0", "yes"])
+def test_sewered_rejects_text_flags(net, flag):
+    polygons = squares().assign(residential=[False, False, flag])
+    with pytest.raises(ValueError, match="sewered must hold booleans"):
+        allocate(net, polygons, sewered="residential")
+
+
+def test_sewered_takes_zero_and_one_and_missing(net):
+    polygons = squares().assign(residential=[0.0, np.nan, 1.0])
+    alloc = allocate(net, polygons, sewered="residential")
+    assert alloc.nearest.index.tolist() == ["R"]
+
+
+def test_midpoint_on_a_shared_edge_takes_the_first_polygon():
+    # Pipe 2's midpoint is at x = 100, on the edge P and Q share: it used to be in neither.
+    pipes = [(1, "N1", "N2", 10, 60, 2), (2, "N2", "N3", 80, 120, 2)]
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", DataWarning)
+        alloc = allocate(make_network(pipes), squares())
+    assert alloc.pipes["polygon"].tolist() == ["P", "P"]
+    assert alloc.no_pipes == ["Q", "R"]
+
+
+def test_geographic_crs_refused(net):
+    from swmmbuilder.population import _check
+
+    lonlat = gpd.GeoDataFrame(net.full_data).to_crs("EPSG:4326")
+    with pytest.raises(ValueError, match="projected in metres"):
+        _check(lonlat, squares(), "population", None, None, None, None, "per_length", "upstream")

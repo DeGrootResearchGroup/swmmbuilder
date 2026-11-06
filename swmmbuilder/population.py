@@ -29,6 +29,7 @@ from __future__ import annotations
 
 import contextlib
 import logging
+import math
 import warnings
 from collections.abc import Callable
 from dataclasses import dataclass, field
@@ -37,6 +38,7 @@ from typing import TYPE_CHECKING, Literal
 import geopandas as gpd
 import numpy as np
 import pandas as pd
+from pyproj import CRS
 
 from .diagnostics import DataWarning, Problems
 
@@ -47,7 +49,11 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-Weight = str | Callable[[gpd.GeoDataFrame], pd.Series] | None
+Weight = str | Callable[[gpd.GeoDataFrame], pd.Series | np.ndarray] | None
+"""The weight of each pipe, as the three loaders take it: None or ``'length'`` for the pipe
+length, ``'diameter_length'`` for its diameter times its length, a column of the pipes, or a
+function of the pipes returning an array of one value per pipe, in their order, or a Series
+indexed exactly like the pipes."""
 Placement = Literal["upstream", "downstream", "split"]
 IMPUTATIONS = ("per_length", "zero")
 PLACEMENTS = ("upstream", "downstream", "split")
@@ -215,15 +221,23 @@ def _place(table, placement):
 
 def _polygon_of(points: gpd.GeoSeries, polygons: gpd.GeoDataFrame) -> pd.Series:
     """ID (index) of the polygon of ``polygons`` containing each point, missing if none. A point
-    in more than one polygon takes the first of them, in the order of ``polygons``."""
+    in more than one polygon, or on the edge shared by two, takes the first of them, in the
+    order of ``polygons``."""
     right = gpd.GeoDataFrame(
         {"_id": polygons.index, "_order": np.arange(len(polygons))},
         geometry=polygons.geometry.to_numpy(),
         crs=polygons.crs,
     )
     left = gpd.GeoDataFrame(geometry=points.to_numpy(), crs=points.crs)
-    found = left.sjoin(right, how="inner", predicate="within").sort_values("_order", kind="stable")
-    overlaps = int(found.index.duplicated().sum())
+    # A point on a polygon's edge is not within it, so one on a shared edge would be in none.
+    found = left.sjoin(right, how="inner", predicate="intersects")
+    found = found.sort_values("_order", kind="stable")
+    shared = found.index[found.index.duplicated()].unique()
+    overlaps = 0
+    if len(shared):
+        # Only a point inside more than one polygon is an overlap, not one on a shared edge.
+        inside = left.loc[shared].sjoin(right, how="inner", predicate="within")
+        overlaps = int(inside.index.value_counts().gt(1).sum())
     if overlaps:
         warnings.warn(
             f"{overlaps} pipe midpoints are in more than one polygon; each takes the first",
@@ -328,15 +342,163 @@ def _quiet(log):
         log.disabled = disabled
 
 
+WEIGHT_NAMES = ("length", "diameter_length")
+
+
+def _check_weight(pipes, weight, max_weight, problems):
+    """Collect the problems of a ``weight`` and ``max_weight``."""
+    if weight is None or callable(weight):
+        pass
+    elif not isinstance(weight, str):
+        problems.add(
+            "weight must be None, 'length', 'diameter_length', a column of the pipes, or a "
+            f"function of the pipes, not {weight!r}"
+        )
+    elif weight == "diameter_length":
+        if not {"diameter", "height", "width"} & set(pipes.columns):
+            problems.add("weight 'diameter_length': the pipes have no diameter, height, or width")
+    elif weight not in pipes.columns:
+        problems.add(f"weight: the pipes have no column {weight!r}")
+    if max_weight is not None and not (_is_number(max_weight) and max_weight >= 0):
+        problems.add(f"max_weight must be a number >= 0 or None, not {max_weight!r}")
+
+
+def _is_number(value):
+    """True for a finite real number that is not a bool or a string."""
+    return (
+        isinstance(value, (int, float, np.integer, np.floating))
+        and not isinstance(value, (bool, np.bool_))
+        and math.isfinite(value)
+    )
+
+
+def _diameter(pipes):
+    """The diameter of each pipe for ``'diameter_length'``, in the pipes' units: ``diameter``
+    for a circular pipe (or one of unknown shape), and for any other shape the mean of its
+    height and width (either one if only one is given), the diameter of a circle of about the
+    same perimeter."""
+
+    def column(name):
+        if name not in pipes.columns:
+            return pd.Series(np.nan, index=pipes.index)
+        return pd.to_numeric(pipes[name], errors="coerce").astype(float)
+
+    diameter = column("diameter")
+    if "shape" in pipes.columns:
+        shape = pipes["shape"]
+        other = pd.concat([column("height"), column("width")], axis=1).mean(axis=1)
+        not_circular = shape.notna() & (shape.astype(str).str.upper() != "CIRCULAR")
+        diameter = diameter.where(~not_circular, other)
+    return diameter
+
+
+def _called(weight, pipes):
+    """The values a callable ``weight`` returns for ``pipes``, as a Series indexed like them;
+    raise ValueError unless it returns one value per pipe, as an array in their order or a
+    Series indexed exactly like them."""
+    values = weight(pipes)
+    if isinstance(values, pd.Series):
+        if not values.index.equals(pipes.index):
+            raise ValueError(
+                "weight: the function returned a Series not indexed exactly like the pipes "
+                "(by pipe_id, in their order), so its values cannot be matched to them; return "
+                "a Series with the pipes' index, or an array in their order"
+            )
+        return values
+    if isinstance(values, pd.DataFrame):
+        raise ValueError("weight: the function must return one value per pipe, not a DataFrame")
+    array = np.asarray(values)
+    if array.ndim != 1 or len(array) != len(pipes):
+        raise ValueError(
+            f"weight: the function must return one value per pipe ({len(pipes)}), not an array "
+            f"of shape {array.shape}"
+        )
+    return pd.Series(array, index=pipes.index)
+
+
 def _weights(pipes, weight):
-    """The weight of each pipe as given, as numbers (anything else missing)."""
-    if weight is None:
+    """The weight of each pipe as given (see :data:`Weight`), as numbers indexed like the pipes
+    (anything else missing)."""
+    if weight is None or weight == "length":
         values = pipes["length"]
+    elif weight == "diameter_length":
+        values = _diameter(pipes) * pd.to_numeric(pipes["length"], errors="coerce")
     elif callable(weight):
-        values = pd.Series(weight(pipes), index=pipes.index)
+        values = _called(weight, pipes)
     else:
         values = pipes[weight]
     return pd.to_numeric(values, errors="coerce").astype(float)
+
+
+def _invalid_weights(given, max_weight):
+    """Whether each weight is invalid: missing, non-numeric, negative, or above
+    ``max_weight``."""
+    invalid = given.isna() | (given < 0)
+    if max_weight is not None:
+        invalid |= given > max_weight
+    return invalid
+
+
+def _weight_label(weight):
+    """A name for ``weight`` in messages."""
+    if weight is None:
+        return "length"
+    return weight if isinstance(weight, str) else "callable"
+
+
+def _warn_invalid(ids, weight, effect, stacklevel):
+    """Warn (DataWarning) that the pipes ``ids`` have no valid weight, with the ``effect``."""
+    if len(ids):
+        warnings.warn(
+            f"{len(ids)} pipes have no valid weight ({_weight_label(weight)}); {effect}: "
+            f"{pd.Index(ids)[:20].tolist()}",
+            DataWarning,
+            stacklevel=stacklevel + 1,
+        )
+
+
+def _share_weights(table, given, serving, weight, max_weight, impute, fallback_weight):
+    """Set the ``weight``, ``weight_imputed``, and ``weight_fallback`` of each row of ``table``
+    (one per pipe and polygon, with ``pipe_id``, ``polygon``, and ``length``), from the weights
+    as ``given`` per row; ``serving`` says per row whether the pipe may serve a polygon. Warn
+    of the invalid weights of pipes serving a polygon. Return the mask of invalid weights, the
+    polygons with a valid weight, and the fallback mask."""
+    invalid = _invalid_weights(given, max_weight)
+    table["weight_imputed"] = invalid
+    in_polygon = table["polygon"].notna()
+    fallen_back = pd.Series(False, index=table.index)
+    if impute == "zero":
+        table["weight"] = given.where(~invalid, 0.0)
+    else:
+        per_metre = (given.where(~invalid) / table["length"]).groupby(table["polygon"]).median()
+        rate = table["polygon"].map(per_metre).astype(float)
+        table["weight"] = given.where(~invalid, (rate * table["length"]).fillna(0.0))
+        if fallback_weight is not None:
+            # No rate to impute from: the median is 0, or the polygon has no valid weight.
+            fallen_back = invalid & in_polygon & (rate.isna() | (rate == 0))
+            table["weight"] = table["weight"].where(~fallen_back, float(fallback_weight))
+    if fallback_weight is not None:
+        weightless = table["polygon"].map(table.groupby("polygon")["weight"].sum()) == 0
+        weightless &= in_polygon
+        table["weight"] = table["weight"].where(~weightless, float(fallback_weight))
+        fallen_back |= weightless
+    table["weight_fallback"] = fallen_back
+    # A pipe that serves no polygon by rule (a force main) takes no connections.
+    table.loc[~serving, "weight"] = 0.0
+    effect = (
+        "counted as 0"
+        if impute == "zero"
+        else "imputed from their polygon's median weight per metre"
+        + ("" if fallback_weight is None else f", or given the fallback weight {fallback_weight:g}")
+    )
+    _warn_invalid(
+        table.loc[(invalid & in_polygon & serving).to_numpy(), "pipe_id"].unique(),
+        weight,
+        effect,
+        4,
+    )
+    no_valid = table.loc[~invalid, "polygon"].dropna().unique()
+    return invalid, no_valid, fallen_back
 
 
 def _check_polygon_values(polygons, values, option, problems):
@@ -355,6 +517,40 @@ def _check_polygon_values(polygons, values, option, problems):
         problems.add(f"{option} must be a column name or pandas.Series indexed by polygon ID")
 
 
+def _check_flags(polygons, values, option, problems):
+    """Collect a problem if the flags ``values`` (a valid column or Series) are not booleans or
+    0 and 1: text such as ``'N'`` or ``'No'`` would otherwise read as true."""
+    if isinstance(values, str):
+        if values not in polygons.columns:
+            return
+        values = polygons[values]
+    elif not isinstance(values, pd.Series):
+        return
+    if pd.api.types.is_bool_dtype(values):
+        return
+    bad = [v for v in pd.unique(values.dropna()) if not _is_flag(v)]
+    if bad:
+        problems.add(
+            f"{option} must hold booleans (or 0 and 1, or missing for not flagged), not "
+            f"{[repr(v) for v in bad[:10]]}"
+        )
+
+
+def _is_flag(value):
+    """True for a boolean, or a number equal to 0 or 1."""
+    if isinstance(value, (bool, np.bool_)):
+        return True
+    return _is_number(value) and value in (0, 1)
+
+
+def _check_metres(pipes, problems):
+    """Collect a problem if the pipes' CRS is not projected in metres."""
+    if pipes.crs is not None:
+        crs = CRS.from_user_input(pipes.crs)
+        if not (crs.is_projected and math.isclose(crs.axis_info[0].unit_conversion_factor, 1.0)):
+            problems.add(f"the network's CRS must be projected in metres, not {crs.name}")
+
+
 def _polygon_values(polygons, values):
     """Read a validated column or Series aligned by polygon ID."""
     return polygons[values] if isinstance(values, str) else values.reindex(polygons.index)
@@ -370,6 +566,7 @@ def _check(
     weight,
     impute,
     placement,
+    max_weight=None,
 ):
     """Raise ValueError listing every invalid option."""
     problems = Problems("Invalid population allocation")
@@ -379,14 +576,14 @@ def _check(
         )
     if sewered is not None:
         _check_polygon_values(polygons, sewered, "sewered", problems)
+        _check_flags(polygons, sewered, "sewered", problems)
     if max_distance is not None and not max_distance >= 0:
         problems.add(f"max_distance must be a distance >= 0 or None, not {max_distance!r}")
     if impute not in IMPUTATIONS:
         problems.add(f"impute must be one of {', '.join(IMPUTATIONS)}, not {impute!r}")
     if placement not in PLACEMENTS:
         problems.add(f"placement must be one of {', '.join(PLACEMENTS)}, not {placement!r}")
-    if isinstance(weight, str) and weight not in pipes.columns:
-        problems.add(f"weight: the pipes have no column {weight!r}")
+    _check_weight(pipes, weight, max_weight, problems)
     _check_polygon_values(polygons, population, "population", problems)
     repeated = polygons.index[polygons.index.duplicated()].unique()
     if len(repeated):
@@ -394,6 +591,7 @@ def _check(
     for name, layer in (("the network", pipes), ("polygons", polygons)):
         if layer.crs is None:
             problems.add(f"{name} has no CRS")
+    _check_metres(pipes, problems)
     problems.raise_if_any()
 
 
@@ -426,7 +624,7 @@ def allocate_population(
         shared over the pipes given, so for a catchment whose boundary cuts polygons, allocate
         over the whole Network and take the catchment's nodes with
         :meth:`PopulationAllocation.within`; allocating over the catchment alone puts all the
-        people of a cut polygon on its part inside.
+        people of a cut polygon on its part inside. Its CRS must be projected in metres.
 
     polygons : geopandas.GeoDataFrame
         The areal units, indexed by a unique ID, with a CRS (they are reprojected to the
@@ -448,7 +646,9 @@ def allocate_population(
     sewered : str or pandas.Series, optional
         Polygons known to be sewered (e.g. residentially zoned): a column of booleans of
         ``polygons``, or a Series indexed by polygon ID (all IDs must be present).
-        Unindexed lists/arrays and missing or repeated IDs raise ``ValueError``.
+        Unindexed lists/arrays and missing or repeated IDs raise ``ValueError``, as do values
+        other than booleans or 0 and 1 (text such as ``'N'`` would otherwise read as true); a
+        missing value is not flagged.
         A flagged polygon left with no pipe by the
         midpoint or distance rule (a development on private sewers, say) is given its nearest
         pipe, within ``max_nearest_distance``; an unflagged one contributes no one. By default no
@@ -464,12 +664,16 @@ def allocate_population(
         get weight 0, even from ``fallback_weight``, and no population).
 
     weight : str, callable or None
-        Weight of each pipe in its polygon's share: a column of the pipes (``full_data``), e.g. a
-        count of service connections such as London's ``PDC_Count``; a function of the pipes
-        returning one value per pipe; or None (default) for the pipe length.
+        Weight of each pipe in its polygon's share (see :data:`Weight`): None (default) or
+        ``'length'`` for the pipe length; ``'diameter_length'`` for its diameter times its length
+        (for a non-circular pipe, the mean of its height and width); a column of the pipes
+        (``full_data``), e.g. a count of service connections such as London's ``PDC_Count``; or
+        a function of the pipes returning an array of one value per pipe, in their order, or a
+        Series indexed exactly like the pipes (anything else raises ``ValueError``).
 
     max_weight : float, optional
         Weights above this are invalid. Missing, non-numeric, and negative weights always are.
+        Invalid weights are imputed as ``impute`` says, with a ``DataWarning``.
 
     impute : {'per_length', 'zero'}
         What an invalid weight becomes: the pipe's length times the median weight per metre
@@ -496,14 +700,16 @@ def allocate_population(
     Raises
     ------
     ValueError
-        If an option is invalid, a polygon ID is repeated, a population is negative, or a layer
-        has no CRS; the message lists every problem.
+        If an option is invalid, a polygon ID is repeated, a population is negative, a layer
+        has no CRS, or the network's CRS is not projected in metres; the message lists every
+        problem.
 
     Warns
     -----
     DataWarning
         With the midpoint rule, if a pipe midpoint is in more than one polygon (it takes the
-        first).
+        first; a midpoint on the edge two polygons share also takes the first, with no warning).
+        If some pipes have no valid weight (they are imputed).
 
     Examples
     --------
@@ -578,6 +784,7 @@ def _allocate_population(
         weight,
         impute,
         placement,
+        max_weight,
     )
     people = pd.to_numeric(_polygon_values(polygons, population), errors="coerce")
     negative = people.index[people < 0]
@@ -637,31 +844,9 @@ def _allocate_population(
     table["polygon"] = rows["polygon"].to_numpy()
 
     given = pd.Series(_weights(pipes, weight).to_numpy()[position])
-    invalid = given.isna() | (given < 0)
-    if max_weight is not None:
-        invalid |= given > max_weight
-    table["weight_imputed"] = invalid
-    in_polygon = table["polygon"].notna()
-    fallen_back = pd.Series(False, index=table.index)
-    if impute == "zero":
-        table["weight"] = given.where(~invalid, 0.0)
-    else:
-        per_metre = (given.where(~invalid) / table["length"]).groupby(table["polygon"]).median()
-        rate = table["polygon"].map(per_metre).astype(float)
-        table["weight"] = given.where(~invalid, (rate * table["length"]).fillna(0.0))
-        if fallback_weight is not None:
-            # No rate to impute from: the median is 0, or the polygon has no valid weight.
-            fallen_back = invalid & in_polygon & (rate.isna() | (rate == 0))
-            table["weight"] = table["weight"].where(~fallen_back, float(fallback_weight))
-    if fallback_weight is not None:
-        weightless = table["polygon"].map(table.groupby("polygon")["weight"].sum()) == 0
-        weightless &= in_polygon
-        table["weight"] = table["weight"].where(~weightless, float(fallback_weight))
-        fallen_back |= weightless
-    table["weight_fallback"] = fallen_back
-    # A pipe that serves no polygon by rule (a force main) takes no connections.
-    table.loc[~serving[position], "weight"] = 0.0
-    no_valid = table.loc[~invalid, "polygon"].dropna().unique()
+    invalid, no_valid, fallen_back = _share_weights(
+        table, given, serving[position], weight, max_weight, impute, fallback_weight
+    )
     logger.info(
         "%d of %d pipe weights invalid; imputed (%s); %d pipes given the fallback weight",
         int(invalid.sum()),
