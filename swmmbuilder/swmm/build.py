@@ -269,7 +269,7 @@ def _found_stations(subnetwork, pump_stations, exclude, extra, unlisted, default
         If an option is invalid, a node is excluded that the report does not list, a node is both
         excluded and added, or a station has no pump and there is no ``default_pump``.
     """
-    from ..subnetwork import PumpStationReport
+    from .. import subnetwork as reports  # at run time, as subnetwork imports this package
 
     if unlisted not in ("warn", "raise", "ignore"):
         raise ValueError(
@@ -282,7 +282,7 @@ def _found_stations(subnetwork, pump_stations, exclude, extra, unlisted, default
                 f"{pump_stations!r}."
             )
         report = subnetwork.find_pump_stations()
-    elif isinstance(pump_stations, PumpStationReport):
+    elif isinstance(pump_stations, reports.PumpStationReport):
         report = pump_stations
     else:
         if exclude or extra:
