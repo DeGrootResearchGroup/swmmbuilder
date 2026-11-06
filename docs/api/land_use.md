@@ -4,4 +4,5 @@
     options:
       members:
         - allocate_land_use
+        - dominant_category
         - LandUseAllocation
