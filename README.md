@@ -622,7 +622,16 @@ sub.to_inp("model.inp", rims=est.rims, max_depth="median")
   of the cells within 1 m, to soften curbs and ditches.
 - Only nodes with no usable rim are estimated, as the DEM value plus `offset` (a number, or
   `"median"`: the median recorded rim − DEM). A DEM rim at or below the invert is not used (a
-  `DataWarning` gives the count). Usable recorded rims are never replaced.
+  `DataWarning` gives the count). Usable recorded rims are kept unless replaced (below).
+- A recorded rim far from the DEM is probably wrong, or a lid not flush with the ground. Its
+  `deviation` (recorded rim − DEM minus the median of that difference, so a datum shift does not
+  count) is in `est.samples`. `flag=1.0` flags the rims deviating by more than 1 m either way
+  (`est.implausible`); `replace_above` and `replace_below` replace by the DEM estimate those
+  recorded more than that far above or below the ground. Lids in fields, ravines, and easements
+  are often raised, so the threshold above can be the larger, e.g.
+  `estimate_rims(dem, offset="median", flag=1.0, replace_above=3.0, replace_below=1.0)`. Passing
+  `est.rims` lists every flagged rim in `data_gaps()` as an `implausible_rim` gap, filled from
+  `estimate_rims` where replaced.
 - The `rims` fill option (of `to_inp`, `build_model`, `data_gaps`, and `fill_gaps`) fills the
   `no_rim` gaps: rims from `est.rims` are flagged as filled from `estimate_rims`, with the DEM as
   their source, and any other `{node: rim}` mapping as filled from `rims`. A given rim at or below

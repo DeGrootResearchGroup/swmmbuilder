@@ -16,6 +16,8 @@ The gap kinds (:data:`GAP_KINDS`):
 ``no_ds_invert``    pipe with no downstream invert (written at the invert of its downstream node)
 ``no_node_invert``  node with no invert from any pipe
 ``no_rim``          node with no usable rim: none recorded, or one at or below the invert
+``implausible_rim`` node whose recorded rim is flagged as implausible against a DEM by
+                    :meth:`Network.estimate_rims` (listed only when its ``rims`` are passed)
 ==================  =========================================================================
 
 ``unknown_shape``, ``no_size`` and ``no_node_invert`` stop a subnetwork from being written
@@ -54,6 +56,7 @@ GAP_KINDS = (
     "no_ds_invert",
     "no_node_invert",
     "no_rim",
+    "implausible_rim",
 )
 BLOCKING_GAPS = frozenset({"unknown_shape", "no_size", "no_node_invert"})
 REPORT_COLUMNS = ("element", "id", "gap", "detail", "filled_from", "value", "source", "order")
@@ -476,6 +479,8 @@ def _fill_rims(subnetwork, inverts, rims, gaps, record):
     rule = "estimate_rims" if getattr(rims, "source", "") else "rims"
     source = getattr(rims, "source", "")
     given = height_corrections(subnetwork, rims, option="rims")
+    # {node: what is wrong}; keys matched like the rims', nodes elsewhere skipped.
+    implausible = subnetwork.match_nodes(getattr(rims, "implausible", None) or {}, "rims")
     found, refused = {}, []
     for node in subnetwork.nodes:
         recorded = subnetwork.graph.nodes[node].get("rim_elevation")
@@ -490,6 +495,9 @@ def _fill_rims(subnetwork, inverts, rims, gaps, record):
                 if recorded is None
                 else f"recorded rim {recorded:g} not above the invert {invert:g}"
             )
+        flagged = usable and node in implausible
+        if flagged:
+            gaps[("node", node, "implausible_rim")] = implausible[node]
         rim = given.get(node)
         if rim is None or pd.isna(rim):
             continue
@@ -497,7 +505,9 @@ def _fill_rims(subnetwork, inverts, rims, gaps, record):
             refused.append(f"{node} ({rim:g} m, invert {invert:g} m)")
             continue
         found[node] = rim
-        if usable:
+        if flagged:
+            record("node", node, "implausible_rim", rule, rim, source)
+        elif usable:
             logger.info("Node %s: rim %s set by %s (recorded %s)", node, rim, rule, recorded)
         else:
             record("node", node, "no_rim", rule, rim, source)

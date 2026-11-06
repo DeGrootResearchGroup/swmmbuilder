@@ -52,6 +52,9 @@ STATUSES = {
     "no_dem_value": "no DEM value at the node (outside the DEM, no data, or no point)",
     "estimated": "no usable rim; estimated from the DEM (in RimEstimate.rims)",
     "dem_not_above_invert": "no usable rim; the DEM estimate is not above the invert, not used",
+    "implausible": "usable recorded rim, but farther from the DEM than ``flag``; kept",
+    "replaced": "usable recorded rim beyond ``replace_above`` or ``replace_below``; replaced by "
+    "the DEM estimate (in RimEstimate.rims)",
 }
 
 # Metres per degree of latitude (and of longitude at the equator), for a window on a DEM in
@@ -242,11 +245,14 @@ def _apply(transform, x, y):
 class Rims(dict):
     """{node: rim (m)} with the ``source`` the rims came from, written in the ``source`` column
     of the data-gaps report when they are passed as the ``rims`` option (see
-    :attr:`RimEstimate.rims`)."""
+    :attr:`RimEstimate.rims`), and ``implausible``: {node: what is wrong} of the recorded rims
+    flagged as implausible, listed in the report as gap ``implausible_rim`` (filled where the
+    node is also in the mapping, i.e. replaced)."""
 
-    def __init__(self, rims: Any = (), source: str = "") -> None:
+    def __init__(self, rims: Any = (), source: str = "", implausible: Any = ()) -> None:
         super().__init__(rims)
         self.source = source
+        self.implausible = dict(implausible)
 
 
 @dataclass
@@ -260,8 +266,11 @@ class RimEstimate:
     samples : pandas.DataFrame
         One row per node sampled, indexed by node ID: ``recorded_rim`` (NaN if none),
         ``invert``, ``dem`` (the DEM value, NaN if none), ``difference`` (recorded rim - DEM, for
-        the nodes compared), ``estimate`` (DEM + ``offset``), and ``status`` (see
-        :data:`STATUSES`): 'compared', 'no_dem_value', 'estimated' or 'dem_not_above_invert'.
+        the nodes compared), ``deviation`` (``difference`` minus its median: how far the
+        recorded rim is from the DEM once a datum shift is taken out; positive when recorded
+        above the ground), ``estimate`` (DEM + ``offset``), and ``status`` (see
+        :data:`STATUSES`): 'compared', 'implausible', 'replaced', 'no_dem_value', 'estimated',
+        or 'dem_not_above_invert'.
 
     offset : float
         Added to the DEM values to estimate the rims, in m (the median difference if
@@ -270,16 +279,34 @@ class RimEstimate:
     source : str
         What the estimates came from, as written in the ``source`` column of the data-gaps
         report.
+
+    flag, replace_above, replace_below : float or None
+        The thresholds the estimate was made with (see :meth:`Network.estimate_rims`).
     """
 
     samples: pd.DataFrame
     offset: float
     source: str
+    flag: float | None = None
+    replace_above: float | None = None
+    replace_below: float | None = None
 
     @property
     def compared(self) -> pd.DataFrame:
-        """The rows of ``samples`` with a usable recorded rim and a DEM value."""
-        return self.samples[self.samples["status"] == "compared"]
+        """The rows of ``samples`` with a usable recorded rim and a DEM value (including those
+        flagged implausible or replaced)."""
+        return self.samples[self.samples["difference"].notna()]
+
+    @property
+    def implausible(self) -> pd.DataFrame:
+        """The rows of ``samples`` whose recorded rim was flagged as implausible, replaced or
+        not."""
+        return self.samples[self.samples["status"].isin(("implausible", "replaced"))]
+
+    @property
+    def replaced(self) -> pd.DataFrame:
+        """The rows of ``samples`` whose recorded rim is replaced by the DEM estimate."""
+        return self.samples[self.samples["status"] == "replaced"]
 
     @property
     def estimated(self) -> pd.DataFrame:
@@ -289,10 +316,17 @@ class RimEstimate:
     @property
     def rims(self) -> Rims:
         """{node: estimated rim} of the nodes with no usable rim whose estimate is above the
-        invert, for the ``rims`` option of :meth:`Subnetwork.to_inp`, which fills them (gap
-        ``no_rim``, filled from ``estimate_rims``, with :attr:`source` as its source)."""
-        estimated = self.estimated["estimate"]
-        return Rims({n: float(v) for n, v in estimated.items()}, self.source)
+        invert, and of the recorded rims replaced, for the ``rims`` option of
+        :meth:`Subnetwork.to_inp`. It fills the first (gap ``no_rim``) and replaces the second
+        (gap ``implausible_rim``), both filled from ``estimate_rims`` with :attr:`source` as
+        their source; the rims flagged but kept are listed as ``implausible_rim`` gaps not
+        filled."""
+        rows = self.samples[self.samples["status"].isin(("estimated", "replaced"))]
+        flagged = {
+            node: f"recorded rim {row.recorded_rim:g}, {row.deviation:+.2f} m from the DEM"
+            for node, row in self.implausible.iterrows()
+        }
+        return Rims({n: float(v) for n, v in rows["estimate"].items()}, self.source, flagged)
 
     @property
     def validation(self) -> pd.Series:
@@ -342,7 +376,12 @@ class RimEstimate:
             )
         else:
             lines.append("  no recorded rim to compare with")
+        if self.flag is not None:
+            lines.append(
+                f"  implausible (more than {self.flag:g} m from the median difference): "
+                f"{len(self.implausible)}, of which {len(self.replaced)} replaced"
+            )
         for status in STATUSES:
-            if status != "compared" and counts.get(status, 0):
+            if status not in ("compared", "implausible", "replaced") and counts.get(status, 0):
                 lines.append(f"  {status}: {counts[status]}")
         return "\n".join(lines)
