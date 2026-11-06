@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import logging
 import warnings
+from collections import deque
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -164,7 +165,15 @@ class TopologyReport:
         pipe. Parallel pipes count separately, as they do in SWMM.
 
     cycles : list of list
-        Each directed cycle as a list of nodes in flow order, starting from its smallest node.
+        One directed cycle per loop (:attr:`loops`), as a list of nodes in flow order: the
+        shortest cycle through the loop's smallest node, starting from that node. A loop of
+        pipes drawn both ways holds far more cycles than this lists (their number grows
+        exponentially with its size), so each loop is shown by one cycle only.
+
+    loops : list of list
+        The sorted nodes of each loop, a set of nodes that can all reach one another
+        (a strongly connected component with more than one node, or one node with a pipe to
+        itself). Every directed cycle lies in one loop, so breaking each loop fixes them all.
 
     dead_ends : list
         Nodes with no outlet pipe that are not outfalls.
@@ -213,6 +222,7 @@ class TopologyReport:
 
     splits: dict = field(default_factory=dict)
     cycles: list = field(default_factory=list)
+    loops: list = field(default_factory=list)
     dead_ends: list = field(default_factory=list)
     dead_end_types: dict = field(default_factory=dict)
     parallel_pipes: dict = field(default_factory=dict)
@@ -229,7 +239,7 @@ class TopologyReport:
     @property
     def is_dendritic(self) -> bool:
         """True when the network has no splits and no cycles, as kinematic-wave routing requires."""
-        return not self.splits and not self.cycles
+        return not self.splits and not self.cycles and not self.loops
 
     def summary(self) -> dict[str, int]:
         """Counts of the report, to cite in a report.
@@ -241,7 +251,8 @@ class TopologyReport:
 
             - ``nodes``, ``pipes``: nodes and pipes of the subnetwork.
             - ``splits``: nodes with more than one outlet pipe (:attr:`splits`).
-            - ``cycles``: directed cycles (:attr:`cycles`).
+            - ``cycles``: loops, the sets of nodes that can reach one another
+              (:attr:`loops`, one cycle each in :attr:`cycles`).
             - ``dead_ends``: nodes with no outlet pipe that are not outfalls.
             - ``parallel_pipes``: node pairs joined by more than one pipe.
             - ``force_mains``: force-main pipes (:attr:`force_mains`).
@@ -266,7 +277,7 @@ class TopologyReport:
             "nodes": int(self.nodes),
             "pipes": int(self.pipes),
             "splits": len(self.splits),
-            "cycles": len(self.cycles),
+            "cycles": len(self.loops or self.cycles),
             "dead_ends": len(self.dead_ends),
             "parallel_pipes": len(self.parallel_pipes),
             "force_mains": len(self.force_mains),
@@ -279,6 +290,25 @@ class TopologyReport:
             "boundary_inflows": int((self.boundary["direction"] == "in").sum()),
             "boundary_splits": int(self.boundary["kind"].isin(("split", "force_main")).sum()),
         }
+
+
+def _shortest_cycle(graph: nx.DiGraph, start: NodeId, component: set) -> list[NodeId]:
+    """The shortest directed cycle through ``start`` within ``component``, in flow order from
+    ``start`` (breadth-first, visiting neighbours in sorted order so the result is stable)."""
+    parent: dict[NodeId, NodeId | None] = {start: None}
+    queue = deque([start])
+    while queue:
+        node = queue.popleft()
+        for down in sorted(graph.successors(node)):
+            if down == start:
+                path = [node]
+                while (up := parent[path[-1]]) is not None:
+                    path.append(up)
+                return path[::-1]
+            if down in component and down not in parent:
+                parent[down] = node
+                queue.append(down)
+    raise ValueError(f"no cycle through {start}")  # unreachable for a strongly connected component
 
 
 class Subnetwork:
@@ -1010,9 +1040,16 @@ class Subnetwork:
                 if len(outlets[down]) > 1:
                     report.parallel_pipes[(node, down)] = sorted(outlets[down])
 
-        for cycle in nx.simple_cycles(nx.DiGraph(self.graph)):
-            i = cycle.index(min(cycle))
-            report.cycles.append(cycle[i:] + cycle[:i])
+        # Strongly connected components, not nx.simple_cycles: the number of simple cycles grows
+        # exponentially with the size of a looped area (millions in a 6 x 6 grid of pipes drawn
+        # both ways), while the components take linear time and are what a user has to fix.
+        graph = nx.DiGraph(self.graph)
+        for component in nx.strongly_connected_components(graph):
+            start = min(component)
+            if len(component) > 1 or graph.has_edge(start, start):
+                report.loops.append(sorted(component))
+                report.cycles.append(_shortest_cycle(graph, start, component))
+        report.loops.sort()
         report.cycles.sort()
 
         dead_end_types = {"cap": "capped", "outfall": "outfall", "pump_station": "pump_station"}
