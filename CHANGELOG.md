@@ -23,6 +23,10 @@ earlier history is in the git log.
   to share by. Each share is placed at the pipe's upstream node, downstream node, or both. The
   result reports the population of polygons with no pipe, and its `nodes` feed
   `dwf_from_population`.
+- **Implausible pipe inverts**: a schema's `invert_range` (opt-in, e.g. London's `rim_range`)
+  treats pipe and drop-structure inverts outside it as missing, such as 25089.0 keyed for 250.89
+  or a drop height in the invert column; each is logged, a `DataWarning` gives the count, and
+  `Network.invert_report` lists them with their recorded values (#105).
 - **Finding pump stations**: `Subnetwork.find_pump_stations()` lists the station nodes with a
   force main leaving them (to pass to `pump_stations`), those with none, and, as likely lift
   stations missing from the station layer, force mains that climb from a node that is not a

@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import logging
 import re
+import warnings
 from collections.abc import Iterable
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -15,6 +16,7 @@ import numpy as np
 import pandas as pd
 from shapely import Point
 
+from .diagnostics import DataWarning
 from .gaps import lowest_inverts
 from .geometry import is_disjoint, line_coords, node_positions, to_geodataframe
 from .schema import LONDON_ON, NODE_COLUMNS, as_schema
@@ -240,6 +242,11 @@ class Network:
         point to the nearest of its pipe ends, in m) and ``attributes`` ('node layer', or
         'pipes' for a structure with no point).
 
+    invert_report : pandas.DataFrame
+        The pipe and drop-structure inverts outside the schema's plausible range
+        (``Schema.invert_range``), treated as missing: ``pipe_id``, ``column``,
+        ``source_column``, and ``value`` (in m), as recorded.
+
     version : int
         Bumped each time the graph is rebuilt (by :meth:`snap_nodes`); subnetworks made from
         an older version raise when used.
@@ -278,7 +285,26 @@ class Network:
                 f"split_tolerance ({split_tolerance} m) must exceed snap_tolerance "
                 f"({snap_tolerance} m)."
             )
-        self.full_data = schema.normalize(_read(source))
+        raw = _read(source)
+        self.full_data = schema.normalize(raw)
+        self.invert_report = schema.implausible_inverts(raw)
+        if len(self.invert_report) and schema.invert_range is not None:
+            low, high = schema.invert_range
+            for row in self.invert_report.itertuples():
+                logger.info(
+                    "Pipe %s: %s %s outside %g-%g m, treated as missing",
+                    row.pipe_id,
+                    row.source_column,
+                    row.value,
+                    low,
+                    high,
+                )
+            warnings.warn(
+                f"{len(self.invert_report)} pipe inverts outside {low:g}-{high:g} m treated as "
+                "missing (see Network.invert_report)",
+                DataWarning,
+                stacklevel=2,
+            )
         if normalize_ids is not None:
             for column in ("from_node", "to_node"):
                 self.full_data[column] = self.full_data[column].map(
