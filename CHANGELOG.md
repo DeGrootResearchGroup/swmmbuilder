@@ -259,9 +259,6 @@ earlier history is in the git log.
 
 ### Changed
 
-- **`NodeLoading.options()` includes `flow_units`** (#158): the dictionary always has a
-  `flow_units` key, even when there is nothing else to write.
-
 - The package is `swmmbuilder` (formerly SewerNetworkx) (#35). `Network.catchment` returns a
   `Subnetwork` (#27); models are built as records and rendered once (#25); progress is logged, not
   printed (#24).
