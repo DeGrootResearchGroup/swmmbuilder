@@ -31,6 +31,7 @@ pip install swmmbuilder                 # from PyPI
 pip install "swmmbuilder[maps]"         # + web-tile basemaps and Leaflet maps (contextily, xyzservices, folium)
 pip install "swmmbuilder[simulate]"     # + pyswmm, to run the .inp files
 pip install "swmmbuilder[census]"       # + pycancensus, for Canadian census polygons (CensusMapper)
+pip install "swmmbuilder[elevation]"    # + rasterio, to estimate missing rims from a DEM
 pip install -e .                        # from a clone of this repository (extras as above)
 ```
 
@@ -110,7 +111,8 @@ sub.to_inp("model.inp")  # outfalls default to the outfall nodes of the subnetwo
 - **Maintenance-hole attributes.** `rim_elevation` is the layer's (London: `LidElevation`, or
   `HeadwallElevation` for outfalls), else `invert + depth`; rims outside the schema's
   `rim_range` (London: 150–350 m) are treated as missing. The `.inp` writer uses rim − invert
-  as a junction's maximum depth where it is known, and `max_depth` elsewhere. `has_drop`,
+  as a junction's maximum depth where it is known, and `max_depth` elsewhere (or a rim estimated
+  from a ground-elevation model: see [Rims from a DEM](#rims-from-a-dem)). `has_drop`,
   `overflow`, `weir`, `pipes_in`, `pipes_out`, `flow_monitor`, `access` and `verified` are passed
   through for downstream use, e.g. choosing accessible or flow-monitored sampling sites.
 
@@ -198,6 +200,26 @@ printed. To see it:
 import logging
 logging.basicConfig(level=logging.INFO)
 ```
+
+### Capturing the log of a build
+
+`logging.basicConfig` does nothing once the root logger has a handler, so a second build in the
+same process gets no log, and it never sees the warnings. `capture_log` collects both for one
+build:
+
+```python
+with swmmbuilder.capture_log(level="INFO", path=out / "build_log.txt") as captured:
+    ...  # build the model
+print(captured.text)
+```
+
+It attaches a handler to the `swmmbuilder` logger only (lowering the logger's level for the block
+if needed) and removes it on exit, even after an error, so each use gets its own text. Warnings of
+`SwmmBuilderWarning` and its subclasses are added to the text and still shown as usual. Python
+shows a given warning once per location by default, so the text holds the warnings that were
+shown. Lines have the `basicConfig` format, `INFO:swmmbuilder.gaps:...`, with the category in
+place of the logger for a warning, `WARNING:DataWarning:...`. With `path=`, the text is written
+to that file (UTF-8) on exit.
 
 ## GIS schema
 
@@ -635,6 +657,43 @@ receiving node's invert (known, or filled first by `invert_fill`/`headwater_slop
 schema's optional `[design]` table, apart from the column mapping, and are used only when passed:
 London's (`london_on.toml`) is the Design Specifications & Requirements Manual's limit of 200 mm
 above the receiving maintenance hole's flow line (Ch. 4, s. 4.8).
+
+### Rims from a DEM
+
+A junction's maximum depth is rim − invert, so a junction with no usable rim (none recorded, or one
+at or below the invert) takes the default `max_depth`, whatever the ground above it. Every such
+node is listed in `data_gaps()` as a `no_rim` gap (not blocking). Maintenance-hole lids in streets
+are generally close to flush with the pavement, so a bare-earth ground-elevation model (DEM) from
+airborne lidar, such as the Ontario Digital Terrain Model (Lidar-Derived), estimates the missing
+rims. `Network.estimate_rims` samples a GeoTIFF (or a list of tiles, in any CRS) at the nodes,
+compares it with the recorded rims, and estimates the missing ones; it does not change the network.
+It needs the `elevation` extra (`pip install "swmmbuilder[elevation]"`: rasterio).
+
+```python
+est = net.estimate_rims(["tile_1.tif", "tile_2.tif"], window=1.0, offset="median")
+print(est.summary())                 # recorded rim - DEM: median, IQR, 5-95 %, largest
+est.largest_differences(10)          # recorded rims that are probably wrong, or raised lids
+est.samples                          # DEM value, difference, estimate and status of each node
+sub.to_inp("model.inp", rims=est.rims, max_depth="median")
+```
+
+- `window=0` (default) takes the cell at the node; `window=1.0` the median (or `statistic="mean"`)
+  of the cells within 1 m, to soften curbs and ditches.
+- Only nodes with no usable rim are estimated, as the DEM value plus `offset` (a number, or
+  `"median"`: the median recorded rim − DEM). A DEM rim at or below the invert is not used (a
+  `DataWarning` gives the count). Usable recorded rims are never replaced.
+- The `rims` fill option (of `to_inp`, `build_model`, `data_gaps`, and `fill_gaps`) fills the
+  `no_rim` gaps: rims from `est.rims` are flagged as filled from `estimate_rims`, with the DEM as
+  their source, and any other `{node: rim}` mapping as filled from `rims`. A given rim at or below
+  the node's invert is not used, with a `DataWarning`.
+- Filled rims count as usable for `max_depth="median"` (or a function): they enter the median, and
+  the junctions they fill are no longer given the default depth (nor listed in `derived`).
+
+Caveats: lids in fields, ravines, or easements are often raised above grade, and structures under
+bridges, at creek crossings, or inside buildings cannot be read from the ground surface. A
+bare-earth model may smooth sharp features; the window and the comparison are the guard. The DEM
+and the City's elevations must share a vertical datum (CGVD28 and CGVD2013 differ by decimetres in
+Ontario): check, or convert, before comparing.
 
 ## Tests
 
