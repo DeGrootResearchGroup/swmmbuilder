@@ -10,7 +10,7 @@ from collections import Counter
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, replace
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 import pandas as pd
 
@@ -883,7 +883,7 @@ def build_model(
     check_options(fills, BUILD_OPTIONS, "build_model")
     defaults = _Defaults(
         # A rule ('median' or a function) is resolved once the inverts are known.
-        max_depth=float(max_depth) if _is_real(max_depth) else 0.0,
+        max_depth=float(cast(float, max_depth)) if _is_real(max_depth) else 0.0,
         init_depth=init_depth,
         surcharge_depth=surcharge_depth,
         ponding_area=ponding_area,
