@@ -11,6 +11,11 @@ earlier history is in the git log.
 
 ### Added
 
+- **Dominant category** (#139): `dominant_category(polygons, layer, column)` gives, for each
+  polygon, the category of a layer (such as zoning) covering its largest area, and that area's
+  share of the polygon. It is the usual source of `allocate_population`'s `sewered` flag, e.g.
+  census blocks that are mostly zoned residential. A tie goes to the category that sorts first,
+  and a polygon meeting no feature of the layer has a missing category.
 - **Census polygons** (#128): `swmmbuilder.census.census_polygons` gets the polygons covering a
   network (or any area) from a pluggable source, keeps those meeting the footprint of its gravity
   pipes, and returns them with `population` and `parent` columns for `allocate_population`. A
