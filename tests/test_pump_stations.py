@@ -1056,3 +1056,18 @@ def test_force_main_delays_arrival(net, tmp_path, station):
         assert start == pytest.approx(0.0, abs=60)
         assert 0.95 * half / 0.005 <= arrival <= 1.05 * FORCE_MAIN_VOLUME / 0.005
     assert abs(routing_error) < 1.0  # continuity error, %
+
+
+def test_discharge_node_given_the_rule_depth_is_derived(sub):
+    """A station's discharge node takes the max_depth rule's depth and is listed in derived
+    (#123)."""
+    model = build_model(
+        sub,
+        pump_stations={"PS": dict(pump=dict(curve=[(0, 5.0)], curve_type="PUMP2"))},
+        force_main_roughness=C,
+        max_depth=lambda d: 2.5,
+    )
+    (node,) = [j for j in model.junctions if j.name == "PS_D"]
+    assert node.max_depth == 2.5
+    rows = model.derived_report()
+    assert set(rows.loc[rows["id"] == "PS_D", "rule"]) == {"max_depth function"}

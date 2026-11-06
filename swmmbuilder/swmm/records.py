@@ -9,6 +9,9 @@ import pandas as pd
 
 # Decimals that numbers are rounded to in the .inp file: 1 micrometre for lengths in metres.
 DECIMALS = 6
+# Significant figures that flows are written to, whatever the FLOW_UNITS: a flow in CMS can be far
+# below 10**-DECIMALS.
+FLOW_DIGITS = 10
 
 
 def _number(value):
@@ -20,6 +23,16 @@ def _number(value):
         return str(int(value))
     value = round(float(value), DECIMALS)
     return repr(value + 0.0)  # + 0.0 turns -0.0 into 0.0
+
+
+def _flow(value):
+    """Text of a flow for the .inp file: :data:`FLOW_DIGITS` significant figures in their
+    shortest form, so that small flows in CMS keep their value."""
+    if isinstance(value, bool):
+        raise TypeError(f"Expected a number, not {value!r}.")
+    if isinstance(value, numbers.Integral):
+        return str(int(value))
+    return repr(float(f"{float(value):.{FLOW_DIGITS}g}") + 0.0)
 
 
 def _name(value):
@@ -196,7 +209,8 @@ class SwmmModel:
 
         Fields are padded into columns for readability, but always separated by at least one
         space, so a long name or number cannot run into the next field. Numbers are rounded to
-        :data:`DECIMALS` decimals.
+        :data:`DECIMALS` decimals, and flows (dry-weather, inflow, time-series, pump-curve, and
+        conduit flows) to :data:`FLOW_DIGITS` significant figures.
 
         Raises
         ------
@@ -245,8 +259,8 @@ class SwmmModel:
                     (c.roughness, 11),
                     (c.inlet_offset, 11),
                     (c.outlet_offset, 11),
-                    (c.init_flow, 11),
-                    (c.max_flow, 11),
+                    (_flow(c.init_flow), 11),
+                    (_flow(c.max_flow), 11),
                 )
                 for c in self.conduits
             ),
@@ -276,7 +290,9 @@ class SwmmModel:
             ),
             "curves": "".join(
                 "".join(
-                    _line((_name(c.name), 16), (c.type if i == 0 else "", 9), (x, 11), (y, 11))
+                    _line(
+                        (_name(c.name), 16), (c.type if i == 0 else "", 9), (x, 11), (_flow(y), 11)
+                    )
                     for i, (x, y) in enumerate(c.points)
                 )
                 + "\n"
@@ -286,7 +302,7 @@ class SwmmModel:
                 _line(
                     (_name(d.node), 16),
                     ("FLOW", 16),
-                    (d.base, 11),
+                    (_flow(d.base), 11),
                     *((f'"{_name(p)}"', 0) for p in d.patterns),
                 )
                 for d in self.dwf
@@ -313,14 +329,15 @@ class SwmmModel:
                     ("FLOW", 8),
                     (1.0, 8),
                     (i.scale, 8),
-                    (i.baseline, 8),
+                    (_flow(i.baseline), 8),
                     *(() if i.baseline_pattern is None else ((_name(i.baseline_pattern), 0),)),
                 )
                 for i in self.inflows
             ),
             # Times in decimal hours from the start of the run.
             "timeseries": "".join(
-                "".join(_line((_name(s.name), 16), (t, 11), (v, 11)) for t, v in s.points) + "\n"
+                "".join(_line((_name(s.name), 16), (t, 11), (_flow(v), 11)) for t, v in s.points)
+                + "\n"
                 for s in self.timeseries
             ),
             "coordinates": "".join(

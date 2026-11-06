@@ -112,6 +112,19 @@ earlier history is in the git log.
   `distribute_flow` leave out the pipes with a missing `from_node` or `to_node`, which are in no
   catchment, so their share goes to the other pipes instead of being lost; a warning lists them
   with the people (or flow) they would have taken (#122).
+- **Small flows in the .inp file**: dry-weather, inflow, time-series, pump-curve, and conduit flows
+  are written to 10 significant figures (`swmm.FLOW_DIGITS`) instead of 6 decimals, so a flow
+  below a micro-unit (common in CMS) is no longer rounded off or written as 0 (#123).
+- **`Network.invert_report`** and its warning list only the pipes kept, not those removed by
+  `flow_types`, `status`, or `include_overflows` (#123).
+- **NumPy numbers as `max_depth`**: `build_model` takes `np.int64(3)` as a depth, not a rule
+  (#123).
+- **Every junction given the `max_depth` rule's depth is in `derived`**, including pump-station
+  discharge nodes and outfalls written as junctions by `outfall_link` (#123).
+- **Given split fractions under 1**: where every outlet of a node is given and the fractions add
+  up to less than 1, `accumulate` warns that the rest leaves the totals (#123).
+- **`Subnetwork.in_network`** builds its index of node IDs as text once, not on every call, which
+  made `height_correction` slow on large networks (#123).
 
 ## [0.1.0] - 2026-11-03
 

@@ -85,6 +85,7 @@ from .pumping import (  # noqa: F401
 )
 from .records import (  # noqa: F401
     DECIMALS,
+    FLOW_DIGITS,
     Conduit,
     Curve,
     DryWeatherFlow,

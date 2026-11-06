@@ -6,7 +6,7 @@ import pytest
 from conftest import DENDRITIC, subnetwork
 from test_population import make_network
 
-from swmmbuilder import UpstreamTotals
+from swmmbuilder import DataWarning, UpstreamTotals
 from swmmbuilder.subnetwork import _trapped
 
 ONES = dict.fromkeys(["A1", "A2", "B1", "B2", "C1", "J1", "J2", "OUT"], 1.0)
@@ -124,3 +124,20 @@ def test_only_the_nodes_with_no_exit_are_named():
     assert _trapped(["x", "y", "z"], a) == ["y", "z"]
     a[1, 2] = 0.9  # z now sends a tenth out: every node reaches an exit
     assert _trapped(["x", "y", "z"], a) == []
+
+
+def test_given_fractions_under_one_warn(sub):
+    """Every outlet of J1 given, adding up to 0.75: a quarter of J1's total leaves (#123)."""
+    a, b = parallel(sub)
+    with pytest.warns(DataWarning, match=r"less than 1 at 1 nodes.*J1 \(0\.75\)"):
+        totals = sub.accumulate(ONES, split={a: 0.5, b: 0.25})
+    assert totals.nodes["J2"] == pytest.approx(1 + 6 * 0.75)
+
+
+def test_in_network_builds_its_text_index_once(sub):
+    """in_network matches a node by its text, building the index once, not per call (#123). A
+    rebuilt network makes the subnetwork itself out of date, so the index cannot go stale."""
+    assert not sub.in_network("nowhere")
+    first = sub._network_text
+    assert first is not None and not sub.in_network("elsewhere")
+    assert sub._network_text is first
