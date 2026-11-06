@@ -82,3 +82,10 @@ def test_a_linked_outfall_given_the_rule_depth_is_derived(sub):
     model = swmm.build_model(sub, ["J1"], outfall_link=True, max_depth=lambda d: 2.0)
     assert next(j for j in model.junctions if j.name == "J1").max_depth == 2.0
     assert "J1" in set(model.derived_report()["id"])
+
+
+def test_outfall_link_empty_dict_takes_the_defaults(sub):
+    # #160: an empty dict is falsy, and added no links.
+    model = swmm.build_model(sub, ["J1"], outfall_link={}, max_depth=2.5)
+    assert [o.name for o in model.outfalls] == ["J1_OUT"]
+    assert next(c for c in model.conduits if c.name == "J1_DUMMY").length == 30.0

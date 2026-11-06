@@ -175,12 +175,38 @@ def _rule_params(name, rule, keys, required):
 NOT_GRAVITY = ("force_main", "overflow")
 
 
-def gravity_inlets(pipes, node, force_mains=()):
+def inlet_end(us_invert, ds_invert, length, headwater_slope=None):
+    """(invert, how) of the downstream end of a pipe arriving at a station: its recorded
+    ``ds_invert`` or, if that is missing and ``headwater_slope`` is given, ``us_invert`` minus
+    ``headwater_slope`` times ``length``; (None, '') if neither is known. The
+    ``station_invert`` and ``wet_well_defaults`` rules of :func:`build_model` both use it."""
+    if pd.notna(ds_invert):
+        return float(ds_invert), "recorded downstream invert"
+    if headwater_slope is not None and pd.notna(us_invert) and pd.notna(length):
+        end = float(us_invert) - headwater_slope * float(length)
+        return end, f"upstream invert - {headwater_slope} x length"
+    return None, ""
+
+
+def gravity_inlets(pipes, node, force_mains=(), headwater_slope=None):
     """Rows of ``pipes`` entering ``node`` that have a downstream invert and are neither in
-    ``force_mains`` nor of a structure type in :data:`NOT_GRAVITY`."""
+    ``force_mains`` nor of a structure type in :data:`NOT_GRAVITY`. With ``headwater_slope``, a
+    pipe with no downstream invert is estimated from its upstream one (see :func:`inlet_end`),
+    and the rows estimated so have ``ds_invert`` set to the estimate and ``ds_invert_estimated``
+    True."""
     entering = pipes[(pipes["to_node"] == node) & ~pipes["pipe_id"].isin(list(force_mains))]
     if "structure_type" in entering:
         entering = entering[~entering["structure_type"].isin(NOT_GRAVITY)]
+    if headwater_slope is None:
+        return entering[entering["ds_invert"].notna()]
+    entering = entering.copy()
+    entering["ds_invert_estimated"] = entering["ds_invert"].isna()
+    entering["ds_invert"] = [
+        inlet_end(us, ds, length, headwater_slope)[0]
+        for us, ds, length in zip(
+            entering["us_invert"], entering["ds_invert"], entering["length"], strict=True
+        )
+    ]
     return entering[entering["ds_invert"].notna()]
 
 
@@ -212,6 +238,7 @@ def apply_wet_well_defaults(
     force_mains=(),
     pump_names=None,
     rims=None,
+    headwater_slope=None,
 ):
     """Fill in the stations' missing wet wells and pump on/off depths from the
     ``wet_well_defaults`` rule of :func:`build_model`, in place.
@@ -233,7 +260,9 @@ def apply_wet_well_defaults(
     the on/off depths are derived only for a pump with a curve (an ideal pump does not cycle).
     ``pump_names`` ({node: [pump link names]}, default the node) names the pumps in the
     :class:`Derived` rows. ``rims`` ({node: rim}, e.g. :attr:`FilledData.rims`) defaults to the
-    recorded rims.
+    recorded rims. With ``headwater_slope`` (given by :func:`build_model` with
+    ``station_invert='lowest_inlet'``), an inlet with no downstream invert counts at the end
+    that rule estimates for it (see :func:`inlet_end`).
 
     Returns
     -------
@@ -256,7 +285,7 @@ def apply_wet_well_defaults(
         if not (needs_well or needs_levels):
             continue
         floor = inverts[node]
-        inlets = gravity_inlets(pipes, node, force_mains)
+        inlets = gravity_inlets(pipes, node, force_mains, headwater_slope)
         if inlets.empty:
             problems.append(f"{node} has no gravity inlet pipe with an invert")
             continue
@@ -279,7 +308,13 @@ def apply_wet_well_defaults(
                 f"{inlet}) is not above the low water level ({low_how}, floor {floor})"
             )
             continue
-        basis = f"floor {floor}, inlet invert {inlet} (pipe {lowest['pipe_id']})"
+        estimated = bool(lowest.get("ds_invert_estimated", False))
+        basis = (
+            f"floor {floor}, inlet invert {round(inlet, 4) if estimated else inlet} "
+            f"(pipe {lowest['pipe_id']}"
+            + (f", upstream invert - {headwater_slope} x length" if estimated else "")
+            + ")"
+        )
         found = []
         if needs_well:
             if station.design_flow is None:

@@ -8,7 +8,13 @@ import pandas as pd
 import pytest
 from conftest import DENDRITIC, REPO, read_sections, subnetwork, write_inp
 
-from swmmbuilder import Inflow, NodeLoading, dwf_from_population, pattern_inflows
+from swmmbuilder import (
+    DesignWarning,
+    Inflow,
+    NodeLoading,
+    dwf_from_population,
+    pattern_inflows,
+)
 
 FLAT = [1.0] * 24
 DAY = [0.5] * 12 + [1.5] * 12
@@ -192,9 +198,22 @@ def test_require_unit_mean_can_be_relaxed():
 # ---- pattern_inflows(require_unit_mean=...) -----------------------------------------------------
 
 
-def test_pattern_inflows_accepts_any_mean_by_default():
-    inflows, _ = pattern_inflows({"COM": {"A": 1.0}}, {"COM": [2.0] * 24}, days=1)
+def test_pattern_inflows_warns_of_a_mean_by_default(recwarn):
+    # #160: warned at the tolerance of [DWF] patterns and NodeLoading, 0.001.
+    with pytest.warns(DesignWarning, match=r"Pattern COM has a mean of 1\.002, not 1"):
+        inflows, _ = pattern_inflows({"COM": {"A": 1.0}}, {"COM": [1.002] * 24}, days=1)
     assert inflows["A"].scale == 1.0
+    recwarn.clear()
+    pattern_inflows({"COM": {"A": 1.0}}, {"COM": [2.0] * 24}, days=1, require_unit_mean=False)
+    pattern_inflows({"COM": {"A": 1.0}}, {"COM": [1.0005] * 24}, days=1)
+    assert not [w for w in recwarn if issubclass(w.category, DesignWarning)]
+
+
+@pytest.mark.parametrize("kind", ["population", "sanitary", "steady"])
+def test_patterned_kind_cannot_take_a_table_column(kind):
+    # #160: the kind's column overwrote the part's in table().
+    with pytest.raises(ValueError, match=f"patterned kinds cannot be named {kind}"):
+        NodeLoading(patterned={kind: {"A1": 1.0}}, patterns={kind: FLAT}, days=1)
 
 
 @pytest.mark.parametrize("require", [True, 1e-3, 0.0])

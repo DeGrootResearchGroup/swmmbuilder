@@ -98,6 +98,23 @@ def test_swap_nodes_keeps_inverts_and_geometry():
     assert row[["action", "old", "new"]].tolist() == ["swap_nodes", "D1 -> D2", "D2 -> D1"]
 
 
+def test_swap_nodes_swaps_the_node_types():
+    # #160: a node's inventory type is recorded with its ID, so it moves with it.
+    data = gpd.read_file(FIXTURE)
+    row = data["OBJECTID"] == 1010
+    data.loc[row, "UpstreamInventoryType"] = "MH"
+    data.loc[row, "DownstreamInventoryType"] = "PS"
+    before = Network(data).full_data.set_index("pipe_id").loc[1010]
+    network = Network(data, corrections={"swap_nodes": {1010: "recorded backwards"}})
+    after = network.full_data.set_index("pipe_id").loc[1010]
+    assert (after["from_node"], after["to_node"]) == ("D2", "D1")
+    assert (after["us_node_type"], after["ds_node_type"]) == (
+        before["ds_node_type"],
+        before["us_node_type"],
+    )
+    assert before["us_node_type"] != before["ds_node_type"]
+
+
 def test_pipe_ids_match_by_text():
     network = Network(FIXTURE, corrections={"drop": {"1009": "as text"}})
     assert network.corrections_report["pipe_id"].tolist() == [1009]

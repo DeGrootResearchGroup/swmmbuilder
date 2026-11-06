@@ -138,3 +138,12 @@ def test_pumped_network_runs_in_swmm(sub, tmp_path):
         for _ in sim:
             pumped = max(pumped, pump.flow)
     assert pumped > 2.0  # the pump cycles on and off, above the inflow while on
+
+
+def test_pumped_pipes_are_not_stations(sub):
+    # #160: summary()["stations"] counted the inlets of pipes pumped by pumps= too.
+    from swmmbuilder.swmm import build_model
+
+    model = build_model(sub, ["OUT"], pumps={1010: dict(curve="*")})
+    assert model.stations == []
+    assert (model.summary()["pumps"], model.summary()["stations"]) == (1, 0)

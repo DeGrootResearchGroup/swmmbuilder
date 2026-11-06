@@ -6,7 +6,7 @@ import math
 import pytest
 from conftest import DENDRITIC, TEMPLATE, read_sections, run_swmm, subnetwork, write_inp
 
-from swmmbuilder import dwf_from_population, swmm
+from swmmbuilder import DesignWarning, dwf_from_population, swmm
 
 DWF = {"A1": 1.0, "B1": 0.5, "C1": 0.75, "J1": 0.25}
 PEAK_HOUR = 8
@@ -156,6 +156,15 @@ def test_invalid_dwf_patterns_rejected(sub, tmp_path, dwf_patterns, match):
 def test_hourly_pattern_mean_not_one_warns(sub):
     with pytest.warns(UserWarning, match=r"Pattern p: the mean .* is 2\.000"):
         swmm.build_model(sub, ["OUT"], patterns={"p": [2.0] * 24})
+
+
+def test_hourly_pattern_mean_tolerance_is_shared(sub, recwarn):
+    # #160: the tolerance of pattern_inflows and NodeLoading, 0.001 (it was 0.01).
+    with pytest.warns(DesignWarning, match=r"is 1\.0050, not 1"):
+        swmm.build_model(sub, ["OUT"], patterns={"p": [1.005] * 24})
+    recwarn.clear()
+    swmm.build_model(sub, ["OUT"], patterns={"p": [1.0005] * 24})
+    assert not [w for w in recwarn if "Pattern" in str(w.message)]
 
 
 def test_daily_pattern_mean_not_checked(sub, recwarn):

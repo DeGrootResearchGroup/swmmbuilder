@@ -54,6 +54,7 @@ from ..units import (  # noqa: F401
 from .build import (  # noqa: F401
     BUILD_OPTIONS,
     FILL_OPTIONS,
+    GAP_OPTIONS,
     OUTFALL_LINK_DEFAULTS,
     build_model,
     logger,

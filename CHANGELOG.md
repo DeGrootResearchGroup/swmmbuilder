@@ -11,12 +11,36 @@ earlier history is in the git log.
 
 ### Fixed
 
+- **Small fixes in the model writer and design rules** (#160). `write_inp` applied
+  `design="schema"` twice, logging a second, misleading line that the rules were given
+  explicitly; it now applies it once. `outfall_link={}` added no links; it now takes the
+  defaults. With `station_invert="lowest_inlet"`, `wet_well_defaults` takes the same estimated
+  inlet end (new `inlet_end` in `swmmbuilder.design`), so a station whose only inlet has no
+  downstream invert no longer raises "has no gravity inlet pipe with an invert". A station given
+  an invert by `station_invert` is logged and reported in `data_gaps` as filled by that rule, not
+  by `height_correction` (`fill_gaps` takes `correction_rules`). `swap_nodes` swaps
+  `us_node_type` and `ds_node_type` with the IDs. `Subnetwork.data_gaps()` takes `design`,
+  `station_invert`, and the station options, so that its report is the one `to_inp` gives.
+  `NodeLoading` refuses a patterned kind named `population`, `sanitary`, or `steady`, which
+  overwrote that column of `table()`. The docs of `design="schema"` say that an ideal default
+  pump raises SWMM's ERROR 134 at a station with an overflow, and how to give it a curve.
+
 - **Polygon allocation option validation** (issue #147): `population`, `sewered`, and
   `land_use` reject unindexed lists/arrays and Series with missing or repeated polygon IDs.
   These problems are reported together with other invalid options before allocation starts.
   Partial `land_use` Series now raise `ValueError`; previously, missing polygons were left
   unrated and contributed no flow. Complete Series remain aligned by ID, and explicitly
   missing or non-numeric population values still count as zero.
+
+### Changed
+
+- **Summary counts and pattern means** (#160). `SwmmModel.summary()["stations"]` counts pump
+  stations only (the new `SwmmModel.stations`), no longer the inlets of pipes pumped by `pumps=`.
+  `SwmmModel.summary()` and `TopologyReport.summary()` gain `data_gaps_blocking` and
+  `data_gaps_no_rim`, since `data_gaps` includes the non-blocking `no_rim` gaps. Hourly
+  patterns share one tolerance on their mean, 0.001: a [DWF] pattern warns beyond it (it was
+  0.01), `pattern_inflows` now warns by default (`require_unit_mean=None`; `False` is silent, as
+  the default was), and `NodeLoading` still refuses by default.
 
 ### Added
 

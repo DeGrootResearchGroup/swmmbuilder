@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING
 
 from ..diagnostics import DesignWarning, Problems
 from ..units import _FLOW_UNIT_LPS, _TIME_SECONDS, _VOLUME_LITRES, SI_FLOW_UNITS, _is_finite_number
+from .inflows import UNIT_MEAN_TOLERANCE
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
@@ -31,7 +32,10 @@ def resolve_patterns(patterns):
 
     Each pattern is a list of multipliers, whose type is set by its length (24 HOURLY, 7 DAILY,
     12 MONTHLY), or a (type, multipliers) pair. A warning is given for an HOURLY or WEEKEND
-    pattern whose mean is not 1, since the mean then scales the base flows.
+    pattern whose mean is off 1 by more than
+    :data:`~swmmbuilder.swmm.inflows.UNIT_MEAN_TOLERANCE` (0.001, the tolerance of
+    :func:`~swmmbuilder.swmm.pattern_inflows` and :class:`~swmmbuilder.swmm.NodeLoading`), since
+    the mean then scales the base flows.
 
     Raises
     ------
@@ -66,9 +70,9 @@ def resolve_patterns(patterns):
             continue
         values = tuple(float(v) for v in values)
         mean = sum(values) / len(values)
-        if kind in ("HOURLY", "WEEKEND") and abs(mean - 1) > 0.01:
+        if kind in ("HOURLY", "WEEKEND") and abs(mean - 1) > UNIT_MEAN_TOLERANCE:
             warnings.warn(
-                f"Pattern {name}: the mean of the {kind} multipliers is {mean:.3f}, not 1, so the "
+                f"Pattern {name}: the mean of the {kind} multipliers is {mean:.4f}, not 1, so the "
                 "mean dry-weather flow is the base flow scaled by it.",
                 DesignWarning,
                 stacklevel=3,

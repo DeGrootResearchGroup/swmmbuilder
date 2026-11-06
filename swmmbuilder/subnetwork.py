@@ -249,7 +249,12 @@ class TopologyReport:
             - ``orphan_force_mains``: force mains that start at no pump station.
             - ``force_main_ends``: force-main chains that join another or end at a dead end.
             - ``pipe_count_mismatches``: nodes whose recorded pipe counts differ from the graph.
-            - ``data_gaps``: gaps in the data, all kinds (:attr:`data_gaps`).
+            - ``data_gaps``: gaps in the data, all kinds (:attr:`data_gaps`). A node with no
+              usable rim is a gap (``no_rim``) that does not stop the model from being
+              written, so this can exceed the number of pipes.
+            - ``data_gaps_blocking``: those of the kinds that stop a model from being written
+              unless filled (:data:`~swmmbuilder.gaps.BLOCKING_GAPS`).
+            - ``data_gaps_no_rim``: those of kind ``no_rim``.
             - ``boundary_outflows``, ``boundary_inflows``: pipes leaving and entering the
               subnetwork (:attr:`boundary`).
             - ``boundary_splits``: the leaving pipes of kind ``'split'`` or ``'force_main'``,
@@ -275,6 +280,10 @@ class TopologyReport:
             "force_main_ends": len(self.force_main_ends),
             "pipe_count_mismatches": len(self.pipe_count_mismatches),
             "data_gaps": sum(self.data_gaps.values()),
+            "data_gaps_blocking": sum(
+                n for gap, n in self.data_gaps.items() if gap in gaps.BLOCKING_GAPS
+            ),
+            "data_gaps_no_rim": self.data_gaps.get("no_rim", 0),
             "boundary_outflows": int((self.boundary["direction"] == "out").sum()),
             "boundary_inflows": int((self.boundary["direction"] == "in").sum()),
             "boundary_splits": int(self.boundary["kind"].isin(("split", "force_main")).sum()),
@@ -1072,8 +1081,13 @@ class Subnetwork:
             The fill options of :meth:`to_inp` (``height_correction``, ``size_overrides``,
             ``shape_codes``, ``size_fill``, ``invert_fill``, ``headwater_slope``,
             ``force_main_discharge``, ``rims``, and ``pumps``, whose pipes need no
-            cross-section); see
-            :func:`swmmbuilder.gaps.fill_gaps`.
+            cross-section; see :func:`swmmbuilder.gaps.fill_gaps`), and the options of
+            :func:`~swmmbuilder.swmm.build_model` that change the fills: ``design`` (whose
+            ``force_main_discharge`` rule fills force-main ends), ``station_invert`` (which
+            lowers stations), and the station options it needs (``pump_stations``,
+            ``pump_stations_exclude``, ``pump_stations_extra``, ``pump_stations_unlisted``,
+            and ``default_pump``). The report is then the one :meth:`to_inp` with the same
+            options gives in :attr:`SwmmModel.data_gaps <swmmbuilder.swmm.SwmmModel.data_gaps>`.
 
         Returns
         -------
@@ -1082,12 +1096,8 @@ class Subnetwork:
             ``filled_from`` (the rule that filled it; NaN if it is not filled), ``value``,
             ``source`` and ``order`` (the order of the fills).
         """
-        check_options(
-            fills, [*swmm.FILL_OPTIONS, "pumps", "height_correction"], "Subnetwork.data_gaps"
-        )
-        if "pumps" in fills:
-            fills["pumps"] = swmm.resolve_pumps(self, fills["pumps"])
-        return gaps.fill_gaps(self, **fills).report
+        check_options(fills, [*swmm.FILL_OPTIONS, *swmm.GAP_OPTIONS], "Subnetwork.data_gaps")
+        return swmm.build._gap_report(self, fills)
 
     def to_inp(self, path: StrPath, outfalls: Outfalls | None = None, **options: Any) -> SwmmModel:
         """Write the subnetwork to a SWMM .inp file; see :func:`swmmbuilder.swmm.write_inp`.

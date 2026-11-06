@@ -10,6 +10,7 @@ from conftest import DENDRITIC, subnetwork, with_pipes
 
 from swmmbuilder import allocate_land_use, swmm
 from swmmbuilder.design import Derived
+from swmmbuilder.gaps import BLOCKING_GAPS
 from swmmbuilder.swmm.records import Conduit, Junction, Outfall, PumpLink, SwmmModel
 
 POPULATION_KEYS = [
@@ -176,6 +177,10 @@ def test_topology_summary(network):
     ):
         assert s[key] == len(getattr(report, key))
     assert s["data_gaps"] == sum(report.data_gaps.values())
+    assert s["data_gaps_no_rim"] == report.data_gaps.get("no_rim", 0)
+    assert s["data_gaps_blocking"] == sum(
+        n for gap, n in report.data_gaps.items() if gap in BLOCKING_GAPS
+    )
     assert all(type(v) is int for v in s.values())
 
 
@@ -187,7 +192,9 @@ def test_topology_summary_counts_a_cycle():
 
 
 def test_model_summary_of_records():
-    gaps = pd.DataFrame({"gap": ["a", "b", "c"], "filled_from": ["size_fill", None, "x"]})
+    gaps = pd.DataFrame(
+        {"gap": ["no_size", "no_rim", "no_rim"], "filled_from": ["size_fill", None, "x"]}
+    )
     model = SwmmModel(
         junctions=[Junction(n, 0.0, 2.0, 0.0, 0.0, 0.0) for n in ("A", "S", "J")],
         outfalls=[Outfall("J_OUT", -0.3, "FREE"), Outfall("O2", 0.0, "FREE")],
@@ -206,6 +213,7 @@ def test_model_summary_of_records():
             Derived("junction", "K", "max_depth", 1.7, "rim estimate", ""),
             Derived("station", "S", "invert", -1.0, "station_invert='lowest_inlet'", ""),
         ],
+        stations=["S"],
     )
     assert model.summary() == {
         "junctions": 3,
@@ -218,6 +226,8 @@ def test_model_summary_of_records():
         "stations_excluded": 0,
         "outfall_links": 1,
         "data_gaps": 3,
+        "data_gaps_blocking": 1,
+        "data_gaps_no_rim": 2,
         "data_gaps_filled": 2,
         "derived": 4,
         "derived_junction_max_depth": 3,

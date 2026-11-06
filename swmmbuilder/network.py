@@ -221,7 +221,7 @@ class Network:
         dropped by the flow-type, status, and overflow filters (or as invalid), so that e.g.
         ``set={pid: {'status': 'built'}}`` keeps a pipe the data mark as proposed. Each one is
         logged at INFO with its reason and listed in ``corrections_report``. ``swap_nodes``
-        swaps only the node IDs (inverts and geometry stay as recorded; see
+        swaps the node IDs and their node types (inverts and geometry stay as recorded; see
         :class:`PipeCorrections`). Raises ValueError naming every pipe ID that is not in the
         data.
 
@@ -517,10 +517,19 @@ class Network:
                 )
                 rows.append((pipe, "set", column, old, value, reason))
         ends = [column_of("from_node"), column_of("to_node")]
+        # A node's inventory type is recorded with its ID, so it moves with it.
+        types = (
+            [column_of("us_node_type"), column_of("ds_node_type")]
+            if {"us_node_type", "ds_node_type"} <= set(data.columns)
+            else None
+        )
         for pipe, reason in matched["swap_nodes"].items():
             i = positions[pipe]
             up, down = data.iat[i, ends[0]], data.iat[i, ends[1]]
             data.iat[i, ends[0]], data.iat[i, ends[1]] = down, up
+            if types is not None:
+                up_type, down_type = data.iat[i, types[0]], data.iat[i, types[1]]
+                data.iat[i, types[0]], data.iat[i, types[1]] = down_type, up_type
             logger.info(
                 "Pipe %s: node IDs swapped by corrections, %s -> %s is now %s -> %s: %s",
                 pipe,

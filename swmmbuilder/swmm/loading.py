@@ -30,6 +30,9 @@ if TYPE_CHECKING:
 # Name of the [DWF] pattern when it is given as multipliers.
 DWF_PATTERN_NAME = "diurnal"
 
+# The columns of NodeLoading.table() besides the kinds of patterned flow.
+_TABLE_PARTS = ("population", "sanitary", "steady")
+
 
 def _node_values(values: Mapping[NodeId, float] | pd.Series, what: str) -> pd.Series:
     """{node: value} as a float Series, checked to be non-negative and finite."""
@@ -76,7 +79,8 @@ class NodeLoading:
 
     patterned : pandas.DataFrame or dict, optional
         Mean flow at each node by kind: a DataFrame of nodes (index) by kinds (columns), or
-        {kind: {node: flow}}, in ``flow_units``.
+        {kind: {node: flow}}, in ``flow_units``. A kind cannot be named ``population``,
+        ``sanitary``, or ``steady``, the other columns of :meth:`table`.
 
     patterns : dict, optional
         {name: 24 hourly multipliers, from 00:00}: one for every kind of ``patterned`` with a
@@ -99,7 +103,9 @@ class NodeLoading:
     require_unit_mean : bool or float
         Refuse an hourly pattern (the sanitary one, or one of ``patterned``) whose mean is not 1:
         True (default) for a tolerance of 0.001, a tolerance, or False to accept any mean. A
-        pattern's mean scales the mean flow, so that the table would not match the model.
+        pattern's mean scales the mean flow, so that the table would not match the model; this
+        is why the default refuses what :func:`~swmmbuilder.swmm.pattern_inflows` and a [DWF]
+        pattern only warn of, at the same tolerance.
 
     flow_units : {'LPS', 'CMS', 'MLD'}
         FLOW_UNITS of the template (default LPS, the shipped template's): the unit of the
@@ -109,8 +115,9 @@ class NodeLoading:
     ------
     ValueError
         If no part is given, ``population`` comes without ``per_capita``, ``patterned`` without
-        ``days``, or ``pattern`` without ``population``; a pattern is missing or its mean is not
-        1; or a population or flow is negative or not finite.
+        ``days``, or ``pattern`` without ``population``; a kind of ``patterned`` is named like
+        a column of :meth:`table`; a pattern is missing or its mean is not 1; or a population or
+        flow is negative or not finite.
 
     Examples
     --------
@@ -150,6 +157,15 @@ class NodeLoading:
             problems.add("patterned needs days")
         if isinstance(pattern, str) and pattern not in patterns:
             problems.add(f"pattern {pattern!r} is not in patterns")
+        table = None
+        if patterned is not None:
+            table = patterned if isinstance(patterned, pd.DataFrame) else pd.DataFrame(patterned)
+            reserved = [str(k) for k in table.columns if k in _TABLE_PARTS]
+            if reserved:
+                problems.add(
+                    f"patterned kinds cannot be named {', '.join(reserved)}, a column of the "
+                    "table of the other parts"
+                )
         problems.raise_if_any()
 
         self.flow_units = flow_units
@@ -157,11 +173,7 @@ class NodeLoading:
             _node_values(population, "populations") if population is not None else None
         )
         self.steady = _node_values(steady, "steady flows") if steady is not None else None
-        if patterned is None:
-            self.patterned = None
-        else:
-            table = patterned if isinstance(patterned, pd.DataFrame) else pd.DataFrame(patterned)
-            self.patterned = table.fillna(0.0).astype(float)
+        self.patterned = None if table is None else table.fillna(0.0).astype(float)
 
         # [DWF] and its pattern.
         self.dwf: dict[NodeId, float] = {}
