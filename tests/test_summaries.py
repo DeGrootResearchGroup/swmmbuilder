@@ -13,10 +13,10 @@ from swmmbuilder.design import Derived
 from swmmbuilder.swmm.records import Conduit, Junction, Outfall, PumpLink, SwmmModel
 
 POPULATION_KEYS = [
-    "population",
+    "total",
     "nodes",
     "weight",
-    "population_total",
+    "allocation_total",
     "unallocated",
     "polygons",
     "polygons_served",
@@ -41,10 +41,10 @@ def test_population_summary(net):
     s = test_population.allocate(net).summary()
     assert list(s) == POPULATION_KEYS
     assert s == {
-        "population": 180.0,
+        "total": 180.0,
         "nodes": 4,  # N5 gets 0
         "weight": 13.0,
-        "population_total": 180.0,
+        "allocation_total": 180.0,
         "unallocated": 30.0,
         "polygons": 3,
         "polygons_served": 2,
@@ -58,15 +58,15 @@ def test_population_summary(net):
         "fallback": 0,
     }
     assert math.isnan(s["nearest_max_distance"])
-    assert type(s["nodes"]) is int and type(s["population"]) is float
-    assert f"{s['population']:,.0f} at {s['nodes']} nodes" == "180 at 4 nodes"
+    assert type(s["nodes"]) is int and type(s["total"]) is float
+    assert f"{s['total']:,.0f} at {s['nodes']} nodes" == "180 at 4 nodes"
 
 
 def test_population_summary_within_a_subnetwork(net):
     s = test_population.allocate(net).summary(net.catchment("N4"))  # pipes 1-3
-    assert (s["population"], s["nodes"], s["weight"]) == (140.0, 3, 11.0)
+    assert (s["total"], s["nodes"], s["weight"]) == (140.0, 3, 11.0)
     # The rest is of the whole allocation.
-    assert (s["population_total"], s["no_pipes"]) == (180.0, 1)
+    assert (s["allocation_total"], s["no_pipes"]) == (180.0, 1)
 
 
 def test_population_summary_of_nearest_polygons(net):
@@ -77,7 +77,7 @@ def test_population_summary_of_nearest_polygons(net):
     ).summary()
     assert (s["nearest"], s["nearest_population"], s["nearest_max_distance"]) == (1, 30.0, 50.0)
     assert (s["no_pipes"], s["no_pipes_population"], s["unallocated"]) == (0, 0.0, 0.0)
-    assert (s["fallback"], s["weight"], s["population"]) == (1, 14.0, 210.0)
+    assert (s["fallback"], s["weight"], s["total"]) == (1, 14.0, 210.0)
 
 
 def test_population_summary_takes_the_mean_weight_of_a_shared_pipe(net):
@@ -103,6 +103,10 @@ def test_land_use_summary(net):
         "INDUSTRIAL_area_ha",
         "INDUSTRIAL_flow",
         "INDUSTRIAL_nodes",
+        "total",
+        "nodes",
+        "weight",
+        "allocation_total",
         "polygons",
         "polygons_served",
         "area_ha",
@@ -110,9 +114,9 @@ def test_land_use_summary(net):
         "nearest_median_distance",
         "nearest_max_distance",
         "no_pipes",
-        "unallocated",
+        "zero_weight",
+        "unallocated_design_flow",
         "scale",
-        "total",
     ]
     # P (commercial, 0.1 L/s at N1 and N2) and Q (industrial, 0.2 L/s at N3 and N4) are served;
     # R (commercial) has no pipe.
@@ -125,14 +129,17 @@ def test_land_use_summary(net):
         "INDUSTRIAL_area_ha": 1.0,
         "INDUSTRIAL_flow": 0.2,
         "INDUSTRIAL_nodes": 2,
+        "total": 0.3,
+        "nodes": 4,
+        "allocation_total": 0.3,
         "polygons": 3,
         "polygons_served": 2,
         "area_ha": 2.0,
         "nearest": 0,
         "no_pipes": 1,
-        "unallocated": 0.1,
+        "zero_weight": 0,
+        "unallocated_design_flow": 0.1,
         "scale": 1.0,
-        "total": 0.3,
     }
     assert {k: s[k] for k in expected} == pytest.approx(expected)
     assert math.isnan(s["nearest_median_distance"]) and math.isnan(s["nearest_max_distance"])
@@ -256,3 +263,111 @@ def test_model_summary_counts_outfall_links(network):
     sub = subnetwork(network, [e for e in DENDRITIC if "OUT" not in e and "J2" not in e])
     s = swmm.build_model(sub, ["J1"], outfall_link=True, max_depth=2.5).summary()
     assert (s["outfall_links"], s["outfalls"], s["junctions"]) == (1, 1, 6)
+
+
+# ---- one shape and one key style for every result (#161) -----------------------------------------
+
+
+def test_land_use_summary_within_a_subnetwork(net):
+    land = allocate_land_use(net, test_land_use.zoning(), land_use="use", rates=test_land_use.RATES)
+    sub = net.catchment("N4")  # pipes 1-3: P's, and Q's pipe 3 (0.12 L/s at N3)
+    s = land.summary(sub)
+    assert [s["total"], s["COMMERCIAL_flow"], s["INDUSTRIAL_flow"]] == pytest.approx(
+        [0.22, 0.1, 0.12]
+    )
+    assert (s["nodes"], s["COMMERCIAL_nodes"], s["INDUSTRIAL_nodes"]) == (3, 2, 1)
+    assert s["weight"] == pytest.approx(50 + 30 + 60)  # lengths
+    assert s["allocation_total"] == pytest.approx(0.3)  # the rest is of the whole allocation
+    assert (s["polygons_served"], s["no_pipes"]) == (2, 1)
+    assert s["total"] == pytest.approx(land.within(sub).to_numpy().sum())
+
+
+def test_land_use_by_pipe(net):
+    land = allocate_land_use(net, test_land_use.zoning(), land_use="use", rates=test_land_use.RATES)
+    flows = land.by_pipe()
+    assert flows.index.name == "pipe_id"
+    assert flows.to_dict() == pytest.approx({1: 0.0625, 2: 0.0375, 3: 0.12, 4: 0.08, 5: 0.0})
+    population = test_population.allocate(net).by_pipe()
+    assert list(flows.index) == list(population.index)
+
+
+def test_within_returns_the_type_of_nodes(net):
+    sub = net.catchment("N4")
+    people = test_population.allocate(net)
+    land = allocate_land_use(net, test_land_use.zoning(), land_use="use", rates=test_land_use.RATES)
+    assert type(people.within(sub)) is type(people.nodes)
+    assert type(land.within(sub)) is type(land.nodes)
+    assert list(land.within(sub).columns) == list(land.nodes.columns)
+
+
+def test_land_use_summary_counts_a_polygon_with_zero_weight_once():
+    # Q's pipes (3 and 4) weigh 0, so Q is served but unallocated, and R has no pipe. Q used to
+    # be counted both in polygons_served and in no_pipes.
+    pipes = [
+        (p, u, d, x0, x1, 0 if p in (3, 4) else 1) for p, u, d, x0, x1, _ in test_population.PIPES
+    ]
+    net = test_population.make_network(pipes)
+    land = allocate_land_use(
+        net, test_land_use.zoning(), land_use="use", rates=test_land_use.RATES, weight="PDC_Count"
+    )
+    assert sorted(land.no_pipes) == ["Q", "R"]
+    s = land.summary()
+    assert (s["polygons"], s["polygons_served"], s["no_pipes"], s["zero_weight"]) == (3, 2, 1, 1)
+    assert s["unallocated_design_flow"] == pytest.approx(0.1 + 0.2)
+
+
+def test_former_keys_still_read_with_a_warning(net):
+    s = test_population.allocate(net).summary()
+    with pytest.warns(DeprecationWarning, match="'population' is now 'total'"):
+        assert s["population"] == s["total"]
+    with pytest.warns(DeprecationWarning, match="'population_total' is now 'allocation_total'"):
+        assert s["population_total"] == s["allocation_total"]
+    assert "population" not in s and "population" not in list(s)
+    land = allocate_land_use(net, test_land_use.zoning(), land_use="use", rates=test_land_use.RATES)
+    with pytest.warns(DeprecationWarning, match="'unallocated' is now 'unallocated_design_flow'"):
+        assert land.summary()["unallocated"] == pytest.approx(0.1)
+    with pytest.raises(KeyError):
+        s["no_such_key"]
+
+
+def test_summaries_are_flat_dicts_of_numbers(net, network):
+    sub = net.catchment("N4")
+    people = test_population.allocate(net)
+    results = [
+        people.summary(),
+        people.summary(sub),
+        allocate_land_use(
+            net, test_land_use.zoning(), land_use="use", rates=test_land_use.RATES
+        ).summary(sub),
+        sub.accumulate(people.within(sub)).summary(),
+        sub.validate().summary(),
+        network.subnetwork(network.nodes.index).find_pump_stations().summary(),
+    ]
+    for s in results:
+        assert isinstance(s, dict)
+        assert all(isinstance(k, str) for k in s)
+        assert all(type(v) in (int, float) for v in s.values())
+        assert dict(s) == s
+
+
+def test_upstream_totals_summary(net):
+    sub = net.catchment("N4")
+    totals = sub.accumulate(test_population.allocate(net).within(sub))
+    assert totals.summary() == {
+        "nodes": 4,
+        "pipes": 3,
+        "shared_pipes": 0,
+        "max": pytest.approx(140.0),
+    }
+    zones = pd.DataFrame({"a": {"N1": 1.0}, "b": {"N2": 2.0}})
+    s = sub.accumulate(zones).summary()
+    assert (s["a_max"], s["b_max"]) == (1.0, 2.0) and "max" not in s
+
+
+def test_pump_station_report_summary(network):
+    report = network.subnetwork(network.nodes.index).find_pump_stations()
+    assert report.summary() == {
+        "stations": len(report.stations),
+        "no_force_main": len(report.no_force_main),
+        "unlisted": len(report.unlisted),
+    }

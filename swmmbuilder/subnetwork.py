@@ -4,6 +4,7 @@ them."""
 from __future__ import annotations
 
 import logging
+import math
 import warnings
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -14,6 +15,7 @@ import numpy as np
 import pandas as pd
 
 from . import gaps, swmm
+from ._summary import Summary
 from .diagnostics import DataWarning, check_options
 from .geometry import node_positions, to_geodataframe
 
@@ -125,6 +127,45 @@ class UpstreamTotals:
     fractions: pd.Series
     split: str
 
+    def summary(self) -> dict[str, float | int]:
+        """Counts and the largest totals, to cite in a report.
+
+        The keys follow the rules of every ``summary()`` (see the Diagnostics page of the
+        documentation).
+
+        Returns
+        -------
+        dict
+            Plain Python numbers (``int`` for counts, ``float`` for totals, NaN where there is
+            nothing to measure), under these keys:
+
+            - ``nodes``, ``pipes``: nodes and pipes with a total.
+            - ``shared_pipes``: pipes carrying less than the whole total of their upstream node
+              (a fraction below 1, at a split).
+            - ``max``: the largest total at a node (that of the outlet, with one outlet and
+              ``split='equal'``), or for values given as a DataFrame, ``<column>_max`` for
+              each column.
+
+        Examples
+        --------
+        ::
+
+            s = sub.accumulate(alloc.within(sub)).summary()
+            print(f"{s['max']:,.0f} people reach the outlet")
+        """
+        values: dict[str, float | int] = {
+            "nodes": len(self.nodes),
+            "pipes": len(self.pipes),
+            "shared_pipes": int((self.fractions < 1).sum()),
+        }
+        if isinstance(self.nodes, pd.DataFrame):
+            for column in self.nodes.columns:
+                totals = self.nodes[column]
+                values[f"{column}_max"] = float(totals.max()) if len(totals) else math.nan
+        else:
+            values["max"] = float(self.nodes.max()) if len(self.nodes) else math.nan
+        return Summary(values)
+
 
 @dataclass
 class PumpStationReport:
@@ -151,6 +192,30 @@ class PumpStationReport:
     stations: list = field(default_factory=list)
     no_force_main: list = field(default_factory=list)
     unlisted: pd.DataFrame = field(default_factory=pd.DataFrame)
+
+    def summary(self) -> dict[str, int]:
+        """Counts of the report, to cite in a report.
+
+        The keys follow the rules of every ``summary()`` (see the Diagnostics page of the
+        documentation).
+
+        Returns
+        -------
+        dict
+            Plain Python ints, under these keys:
+
+            - ``stations``: stations with a force main (:attr:`stations`).
+            - ``no_force_main``: stations with none (:attr:`no_force_main`).
+            - ``unlisted``: likely lift stations missing from the station layer, one per force
+              main (rows of :attr:`unlisted`).
+        """
+        return Summary(
+            {
+                "stations": len(self.stations),
+                "no_force_main": len(self.no_force_main),
+                "unlisted": len(self.unlisted),
+            }
+        )
 
 
 @dataclass

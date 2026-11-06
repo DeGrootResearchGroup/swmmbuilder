@@ -1133,6 +1133,17 @@ class Network:
         """
         return to_geodataframe(self.full_data, self.nodes, kind, values)
 
+    def pipes(self) -> gpd.GeoDataFrame:
+        """The rows of :attr:`full_data` of the pipes in the network's graph, sorted by pipe_id:
+        those of :meth:`Subnetwork.pipes <swmmbuilder.Subnetwork.pipes>` for the whole network.
+
+        A pipe kept in ``full_data`` with a missing ``from_node`` or ``to_node`` is not in the
+        graph, so it is left out.
+        """
+        data = self.full_data
+        ids = {key for _, _, key in self.graph.edges(keys=True)}
+        return data[data["pipe_id"].isin(ids)].sort_values("pipe_id")
+
     def check_nodes(self, nodes: Iterable[NodeId]) -> None:
         """Raise ValueError listing the ``nodes`` that are not in the network."""
         missing = sorted(n for n in nodes if n not in self.graph)

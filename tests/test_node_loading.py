@@ -115,15 +115,38 @@ def test_table_and_summary(parts):
     s = loading.summary()
     sanitary = 240.5 * 230 / 86400
     assert s["population"] == pytest.approx(240.5) and s["population_nodes"] == 3
-    assert s["sanitary"] == pytest.approx(sanitary) and s["sanitary_nodes"] == 3
-    assert s["steady"] == pytest.approx(0.045) and s["steady_nodes"] == 3
-    assert s["patterned"] == pytest.approx(1.0) and s["patterned_nodes"] == 3
-    assert s["patterned_COMMERCIAL"] == pytest.approx(0.5)
-    assert s["patterned_COMMERCIAL_nodes"] == 2
-    assert s["patterned_INDUSTRIAL"] == 0 and s["patterned_INDUSTRIAL_nodes"] == 0
+    assert s["sanitary_flow"] == pytest.approx(sanitary) and s["sanitary_nodes"] == 3
+    assert s["steady_flow"] == pytest.approx(0.045) and s["steady_nodes"] == 3
+    assert s["patterned_flow"] == pytest.approx(1.0) and s["patterned_nodes"] == 3
+    assert s["COMMERCIAL_flow"] == pytest.approx(0.5)
+    assert s["COMMERCIAL_nodes"] == 2
+    assert s["INDUSTRIAL_flow"] == 0 and s["INDUSTRIAL_nodes"] == 0
     assert s["total"] == pytest.approx(sanitary + 1.045)
-    assert s["loaded_nodes"] == 6  # A1, A2, B1, B2, C1, J1
+    assert s["nodes"] == 6  # A1, A2, B1, B2, C1, J1
+    assert list(s)[:4] == ["total", "nodes", "population", "population_nodes"]
+    assert all(type(v) in (int, float) for v in s.values())
     assert "sanitary=" in repr(loading)
+
+
+def test_summary_former_keys_still_read(parts):
+    s = loading_of(*parts).summary()
+    for old, new in [
+        ("sanitary", "sanitary_flow"),
+        ("steady", "steady_flow"),
+        ("patterned", "patterned_flow"),
+        ("loaded_nodes", "nodes"),
+        ("patterned_COMMERCIAL", "COMMERCIAL_flow"),
+        ("patterned_COMMERCIAL_nodes", "COMMERCIAL_nodes"),
+    ]:
+        with pytest.warns(DeprecationWarning, match=f"'{old}' is now '{new}'"):
+            assert s[old] == s[new]
+        assert old not in s
+
+
+@pytest.mark.parametrize("kind", ["sanitary", "steady", "population", "patterned"])
+def test_a_patterned_kind_may_not_take_the_name_of_a_part(kind):
+    with pytest.raises(ValueError, match=f"patterned kind '{kind}' is the name of a part"):
+        NodeLoading(patterned={kind: {"A1": 1.0}}, patterns={kind: [1.0] * 24}, days=1)
 
 
 def test_only_the_options_needed():
@@ -228,7 +251,7 @@ def test_loaded_catchment_example(tmp_path, capsys):
     assert {row[0] for row in sections["PATTERNS"]} == {"diurnal"}
     assert {"LU_COMMERCIAL", "LU_INDUSTRIAL"} <= {row[0] for row in sections["TIMESERIES"]}
     assert summary["population"] == pytest.approx(sum(300 + 50 * k for k in range(6)))
-    assert summary["patterned_COMMERCIAL"] > 0 and summary["patterned_INDUSTRIAL"] > 0
+    assert summary["COMMERCIAL_flow"] > 0 and summary["INDUSTRIAL_flow"] > 0
     table = pd.read_csv(tmp_path / "node_loading.csv", index_col="node")
-    assert table["sanitary"].sum() == pytest.approx(summary["sanitary"], rel=1e-5)
+    assert table["sanitary"].sum() == pytest.approx(summary["sanitary_flow"], rel=1e-5)
     assert "wrote" in capsys.readouterr().out

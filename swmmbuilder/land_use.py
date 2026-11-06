@@ -34,6 +34,7 @@ import numpy as np
 import pandas as pd
 from pyproj import CRS
 
+from ._summary import Summary
 from .diagnostics import Problems
 from .population import (
     PLACEMENTS,
@@ -45,6 +46,7 @@ from .population import (
     _missing_node,
     _nearest,
     _pipes_of,
+    _pipes_within,
     _polygon_values,
     _quiet,
     _weights,
@@ -117,15 +119,34 @@ class LandUseAllocation:
         """Flow placed at the nodes, all land uses."""
         return float(self.nodes.to_numpy().sum())
 
+    def by_pipe(self) -> pd.Series:
+        """Flow of each pipe, summed over the polygons it serves, indexed by pipe_id, in
+        :attr:`flow_units` (see :meth:`PopulationAllocation.by_pipe
+        <swmmbuilder.PopulationAllocation.by_pipe>`)."""
+        return self.pipes.groupby(level=0, sort=False)["flow"].sum()
+
     def within(self, sub: Subnetwork) -> pd.DataFrame:
-        """Flow at the nodes of ``sub`` by land use, from the shares of the subnetwork's own pipes
-        (see :meth:`PopulationAllocation.within <swmmbuilder.PopulationAllocation.within>`)."""
-        keys = {key for _, _, key in sub.graph.edges(keys=True)}
-        table = self.pipes[self.pipes.index.isin(keys)]
+        """Flow at the nodes of ``sub`` by land use, from the shares of the subnetwork's own pipes:
+        :attr:`nodes` cut to the subnetwork, of the same type (see
+        :meth:`PopulationAllocation.within <swmmbuilder.PopulationAllocation.within>`)."""
+        table = _pipes_within(self.pipes, sub)
         return _place_by_use(table, self.placement, list(self.nodes.columns))
 
-    def summary(self) -> dict[str, float | int]:
+    def summary(self, sub: Subnetwork | None = None) -> dict[str, float | int]:
         """Counts and totals of the allocation, to cite in a report.
+
+        The keys follow the rules of every ``summary()`` (see the Diagnostics page of the
+        documentation), and match those of :meth:`PopulationAllocation.summary
+        <swmmbuilder.PopulationAllocation.summary>` where they measure the same thing.
+
+        Parameters
+        ----------
+        sub : Subnetwork, optional
+            A subnetwork (e.g. a catchment) of the network the flows were allocated over. The
+            keys marked "within ``sub``" count only its pipes and the nodes they place flow at
+            (see :meth:`within`); without it, they count every pipe and node. Scaling to a
+            ``total`` is over the whole allocation, so ``total`` within ``sub`` is the
+            subnetwork's share of it.
 
         Returns
         -------
@@ -136,51 +157,72 @@ class LandUseAllocation:
 
             - ``<use>_polygons``: its polygons served by at least one pipe.
             - ``<use>_area_ha``: their area counted, in ha.
-            - ``<use>_flow``: its flow placed at the nodes, in :attr:`flow_units`.
-            - ``<use>_nodes``: nodes given a flow above 0 from it.
+            - ``<use>_flow``: its flow placed at the nodes, in :attr:`flow_units`, within
+              ``sub``.
+            - ``<use>_nodes``: nodes given a flow above 0 from it, within ``sub``.
 
             And over all land uses:
 
+            - ``total``: flow placed at the nodes, within ``sub``.
+            - ``nodes``: nodes given a flow above 0, within ``sub``.
+            - ``weight``: total weight of the pipes, within ``sub`` (each pipe counted once).
+            - ``allocation_total``: flow placed at the nodes over the whole allocation
+              (:attr:`total`).
             - ``polygons``: polygons with a rate.
-            - ``polygons_served``: those served by at least one pipe.
+            - ``polygons_served``: those with at least one pipe.
             - ``area_ha``: area counted of the polygons served, in ha.
             - ``nearest``: polygons given their nearest pipe (:attr:`nearest`).
             - ``nearest_median_distance``, ``nearest_max_distance``: the median and the
-              farthest of their distances to it (NaN if none).
-            - ``no_pipes``: polygons with a flow and no pipe (:attr:`no_pipes`).
-            - ``unallocated``: their design flow, placed nowhere (:attr:`unallocated`).
+              farthest of their distances to it, in m (NaN if none).
+            - ``no_pipes``: polygons with a flow and no pipe.
+            - ``zero_weight``: polygons with a flow whose pipes all weigh 0 (counted in
+              ``polygons_served``). These and ``no_pipes`` make up :attr:`no_pipes`.
+            - ``unallocated_design_flow``: the design flow of both, placed nowhere and not
+              scaled (:attr:`unallocated`), in :attr:`flow_units`.
             - ``scale``: the factor applied to every flow (:attr:`scale`).
-            - ``total``: flow placed at the nodes (:attr:`total`).
+
+            ``unallocated``, the former name of ``unallocated_design_flow``, still reads, with
+            a ``DeprecationWarning``.
 
         Examples
         --------
         ::
 
-            s = land.summary()
+            s = land.summary(net.catchment("OUT"))
             print(f"commercial: {s['COMMERCIAL_flow']:.1f} L/s at {s['COMMERCIAL_nodes']} nodes")
         """
+        pipes = self.pipes
+        nodes = self.nodes
+        if sub is not None:
+            pipes = _pipes_within(pipes, sub)
+            nodes = _place_by_use(pipes, self.placement, list(self.nodes.columns))
         served = self.polygons[self.polygons["pipes"] > 0]
+        lost = self.polygons.index.isin(list(self.no_pipes))
         result: dict[str, float | int] = {}
         for use in self.nodes.columns:
             mine = served["land_use"] == use
             result[f"{use}_polygons"] = int(mine.sum())
             result[f"{use}_area_ha"] = float(served.loc[mine, "area_ha"].sum())
-            result[f"{use}_flow"] = float(self.nodes[use].sum())
-            result[f"{use}_nodes"] = int((self.nodes[use] > 0).sum())
+            result[f"{use}_flow"] = float(nodes[use].sum())
+            result[f"{use}_nodes"] = int((nodes[use] > 0).sum())
         nearest = self.nearest
         result.update(
+            total=float(nodes.to_numpy().sum()),
+            nodes=int((nodes.sum(axis=1) > 0).sum()),
+            weight=float(pipes.groupby(level=0)["weight"].mean().sum()),
+            allocation_total=self.total,
             polygons=len(self.polygons),
             polygons_served=len(served),
             area_ha=float(served["area_ha"].sum()),
             nearest=len(nearest),
             nearest_median_distance=float(nearest.median()) if len(nearest) else math.nan,
             nearest_max_distance=float(nearest.max()) if len(nearest) else math.nan,
-            no_pipes=len(self.no_pipes),
-            unallocated=float(self.unallocated),
+            no_pipes=int((lost & (self.polygons["pipes"] == 0)).sum()),
+            zero_weight=int((lost & (self.polygons["pipes"] > 0)).sum()),
+            unallocated_design_flow=float(self.unallocated),
             scale=float(self.scale),
-            total=self.total,
         )
-        return result
+        return Summary(result, {"unallocated": "unallocated_design_flow"})
 
 
 def _place_by_use(table, placement, uses):
