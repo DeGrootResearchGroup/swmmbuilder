@@ -35,6 +35,31 @@ logger = logging.getLogger(__name__)
 
 SPLITS = ("equal", "full")
 
+# The share of a node's total below which it counts as not leaving a loop (see _trapped).
+EXIT_TOLERANCE = 1e-12
+
+
+def _trapped(order: list[Any], a: np.ndarray) -> list[Any]:
+    """The nodes of a loop (``order``, with ``a[v, u]`` the share of ``u``'s total that goes to
+    ``v`` within it) from which nothing leaves the loop: those that cannot reach, along pipes
+    carrying a share, a node that sends part of its total out of the loop (or nowhere).
+
+    The totals within the loop solve ``(I - a) x = v``, which has one solution exactly when every
+    node can reach such an exit (the shares are then substochastic with spectral radius below 1).
+    Unlike a test of the determinant, which shrinks geometrically with the size of the loop, this
+    does not depend on the loop's size.
+    """
+    exits = [i for i in range(len(order)) if a[:, i].sum() < 1.0 - EXIT_TOLERANCE]
+    reached = set(exits)
+    stack = list(exits)
+    while stack:
+        v = stack.pop()
+        for u in np.flatnonzero(a[v] > 0):
+            if int(u) not in reached:
+                reached.add(int(u))
+                stack.append(int(u))
+    return [n for i, n in enumerate(order) if i not in reached]
+
 
 @dataclass
 class UpstreamTotals:
@@ -627,7 +652,7 @@ class Subnetwork:
                     fractions[key] for _, v, key in graph.out_edges(node, keys=True) if v == node
                 )
                 if loops:
-                    if loops >= 1:
+                    if loops >= 1.0 - EXIT_TOLERANCE:
                         raise ValueError(f"accumulate: the loop at {node} has no exit.")
                     totals[index[node]] /= 1.0 - loops
             else:
@@ -638,11 +663,12 @@ class Subnetwork:
                     for _, v, key in graph.out_edges(u, keys=True):
                         if v in local:
                             a[local[v], local[u]] += fractions[key]
-                system = np.eye(len(order)) - a
-                if abs(np.linalg.det(system)) < 1e-12:
+                trapped = _trapped(order, a)
+                if trapped:
                     raise ValueError(
-                        f"accumulate: a loop has no exit: {', '.join(map(str, order))}"
+                        f"accumulate: a loop has no exit: {', '.join(map(str, trapped))}"
                     )
+                system = np.eye(len(order)) - a
                 rows = [index[n] for n in order]
                 totals[rows] = np.linalg.solve(system, totals[rows])
             for u in members:

@@ -26,7 +26,8 @@ earlier history is in the git log.
 - **Upstream totals**: `Subnetwork.accumulate(values, split=...)` gives the total of a node value
   (population, flow, load) upstream of every node and pipe, shared equally among a node's outlets
   (`'equal'`, conserving), counted once per upstream node (`'full'`), or by given fractions, e.g.
-  from simulated flows. Loops are solved exactly, and a DataFrame of values is accumulated column
+  from simulated flows. Loops are solved exactly (a loop is refused only if some of its nodes
+  cannot reach an exit, whatever its size, #119), and a DataFrame of values is accumulated column
   by column (#107).
 - **Footprint over some of the pipes**: `maps.network_footprint`, `footprint_distance`, and
   `network_extent` take `pipes`: `'gravity'` (every pipe but the force mains, for a service
