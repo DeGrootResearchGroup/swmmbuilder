@@ -5,7 +5,7 @@ from .land_use import LandUseAllocation, allocate_land_use
 from .network import Network, strip_leading_zeros
 from .population import PopulationAllocation, allocate_population
 from .schema import LAZY_PRESETS, LONDON_ON, Schema
-from .subnetwork import PumpStationReport, Subnetwork, TopologyReport
+from .subnetwork import PumpStationReport, Subnetwork, TopologyReport, UpstreamTotals
 from .swmm import (
     Derived,
     Inflow,
@@ -45,6 +45,7 @@ __all__ = [
     "SwmmBuilderWarning",
     "SwmmModel",
     "TopologyReport",
+    "UpstreamTotals",
     "WetWell",
     "allocate_land_use",
     "allocate_population",

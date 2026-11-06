@@ -23,6 +23,11 @@ earlier history is in the git log.
   to share by. Each share is placed at the pipe's upstream node, downstream node, or both. The
   result reports the population of polygons with no pipe, and its `nodes` feed
   `dwf_from_population`.
+- **Upstream totals**: `Subnetwork.accumulate(values, split=...)` gives the total of a node value
+  (population, flow, load) upstream of every node and pipe, shared equally among a node's outlets
+  (`'equal'`, conserving), counted once per upstream node (`'full'`), or by given fractions, e.g.
+  from simulated flows. Loops are solved exactly, and a DataFrame of values is accumulated column
+  by column (#107).
 - **Footprint over some of the pipes**: `maps.network_footprint`, `footprint_distance`, and
   `network_extent` take `pipes`: `'gravity'` (every pipe but the force mains, for a service
   area), a list of pipe IDs, or a function of the pipe rows (#106).

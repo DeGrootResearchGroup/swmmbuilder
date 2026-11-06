@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 import networkx as nx
+import numpy as np
 import pandas as pd
 
 from . import gaps, swmm
@@ -30,6 +31,37 @@ if TYPE_CHECKING:
 
 
 logger = logging.getLogger(__name__)
+
+
+SPLITS = ("equal", "full")
+
+
+@dataclass
+class UpstreamTotals:
+    """The result of :meth:`Subnetwork.accumulate`.
+
+    Attributes
+    ----------
+    nodes : pandas.Series or pandas.DataFrame
+        The total at each node: its own value plus what reaches it from upstream, indexed by
+        node (a DataFrame, one column per column of the values, if the values were one).
+
+    pipes : pandas.Series or pandas.DataFrame
+        The total carried by each pipe, indexed by pipe ID: its share of the total at its
+        upstream node (the whole total with ``split='full'``).
+
+    fractions : pandas.Series
+        The share of its upstream node's total that each pipe carries (1 for every pipe with
+        ``split='full'``).
+
+    split : str
+        ``'equal'``, ``'full'``, or ``'given'``.
+    """
+
+    nodes: pd.Series | pd.DataFrame
+    pipes: pd.Series | pd.DataFrame
+    fractions: pd.Series
+    split: str
 
 
 @dataclass
@@ -476,6 +508,170 @@ class Subnetwork:
                 ", ".join(f"{r.node} ({r.rise:.1f} m)" for r in unlisted.itertuples()),
             )
         return PumpStationReport(stations, no_force_main, unlisted)
+
+    def accumulate(
+        self,
+        values: Mapping[NodeId, float] | pd.Series | pd.DataFrame,
+        split: str | Mapping[PipeId, float] = "equal",
+    ) -> UpstreamTotals:
+        """Totals of a node value (population, flow, load, ...) upstream of every node and pipe.
+
+        A node's total is its own value plus what its inlet pipes carry; a pipe carries a share of
+        the total at its upstream node.
+
+        Parameters
+        ----------
+        values : dict, pandas.Series, or pandas.DataFrame
+            Value of each node, keyed by node ID (missing nodes count 0). A DataFrame is
+            accumulated column by column (e.g. population by zone).
+
+        split : 'equal', 'full', or dict
+            How a node's total is shared among its outlet pipes:
+
+            - ``'equal'`` (default): equally, so totals are conserved and the outlet's total is
+              the sum of all values;
+            - ``'full'``: every outlet pipe carries the whole total, i.e. each node counts every
+              node upstream of it once, whatever splits lie between (totals are not conserved
+              at a split);
+            - {pipe ID: fraction}: given fractions, e.g. from simulated flows. Outlet pipes not
+              given share what is left at their node equally. The fractions at a node must not
+              be negative or add up to more than 1.
+
+            Loops are handled exactly: within each strongly connected part of the network the
+            totals are solved as a linear system, which needs every loop to have an exit (it
+            raises otherwise).
+
+        Returns
+        -------
+        UpstreamTotals
+            ``nodes`` and ``pipes`` totals (e.g. for ``maps.plot_pipes(width=totals.pipes)``),
+            and the ``fractions`` used.
+        """
+        graph = self.graph
+        nodes = list(graph.nodes)
+        frame = values if isinstance(values, pd.DataFrame) else pd.Series(values, dtype=float)
+        frame = frame.rename(index=self.match_node) if len(frame) else frame
+        frame = frame.groupby(level=0).sum().reindex(nodes).fillna(0.0).astype(float)
+        matrix = frame.to_numpy(dtype=float).reshape(len(nodes), -1)
+        edges = list(graph.edges(keys=True))
+        if isinstance(split, str):
+            if split not in SPLITS:
+                raise ValueError(
+                    f"split must be one of {', '.join(SPLITS)}, or a dict, not {split!r}."
+                )
+            if split == "full":
+                fractions = {key: 1.0 for _, _, key in edges}
+            else:
+                fractions = {key: 1.0 / graph.out_degree(u) for u, _, key in edges}
+            name = split
+        else:
+            fractions = self._given_fractions(split, edges)
+            name = "given"
+        index = {n: i for i, n in enumerate(nodes)}
+        if name == "full":
+            totals = self._full_totals(nodes, index, matrix)
+        else:
+            totals = self._shared_totals(nodes, index, matrix, edges, fractions)
+        pipe_rows = [totals[index[u]] * fractions[key] for u, _, key in edges]
+        pipe_index = pd.Index([key for _, _, key in edges], name="pipe_id")
+        node_index = pd.Index(nodes, name="node")
+        if isinstance(frame, pd.DataFrame):
+            node_totals = pd.DataFrame(totals, index=node_index, columns=frame.columns)
+            pipe_totals = pd.DataFrame(
+                np.reshape(pipe_rows, (len(edges), matrix.shape[1])),
+                index=pipe_index,
+                columns=frame.columns,
+            )
+        else:
+            node_totals = pd.Series(totals[:, 0], index=node_index, name=frame.name)
+            pipe_totals = pd.Series(
+                [row[0] for row in pipe_rows], index=pipe_index, name=frame.name, dtype=float
+            )
+        return UpstreamTotals(
+            node_totals,
+            pipe_totals,
+            pd.Series([fractions[key] for _, _, key in edges], index=pipe_index, dtype=float),
+            name,
+        )
+
+    def _given_fractions(self, split, edges):
+        """{pipe: fraction} from given fractions, the rest of each node shared equally."""
+        given = {p: float(f) for p, f in self.match_pipes(split, "split").items()}
+        problems = [f"{p} ({f})" for p, f in given.items() if not (np.isfinite(f) and f >= 0)]
+        if problems:
+            raise ValueError(f"split: fractions must be finite and >= 0: {', '.join(problems)}")
+        fractions, over = {}, []
+        for node in self.graph.nodes:
+            outlets = [key for _, _, key in self.graph.out_edges(node, keys=True)]
+            known = sum(given[p] for p in outlets if p in given)
+            if known > 1 + 1e-9:
+                over.append(f"{node} ({known:.6g})")
+            rest = [p for p in outlets if p not in given]
+            for p in outlets:
+                fractions[p] = given[p] if p in given else max(1.0 - known, 0.0) / len(rest)
+        if over:
+            raise ValueError(f"split: fractions add up to more than 1 at {', '.join(over)}")
+        return fractions
+
+    def _shared_totals(self, nodes, index, matrix, edges, fractions):
+        """Totals with shared outflow: x = v + A x, solved component by component in flow
+        order (a dense solve within each loop)."""
+        graph = self.graph
+        totals = matrix.copy()
+        condensed = nx.condensation(graph)
+        for component in nx.topological_sort(condensed):
+            members = condensed.nodes[component]["members"]
+            if len(members) == 1:
+                (node,) = members
+                loops = sum(
+                    fractions[key] for _, v, key in graph.out_edges(node, keys=True) if v == node
+                )
+                if loops:
+                    if loops >= 1:
+                        raise ValueError(f"accumulate: the loop at {node} has no exit.")
+                    totals[index[node]] /= 1.0 - loops
+            else:
+                order = sorted(members, key=index.get)
+                local = {n: i for i, n in enumerate(order)}
+                a = np.zeros((len(order), len(order)))
+                for u in order:
+                    for _, v, key in graph.out_edges(u, keys=True):
+                        if v in local:
+                            a[local[v], local[u]] += fractions[key]
+                system = np.eye(len(order)) - a
+                if abs(np.linalg.det(system)) < 1e-12:
+                    raise ValueError(
+                        f"accumulate: a loop has no exit: {', '.join(map(str, order))}"
+                    )
+                rows = [index[n] for n in order]
+                totals[rows] = np.linalg.solve(system, totals[rows])
+            for u in members:
+                for _, v, key in graph.out_edges(u, keys=True):
+                    if v not in members:
+                        totals[index[v]] += fractions[key] * totals[index[u]]
+        return totals
+
+    def _full_totals(self, nodes, index, matrix):
+        """Totals with every upstream node counted once: the sum over each node's ancestors and
+        itself, from ancestor sets (bit masks) built over the loops' condensation."""
+        condensed = nx.condensation(self.graph)
+        masks: dict[int, int] = {}
+        totals = np.zeros_like(matrix)
+        width = (len(nodes) + 7) // 8
+        for component in nx.topological_sort(condensed):
+            mask = 0
+            for n in condensed.nodes[component]["members"]:
+                mask |= 1 << index[n]
+            for parent in condensed.predecessors(component):
+                mask |= masks[parent]
+            masks[component] = mask
+            bits = np.unpackbits(
+                np.frombuffer(mask.to_bytes(width, "little"), dtype=np.uint8), bitorder="little"
+            )[: len(nodes)].astype(bool)
+            total = matrix[bits].sum(axis=0)
+            for n in condensed.nodes[component]["members"]:
+                totals[index[n]] = total
+        return totals
 
     def validate(self, outfalls: Iterable[NodeId] | None = None) -> TopologyReport:
         """Check the topology before the subnetwork is written to an .inp file.

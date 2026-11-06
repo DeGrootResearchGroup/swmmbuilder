@@ -9,3 +9,5 @@
 ::: swmmbuilder.subnetwork.TopologyReport
 
 ::: swmmbuilder.subnetwork.PumpStationReport
+
+::: swmmbuilder.subnetwork.UpstreamTotals
