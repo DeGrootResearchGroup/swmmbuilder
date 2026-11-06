@@ -254,6 +254,50 @@ def _resolve_inputs(
     )
 
 
+def _lowest_inlet_inverts(subnetwork, inputs, slope):
+    """({station: invert}, [Derived]) of the ``station_invert='lowest_inlet'`` rule of
+    :func:`build_model`, for the stations of ``inputs`` without a ``height_correction``."""
+    pipes = subnetwork.pipes()
+    given = set(inputs.height_correction or {})
+    stations = [n for n in inputs.stations if n not in given]
+    current = lowest_inverts(pipes, set(stations))
+    found, derived = {}, []
+    for node in stations:
+        ends = []
+        arriving = pipes[pipes["to_node"] == node]
+        for pipe, us, ds, length in zip(
+            arriving["pipe_id"],
+            arriving["us_invert"],
+            arriving["ds_invert"],
+            arriving["length"],
+            strict=True,
+        ):
+            end, how = _invert(ds), "recorded downstream invert"
+            if end is None and slope is not None and _invert(us) is not None:
+                end, how = (
+                    _invert(us) - slope * float(length),
+                    f"upstream invert - {slope} x length",
+                )
+            if end is not None:
+                ends.append((end, pipe, how))
+        if not ends:
+            continue
+        end, pipe, how = min(ends)
+        before = current.get(node)
+        if before is None or end < before:
+            found[node] = end
+            basis = f"pipe {pipe} ({how}); invert from its pipes " + (
+                "none" if before is None else f"{before:.3f}"
+            )
+            derived.append(
+                Derived(
+                    "station", node, "invert", found[node], "station_invert='lowest_inlet'", basis
+                )
+            )
+            logger.info("Station %s: invert %s -> %.3f (%s)", node, before, end, basis)
+    return found, derived
+
+
 def junction_depths(subnetwork, inverts, exclude=()) -> pd.Series:
     """Rim - invert of each node of ``subnetwork`` (not in ``exclude``) whose rim elevation is
     known and above its invert in ``inverts``, rounded as written, indexed by node."""
@@ -632,6 +676,7 @@ def build_model(
     wet_well_defaults: Mapping[str, float] | None = None,
     force_main_checks: Mapping[str, Any] | None = None,
     outfall_link: bool | Mapping[str, float] | None = None,
+    station_invert: str | None = None,
     flow_units: str = "LPS",
     **fills: Any,
 ) -> SwmmModel:
@@ -791,6 +836,18 @@ def build_model(
         pump) over the full pipe area. London's preset is
         ``LONDON_ON.design['force_main_checks']``.
 
+    station_invert : {'lowest_inlet'}, optional
+        A design rule for the stations of ``pump_stations``: a station's wet well cannot sit
+        above the pipes arriving at it. A station's invert is the lowest invert of its pipes, but
+        where an arriving pipe has no downstream invert that end does not count, and the invert
+        may then come from the force main alone, metres above the arriving sewer. With
+        ``'lowest_inlet'``, each arriving pipe's downstream end is its recorded invert or, if
+        missing, its upstream invert minus ``headwater_slope`` times its length (a pipe with
+        neither, or no ``headwater_slope``, does not count), and a station whose invert is
+        above the lowest of these ends, or has none, is lowered to it. ``height_correction``
+        wins over the rule. Each change is listed in :attr:`SwmmModel.derived`. Not applied
+        unless given.
+
     outfall_link : bool or dict, optional
         Under dynamic-wave routing SWMM accepts only one link into an outfall (its ERROR 141), so
         :func:`write_inp` refuses a DYNWAVE model with an outfall that has more than one. With
@@ -846,12 +903,24 @@ def build_model(
         inflows,
         flow_units,
     )
+    lowered = []
+    if station_invert is not None:
+        if station_invert != "lowest_inlet":
+            raise ValueError(
+                f"station_invert must be 'lowest_inlet' or None, not {station_invert!r}."
+            )
+        found, lowered = _lowest_inlet_inverts(subnetwork, inputs, fills.get("headwater_slope"))
+        if found:
+            inputs = replace(
+                inputs, height_correction={**found, **(inputs.height_correction or {})}
+            )
     filled = fill_gaps(
         subnetwork, pumps=inputs.pumps, height_correction=inputs.height_correction, **fills
     )
     _refuse_remaining_gaps(subnetwork, filled)
     pipes, inverts = filled.pipes, filled.inverts
     derived = _apply_design_rules(subnetwork, inputs, pipes, inverts, wet_well_defaults)
+    derived += lowered
     if not isinstance(max_depth, (int, float)):
         depth, defaulted, basis = _default_depth(subnetwork, inputs, inverts, max_depth)
         defaults = replace(defaults, max_depth=depth)

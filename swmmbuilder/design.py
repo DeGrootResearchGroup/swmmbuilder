@@ -124,9 +124,10 @@ class Derived:
     Attributes
     ----------
     element : str
-        'storage', 'pump', or 'junction'.
+        'storage', 'pump', 'junction', or 'station'.
     id : str
-        The storage node, the pump link (``<node>_P``, ``<node>_P1``, ...), or the junction.
+        The storage node, the pump link (``<node>_P``, ``<node>_P1``, ...), the junction, or the
+        pump station node.
     attribute : str
         e.g. 'area', 'max_depth', 'startup', 'shutoff'.
     value : float
