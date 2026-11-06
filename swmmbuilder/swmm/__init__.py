@@ -72,6 +72,7 @@ from .dwf import (  # noqa: F401
 from .inflows import (  # noqa: F401
     Inflow,
     hourly_series,
+    pattern_inflows,
     resolve_inflows,
     resolve_timeseries,
 )

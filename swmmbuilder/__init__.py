@@ -1,5 +1,6 @@
 from ._types import NodeId, PipeId
 from .diagnostics import DataWarning, DesignWarning, OptionWarning, SwmmBuilderWarning
+from .land_use import LandUseAllocation, allocate_land_use
 from .network import Network, strip_leading_zeros
 from .population import PopulationAllocation, allocate_population
 from .schema import LAZY_PRESETS, LONDON_ON, Schema
@@ -13,6 +14,7 @@ from .swmm import (
     WetWell,
     dwf_from_population,
     hourly_series,
+    pattern_inflows,
 )
 
 __all__ = [
@@ -28,6 +30,7 @@ __all__ = [
     "Derived",
     "DesignWarning",
     "Inflow",
+    "LandUseAllocation",
     "Network",
     "NodeId",
     "OptionWarning",
@@ -41,9 +44,11 @@ __all__ = [
     "SwmmModel",
     "TopologyReport",
     "WetWell",
+    "allocate_land_use",
     "allocate_population",
     "dwf_from_population",
     "hourly_series",
+    "pattern_inflows",
     "strip_leading_zeros",
 ]
 

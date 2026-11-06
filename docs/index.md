@@ -19,6 +19,7 @@ the API reference, generated from the docstrings:
 - [Schemas](api/schema.md): how a city's GIS columns map to the canonical ones, and the presets;
 - [SWMM model](api/swmm.md): `build_model`, `write_inp` and the model records;
 - [Population](api/population.md): allocating the population of polygons to nodes;
+- [Land-use flows](api/land_use.md): allocating flows given per hectare of each land use to nodes;
 - [Pumps and design rules](api/pumps.md);
 - [Data gaps](api/gaps.md): reporting and filling missing sizes and inverts;
 - [Diagnostics](api/diagnostics.md): how problems are reported, and the warning categories;
