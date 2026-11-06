@@ -18,6 +18,10 @@ if TYPE_CHECKING:
     from .._types import Fields, NodeId
 
 
+# Tolerance on the mean of an hourly pattern with require_unit_mean=True.
+UNIT_MEAN_TOLERANCE = 1e-3
+
+
 @dataclass(frozen=True)
 class Inflow:
     """An external flow into a node, written to [INFLOWS] (see the ``inflows`` option of
@@ -177,6 +181,34 @@ def resolve_inflows(subnetwork, inflows, timeseries, patterns, outfalls=()) -> d
     return resolved
 
 
+def unit_mean_tolerance(require_unit_mean: bool | float) -> float | None:
+    """The tolerance on a pattern's mean meant by ``require_unit_mean`` (see
+    :func:`pattern_inflows`), or None for no check."""
+    if isinstance(require_unit_mean, bool):
+        return UNIT_MEAN_TOLERANCE if require_unit_mean else None
+    if not (_is_finite_number(require_unit_mean) and float(require_unit_mean) >= 0):
+        raise ValueError(
+            "require_unit_mean must be True, False, or a non-negative tolerance, "
+            f"not {require_unit_mean!r}."
+        )
+    return float(require_unit_mean)
+
+
+def pattern_mean_problem(name: Any, pattern: Sequence[float], tolerance: float) -> str | None:
+    """Why the mean of hourly ``pattern`` is not 1 within ``tolerance``, or None if it is (or if
+    the pattern is not numbers, which is reported elsewhere)."""
+    try:
+        values = np.asarray(pattern, dtype=float)
+    except (TypeError, ValueError):
+        return None
+    if values.ndim != 1 or not len(values) or not np.isfinite(values).all():
+        return None
+    mean = float(values.mean())
+    if abs(mean - 1.0) > tolerance:
+        return f"pattern {name} has a mean of {mean:.6g}, not 1 (tolerance {tolerance:g})"
+    return None
+
+
 def pattern_inflows(
     flows: Mapping[Any, Mapping[NodeId, float]] | pd.DataFrame,
     patterns: Mapping[Any, Sequence[float]],
@@ -184,6 +216,7 @@ def pattern_inflows(
     baseline: Mapping[NodeId, float] | None = None,
     prefix: str = "",
     ramp_minutes: float = 1.0,
+    require_unit_mean: bool | float = False,
 ) -> tuple[dict[NodeId, Inflow], dict[str, list[tuple[float, float]]]]:
     """The ``inflows`` and ``timeseries`` options of :func:`build_model` for mean flows that each
     follow an hourly pattern, e.g. the land-use flows of :func:`~swmmbuilder.allocate_land_use`.
@@ -218,6 +251,10 @@ def pattern_inflows(
     ramp_minutes : float
         See :func:`hourly_series`.
 
+    require_unit_mean : bool or float
+        Refuse a pattern whose mean is not 1: True for a tolerance of 0.001, or a tolerance.
+        False (default) accepts any mean, and the mean flows are then scaled by it.
+
     Returns
     -------
     (dict, dict)
@@ -228,7 +265,8 @@ def pattern_inflows(
     ------
     ValueError
         If a kind with a flow has no pattern, a pattern is not 24 finite numbers, a flow or
-        baseline is negative or not finite, or a series name would be used twice.
+        baseline is negative or not finite, a series name would be used twice, or (with
+        ``require_unit_mean``) a pattern's mean is not 1.
     """
     table = flows if isinstance(flows, pd.DataFrame) else pd.DataFrame(flows)
     table = table.fillna(0.0).astype(float)
@@ -243,6 +281,12 @@ def pattern_inflows(
     bad = [str(n) for n, q in baseline.items() if not (_is_finite_number(q) and float(q) >= 0)]
     if bad:
         problems.add(f"baselines must be non-negative and finite: {', '.join(bad[:20])}")
+    tolerance = unit_mean_tolerance(require_unit_mean)
+    if tolerance is not None:
+        for kind, pattern in patterns.items():
+            problem = pattern_mean_problem(kind, pattern, tolerance)
+            if problem:
+                problems.add(problem)
     problems.raise_if_any()
 
     series = {f"{prefix}{k}": hourly_series(p, days, ramp_minutes) for k, p in patterns.items()}
