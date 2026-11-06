@@ -602,29 +602,33 @@ above the receiving maintenance hole's flow line (Ch. 4, s. 4.8).
 ### Rims from a DEM
 
 A junction's maximum depth is rim − invert, so a junction with no usable rim (none recorded, or one
-at or below the invert) takes the default `max_depth`, whatever the ground above it.
-Maintenance-hole lids in streets are generally close to flush with the pavement, so a bare-earth
-ground-elevation model (DEM) from airborne lidar, such as the Ontario Digital Terrain Model
-(Lidar-Derived), estimates the missing rims. `Network.estimate_rims` samples a GeoTIFF (or a list
-of tiles, in any CRS) at the nodes, compares it with the recorded rims, and fills the missing ones.
+at or below the invert) takes the default `max_depth`, whatever the ground above it. Every such
+node is listed in `data_gaps()` as a `no_rim` gap (not blocking). Maintenance-hole lids in streets
+are generally close to flush with the pavement, so a bare-earth ground-elevation model (DEM) from
+airborne lidar, such as the Ontario Digital Terrain Model (Lidar-Derived), estimates the missing
+rims. `Network.estimate_rims` samples a GeoTIFF (or a list of tiles, in any CRS) at the nodes,
+compares it with the recorded rims, and estimates the missing ones; it does not change the network.
 It needs the `elevation` extra (`pip install "swmmbuilder[elevation]"`: rasterio).
 
 ```python
-check = net.estimate_rims("dtm.tif", window=1.0, fill=False)  # compare only
-print(check.summary())               # recorded rim - DEM: median, IQR, 5-95 %, largest
-check.largest_differences(10)        # recorded rims that are probably wrong, or raised lids
 est = net.estimate_rims(["tile_1.tif", "tile_2.tif"], window=1.0, offset="median")
+print(est.summary())                 # recorded rim - DEM: median, IQR, 5-95 %, largest
+est.largest_differences(10)          # recorded rims that are probably wrong, or raised lids
 est.samples                          # DEM value, difference, estimate and status of each node
+sub.to_inp("model.inp", rims=est.rims, max_depth="median")
 ```
 
 - `window=0` (default) takes the cell at the node; `window=1.0` the median (or `statistic="mean"`)
   of the cells within 1 m, to soften curbs and ditches.
-- Only nodes with no usable rim are filled, with the DEM value plus `offset` (a number, or
+- Only nodes with no usable rim are estimated, as the DEM value plus `offset` (a number, or
   `"median"`: the median recorded rim − DEM). A DEM rim at or below the invert is not used (a
-  `DataWarning` gives the count). Recorded rims are never replaced.
-- Each filled rim is logged, kept in `net.estimated_rims`, and listed in `data_gaps()` as a
-  `no_rim` gap filled from `estimate_rims`, with the DEM as its source. Subnetworks made before
-  the fill are out of date; `snap_nodes` discards the estimates.
+  `DataWarning` gives the count). Usable recorded rims are never replaced.
+- The `rims` fill option (of `to_inp`, `build_model`, `data_gaps`, and `fill_gaps`) fills the
+  `no_rim` gaps: rims from `est.rims` are flagged as filled from `estimate_rims`, with the DEM as
+  their source, and any other `{node: rim}` mapping as filled from `rims`. A given rim at or below
+  the node's invert is not used, with a `DataWarning`.
+- Filled rims count as usable for `max_depth="median"` (or a function): they enter the median, and
+  the junctions they fill are no longer given the default depth (nor listed in `derived`).
 
 Caveats: lids in fields, ravines, or easements are often raised above grade, and structures under
 bridges, at creek crossings, or inside buildings cannot be read from the ground surface. A

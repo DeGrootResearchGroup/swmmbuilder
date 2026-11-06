@@ -2,9 +2,11 @@
 
 A maintenance-hole lid in a street is generally close to flush with the pavement, so the ground
 elevation at a node estimates its rim. :meth:`Network.estimate_rims` samples a bare-earth DEM
-(e.g. one derived from airborne lidar) at the nodes, compares it with the recorded rims, and fills
-the rims that are missing; this module does the sampling (:func:`sample_dem`) and holds the
-result (:class:`RimEstimate`).
+(e.g. one derived from airborne lidar) at the nodes, compares it with the recorded rims, and
+estimates the rims that are missing or not above the invert; passing its :attr:`RimEstimate.rims`
+to the ``rims`` option of :meth:`Subnetwork.to_inp` uses them. Usable recorded rims are never
+replaced. This module does the sampling (:func:`sample_dem`) and holds the result
+(:class:`RimEstimate`).
 
 Reading a raster needs rasterio, an optional dependency: ``pip install 'swmmbuilder[elevation]'``.
 
@@ -48,9 +50,8 @@ STATISTICS = ("median", "mean")
 STATUSES = {
     "compared": "usable recorded rim, compared with the DEM",
     "no_dem_value": "no DEM value at the node (outside the DEM, no data, or no point)",
-    "filled": "no usable rim; filled from the DEM",
+    "estimated": "no usable rim; estimated from the DEM (in RimEstimate.rims)",
     "dem_not_above_invert": "no usable rim; the DEM estimate is not above the invert, not used",
-    "not_filled": "no usable rim; not filled (fill=False)",
 }
 
 # Metres per degree of latitude (and of longitude at the equator), for a window on a DEM in
@@ -139,13 +140,26 @@ def sample_dem(
         raise ValueError(f"statistic must be one of {list(STATISTICS)}; got {statistic!r}.")
     combine = np.median if statistic == "median" else np.mean
     rasterio = _rasterio()
+    present = points[points.notna() & ~points.is_empty]
+    # The points in each raster CRS, transformed once per CRS (tiles usually share one).
+    projected: dict[Any, tuple[np.ndarray, np.ndarray]] = {}
     found: dict[Any, list[np.ndarray]] = {}
     for source in _sources(dem):
         opened = not hasattr(source, "read")
         dataset = rasterio.open(source) if opened else source
         try:
-            for index, values in _sample_raster(dataset, points, window):
-                found.setdefault(index, []).append(values)
+            if (points.crs is None) != (dataset.crs is None):
+                raise ValueError(
+                    f"DEM {dem_name(dataset)}: the CRS of the raster ({dataset.crs}) and of the "
+                    f"network ({points.crs}) must both be known to sample it."
+                )
+            key = None if dataset.crs is None else dataset.crs.to_wkt()
+            if key not in projected:
+                moved = present if key is None else present.to_crs(key)
+                projected[key] = (moved.x.to_numpy(), moved.y.to_numpy())
+            xs, ys = projected[key]
+            for i, values in _sample_raster(dataset, xs, ys, window):
+                found.setdefault(present.index[i], []).append(values)
         finally:
             if opened:
                 dataset.close()
@@ -157,45 +171,46 @@ def sample_dem(
     return result
 
 
-def _sample_raster(dataset, points, window):
-    """Yield (index, values of the cells sampled) for the points the raster covers."""
+def _sample_raster(dataset, xs, ys, window):
+    """Yield (position in ``xs``, values of the cells sampled) for the points (in the raster's
+    CRS) that the raster covers, within the window's reach."""
     if dataset.count != 1:
         raise ValueError(
             f"DEM {dem_name(dataset)} has {dataset.count} bands; give a single-band raster."
         )
-    if (points.crs is None) != (dataset.crs is None):
-        raise ValueError(
-            f"DEM {dem_name(dataset)}: the CRS of the raster ({dataset.crs}) and of the network "
-            f"({points.crs}) must both be known to sample it."
-        )
-    present = points[points.notna() & ~points.is_empty]
-    if dataset.crs is not None:
-        present = present.to_crs(dataset.crs.to_wkt())
-    if present.empty:
+    if not len(xs):
         return
     transform = dataset.transform
-    inverse = ~transform
-    xs, ys = present.x.to_numpy(), present.y.to_numpy()
-    cols, rows = _apply(inverse, xs, ys)
+    cols, rows = _apply(~transform, xs, ys)
     cols, rows = np.floor(cols).astype(int), np.floor(rows).astype(int)
 
-    # The window radius in raster units and in cells.
+    # The window radius in cells, and the metres per raster unit in x and y at each point.
+    geographic = dataset.crs is not None and dataset.crs.is_geographic
+    if geographic:
+        metres_x = _METRES_PER_DEGREE * np.cos(np.radians(ys))
+        metres_y = np.full(len(ys), _METRES_PER_DEGREE)
+    else:
+        factor = dataset.crs.linear_units_factor[1] if dataset.crs is not None else 1.0
+        metres_x = metres_y = np.full(len(ys), factor)
     if window > 0:
-        geographic = dataset.crs is not None and dataset.crs.is_geographic
-        if geographic:
-            units_x = window / (_METRES_PER_DEGREE * np.cos(np.radians(ys)))
-            units_y = np.full(len(ys), window / _METRES_PER_DEGREE)
-        else:
-            factor = dataset.crs.linear_units_factor[1] if dataset.crs is not None else 1.0
-            units_x = units_y = np.full(len(ys), window / factor)
         cell_x = math.hypot(transform.a, transform.d)
         cell_y = math.hypot(transform.b, transform.e)
-        reach = np.ceil(np.maximum(units_x / cell_x, units_y / cell_y)).astype(int)
+        reach = np.ceil(np.maximum(window / metres_x / cell_x, window / metres_y / cell_y)).astype(
+            int
+        )
     else:
         reach = np.zeros(len(ys), dtype=int)
 
+    # Only the points whose window meets the raster (vectorized: a city's nodes against one of
+    # many tiles).
+    inside = np.flatnonzero(
+        (rows + reach >= 0)
+        & (rows - reach < dataset.height)
+        & (cols + reach >= 0)
+        & (cols - reach < dataset.width)
+    )
     nodata = dataset.nodata
-    for i, index in enumerate(present.index):
+    for i in inside:
         r0, r1 = rows[i] - reach[i], rows[i] + reach[i] + 1
         c0, c1 = cols[i] - reach[i], cols[i] + reach[i] + 1
         r0, c0 = max(r0, 0), max(c0, 0)
@@ -209,17 +224,11 @@ def _sample_raster(dataset, points, window):
         if reach[i] > 0:
             rr, cc = np.mgrid[r0:r1, c0:c1]
             cx, cy = _apply(transform, cc + 0.5, rr + 0.5)
-            dx, dy = (cx - xs[i]), (cy - ys[i])
-            if dataset.crs is not None and dataset.crs.is_geographic:
-                dx = dx * _METRES_PER_DEGREE * np.cos(np.radians(ys[i]))
-                dy = dy * _METRES_PER_DEGREE
-            elif dataset.crs is not None:
-                dx = dx * dataset.crs.linear_units_factor[1]
-                dy = dy * dataset.crs.linear_units_factor[1]
+            dx, dy = (cx - xs[i]) * metres_x[i], (cy - ys[i]) * metres_y[i]
             near = np.hypot(dx, dy) <= window
             near |= (rr == rows[i]) & (cc == cols[i])
             valid &= near
-        yield index, block[valid]
+        yield i, block[valid]
 
 
 def _apply(transform, x, y):
@@ -230,18 +239,29 @@ def _apply(transform, x, y):
     )
 
 
+class Rims(dict):
+    """{node: rim (m)} with the ``source`` the rims came from, written in the ``source`` column
+    of the data-gaps report when they are passed as the ``rims`` option (see
+    :attr:`RimEstimate.rims`)."""
+
+    def __init__(self, rims: Any = (), source: str = "") -> None:
+        super().__init__(rims)
+        self.source = source
+
+
 @dataclass
 class RimEstimate:
-    """Rims estimated from a DEM by :meth:`Network.estimate_rims`.
+    """Rims estimated from a DEM by :meth:`Network.estimate_rims`. The network is not changed:
+    pass :attr:`rims` to the ``rims`` option of :meth:`Subnetwork.to_inp` (or
+    :meth:`Subnetwork.data_gaps`) to use them.
 
     Attributes
     ----------
     samples : pandas.DataFrame
-        One row per node sampled, indexed by node ID: ``recorded_rim`` (the node's rim before the
-        estimate, NaN if none), ``invert``, ``dem`` (the DEM value, NaN if none), ``difference``
-        (recorded rim - DEM, for the nodes compared), ``estimate`` (DEM + ``offset``), and
-        ``status`` (see :data:`STATUSES`): 'compared', 'no_dem_value', 'filled',
-        'dem_not_above_invert' or 'not_filled'.
+        One row per node sampled, indexed by node ID: ``recorded_rim`` (NaN if none),
+        ``invert``, ``dem`` (the DEM value, NaN if none), ``difference`` (recorded rim - DEM, for
+        the nodes compared), ``estimate`` (DEM + ``offset``), and ``status`` (see
+        :data:`STATUSES`): 'compared', 'no_dem_value', 'estimated' or 'dem_not_above_invert'.
 
     offset : float
         Added to the DEM values to estimate the rims, in m (the median difference if
@@ -262,9 +282,17 @@ class RimEstimate:
         return self.samples[self.samples["status"] == "compared"]
 
     @property
-    def filled(self) -> pd.DataFrame:
-        """The rows of ``samples`` whose rim was filled from the DEM."""
-        return self.samples[self.samples["status"] == "filled"]
+    def estimated(self) -> pd.DataFrame:
+        """The rows of ``samples`` with no usable rim and an estimate above the invert."""
+        return self.samples[self.samples["status"] == "estimated"]
+
+    @property
+    def rims(self) -> Rims:
+        """{node: estimated rim} of the nodes with no usable rim whose estimate is above the
+        invert, for the ``rims`` option of :meth:`Subnetwork.to_inp`, which fills them (gap
+        ``no_rim``, filled from ``estimate_rims``, with :attr:`source` as its source)."""
+        estimated = self.estimated["estimate"]
+        return Rims({n: float(v) for n, v in estimated.items()}, self.source)
 
     @property
     def validation(self) -> pd.Series:

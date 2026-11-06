@@ -21,11 +21,12 @@ earlier history is in the git log.
 - **Rims from a ground-elevation model**: `Network.estimate_rims(dem)` samples a lidar DEM (a
   GeoTIFF or a list of tiles, in any CRS) at the nodes, at the cell or as the median within a
   window. It compares the DEM with the recorded rims (`RimEstimate.validation`, median offset and
-  spread, and `largest_differences`), and fills only the rims that are missing or not above the
-  invert, optionally after adding an offset such as the median difference. A DEM rim at or below
-  the invert is not used. Each filled rim is listed in `data_gaps()` as a `no_rim` gap filled from
-  `estimate_rims`, with the DEM as its source. Reading rasters needs the new `elevation` extra
-  (rasterio) (#112).
+  spread, and `largest_differences`), and estimates the rims that are missing or not above the
+  invert, optionally after adding an offset such as the median difference; a DEM rim at or below
+  the invert is not used. It does not change the network: the new `rims` fill option
+  (`to_inp(rims=estimate.rims)`) fills them, flagged in `data_gaps()` as filled from
+  `estimate_rims` with the DEM as their source. Filled rims count for `max_depth='median'`.
+  Reading rasters needs the new `elevation` extra (rasterio) (#112).
 - Releases are published to PyPI from GitHub releases (`publish.yml`, trusted publishing), and the
   README installs from PyPI.
 - **Population allocation**: `allocate_population` places the population of polygons (census
@@ -96,6 +97,13 @@ earlier history is in the git log.
   their direction are matched by their other end, and each node-layer point goes to the nearest
   structure. Every split is logged and listed in `Network.split_report`, and snapping never
   merges the structures of one ID again.
+
+### Changed
+
+- **Data-gaps reports list nodes with no usable rim**: `data_gaps()`, `model.data_gaps`, and
+  `TopologyReport.data_gaps` now have a `no_rim` row (not blocking) for every node with no rim
+  recorded, or one at or below the invert, so existing reports gain rows. Unless the `rims` option
+  fills it, such a junction takes the default `max_depth`, as before (#112).
 
 ### Fixed
 

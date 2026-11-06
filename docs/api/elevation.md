@@ -5,4 +5,5 @@
       members:
         - sample_dem
         - RimEstimate
+        - Rims
         - STATUSES

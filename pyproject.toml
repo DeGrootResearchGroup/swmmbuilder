@@ -30,7 +30,8 @@ Issues = "https://github.com/DeGrootResearchGroup/swmmbuilder/issues"
 # Google Maps export (maps.generate_gmap).
 maps = ["contextily", "xyzservices", "folium", "gmplot"]
 # Rims estimated from a ground-elevation model (Network.estimate_rims): reading GeoTIFF DEMs.
-elevation = ["rasterio"]
+# rasterio's 1.x series is pinned, so that a 2.0 release cannot change the reading API unnoticed.
+elevation = ["rasterio>=1.3,<2"]
 # Running the written .inp files. swmmbuilder itself never imports pyswmm, and pyswmm pulls in
 # julian, an sdist-only package that fails to build on some Python 3.13 setups, so it is optional.
 simulate = ["pyswmm"]
@@ -51,7 +52,7 @@ test = [
   "folium",
   "gmplot",
   "pyswmm",
-  "rasterio",
+  "rasterio>=1.3,<2",
 ]
 
 # Found, not listed, so that subpackages (swmmbuilder.swmm, swmmbuilder.maps) are installed too.

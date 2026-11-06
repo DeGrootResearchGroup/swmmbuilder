@@ -4,12 +4,13 @@ import sys
 
 import geopandas as gpd
 import numpy as np
+import pandas as pd
 import pytest
 from conftest import DENDRITIC, nodes_of
 from pyproj import Transformer
 from shapely import Point
 
-from swmmbuilder import DataWarning, OptionWarning
+from swmmbuilder import DataWarning, OptionWarning, swmm
 from swmmbuilder.elevation import RimEstimate, sample_dem
 
 CRS = "EPSG:2958"  # the fixture's: NAD83(CSRS) / UTM zone 17N
@@ -178,7 +179,7 @@ def test_rasterio_is_needed(network, monkeypatch):
 
 def test_the_validation_report(network, recorded, dem):
     record_rims(network, {"J1": recorded["J1"] + 1.5})  # a probably wrong recorded rim
-    estimate = network.estimate_rims(dem, fill=False)
+    estimate = network.estimate_rims(dem)
     assert isinstance(estimate, RimEstimate)
     v = estimate.validation
     assert v["count"] == 4
@@ -189,75 +190,40 @@ def test_the_validation_report(network, recorded, dem):
     assert "median +0.10" in estimate.summary()
 
 
-def test_compare_only_changes_nothing(network, recorded, dem):
-    version = network.version
-    estimate = network.estimate_rims(dem, fill=False)
-    assert network.version == version and network.estimated_rims == {}
-    assert network.nodes["rim_elevation"].notna().sum() == len(recorded)
-    assert (estimate.samples["status"] == "not_filled").sum() == len(network.nodes) - len(recorded)
-
-
-# --- filling ----------------------------------------------------------------------------------
-
-
-def test_only_missing_rims_are_filled(network, recorded, dem):
-    estimate = network.estimate_rims(dem)
-    rims = network.nodes["rim_elevation"]
-    for node, rim in recorded.items():
-        assert rims[node] == rim
-    filled = set(network.nodes.index) - set(recorded)
-    assert set(estimate.filled.index) == filled
-    for node in filled:
-        assert rims[node] == pytest.approx(ground_at(network, node), abs=2e-3)
-        assert network.graph.nodes[node]["rim_elevation"] == rims[node]
-    assert set(network.estimated_rims) == filled
-    rim, detail, source = network.estimated_rims["C1"]
-    assert detail == "no rim recorded" and source == "DEM dem.tif"
-
-
-def test_filled_rims_are_flagged_in_the_data_gaps(network, recorded, dem):
-    network.estimate_rims(dem, window=1.0, offset=0.05)
-    sub = network.subnetwork(nodes_of(DENDRITIC))
-    report = sub.data_gaps()
-    rows = report[report["gap"] == "no_rim"].set_index("id")
-    assert set(rows.index) == set(sub.nodes) - set(recorded)
-    assert set(rows["filled_from"]) == {"estimate_rims"}
-    assert set(rows["source"]) == {"DEM dem.tif, median within 1 m, offset +0.050 m"}
-    assert rows.loc["C1", "value"] == network.nodes.loc["C1", "rim_elevation"]
-    assert rows.loc["C1", "detail"] == "no rim recorded"
-    assert sub.validate().data_gaps["no_rim"] == len(rows)
-
-
-def test_the_model_takes_rim_minus_invert(network, recorded, dem):
+def test_estimating_changes_nothing(network, recorded, dem):
+    version, nodes = network.version, network.nodes.copy()
     network.estimate_rims(dem)
-    sub = network.subnetwork(nodes_of(DENDRITIC))
-    from swmmbuilder import swmm
+    assert network.version == version
+    pd.testing.assert_frame_equal(network.nodes, nodes)
+    assert "rim_elevation" not in network.graph.nodes["C1"]
 
-    model = swmm.build_model(sub, ["OUT"])
-    depths = {j.name: j.max_depth for j in model.junctions}
-    nodes = network.nodes
-    assert depths["C1"] == pytest.approx(
-        nodes.loc["C1", "rim_elevation"] - nodes.loc["C1", "invert"]
-    )
-    assert model.data_gaps["gap"].eq("no_rim").sum() == 4  # B2, C1, J2, OUT
+
+# --- estimates --------------------------------------------------------------------------------
+
+
+def test_only_nodes_with_no_usable_rim_are_estimated(network, recorded, dem):
+    estimate = network.estimate_rims(dem)
+    missing = set(network.nodes.index) - set(recorded)
+    assert set(estimate.estimated.index) == missing
+    rims = estimate.rims
+    assert set(rims) == missing
+    for node in missing:
+        assert rims[node] == pytest.approx(ground_at(network, node), abs=2e-3)
+    assert rims.source == "DEM dem.tif"
 
 
 def test_median_offset(network, recorded, dem):
     estimate = network.estimate_rims(dem, offset="median")
     assert estimate.offset == pytest.approx(LID, abs=2e-3)
-    assert network.nodes.loc["C1", "rim_elevation"] == pytest.approx(
-        ground_at(network, "C1") + LID, abs=3e-3
-    )
+    assert estimate.rims["C1"] == pytest.approx(ground_at(network, "C1") + LID, abs=3e-3)
 
 
 def test_a_rim_below_the_invert_is_not_usable(network, recorded, dem):
     invert = network.nodes.loc["C1", "invert"]
     record_rims(network, {"C1": invert - 1.0})
     estimate = network.estimate_rims(dem)
-    assert estimate.samples.loc["C1", "status"] == "filled"
-    rim, detail, _ = network.estimated_rims["C1"]
-    assert rim == pytest.approx(ground_at(network, "C1"), abs=2e-3)
-    assert detail == f"recorded rim {invert - 1.0:g} not above the invert {invert:g}"
+    assert estimate.samples.loc["C1", "status"] == "estimated"
+    assert estimate.rims["C1"] == pytest.approx(ground_at(network, "C1"), abs=2e-3)
 
 
 def test_a_dem_rim_at_or_below_the_invert_is_refused(network, recorded, dem):
@@ -265,9 +231,7 @@ def test_a_dem_rim_at_or_below_the_invert_is_refused(network, recorded, dem):
     with pytest.warns(DataWarning, match="1 rims from the DEM are at or below the invert"):
         estimate = network.estimate_rims(dem)
     assert estimate.samples.loc["C1", "status"] == "dem_not_above_invert"
-    assert np.isnan(network.nodes.loc["C1", "rim_elevation"])
-    assert "rim_elevation" not in network.graph.nodes["C1"]
-    assert "C1" not in network.estimated_rims
+    assert "C1" not in estimate.rims
 
 
 def test_a_node_with_no_dem_value_is_left(network, recorded, tmp_path):
@@ -276,41 +240,98 @@ def test_a_node_with_no_dem_value_is_left(network, recorded, tmp_path):
     path = write_dem(tmp_path / "west.tif", ground(xs, ys))
     estimate = network.estimate_rims(path)
     assert estimate.samples.loc["C1", "status"] == "no_dem_value"
-    assert "C1" not in network.estimated_rims
+    assert "C1" not in estimate.rims
 
 
 def test_some_nodes_only(network, recorded, dem):
     estimate = network.estimate_rims(dem, nodes=["C1", "A1"])
     assert sorted(estimate.samples.index) == ["A1", "C1"]
-    assert list(network.estimated_rims) == ["C1"]
+    assert list(estimate.rims) == ["C1"]
     with pytest.raises(ValueError, match="not in the network"):
         network.estimate_rims(dem, nodes=["nowhere"])
 
 
-def test_estimating_again_does_not_compare_with_the_estimates(network, recorded, dem):
-    network.estimate_rims(dem)
-    again = network.estimate_rims(dem, offset=0.2)
-    assert again.validation["count"] == len(recorded)
-    assert network.nodes.loc["C1", "rim_elevation"] == pytest.approx(
-        ground_at(network, "C1") + 0.2, abs=2e-3
+# --- the rims option --------------------------------------------------------------------------
+
+
+def no_rim_rows(report):
+    return report[report["gap"] == "no_rim"].set_index("id")
+
+
+def test_every_node_with_no_usable_rim_is_a_gap(network, recorded):
+    invert = network.nodes.loc["C1", "invert"]
+    record_rims(network, {"C1": invert - 1.0})
+    sub = network.subnetwork(nodes_of(DENDRITIC))
+    rows = no_rim_rows(sub.data_gaps())
+    assert set(rows.index) == {"B2", "C1", "J2", "OUT"}
+    assert rows["filled_from"].isna().all()
+    assert rows.loc["B2", "detail"] == "no rim recorded"
+    assert (
+        rows.loc["C1", "detail"] == f"recorded rim {invert - 1.0:g} not above the invert {invert:g}"
     )
+    assert sub.validate().data_gaps["no_rim"] == 4
+
+
+def test_estimated_rims_are_flagged_in_the_data_gaps(network, recorded, dem):
+    estimate = network.estimate_rims(dem, window=1.0, offset=0.05)
     sub = network.subnetwork(nodes_of(DENDRITIC))
-    report = sub.data_gaps()
-    assert report["gap"].eq("no_rim").sum() == 4  # one row per node, not one per call
+    rows = no_rim_rows(sub.data_gaps(rims=estimate.rims))
+    assert set(rows.index) == {"B2", "C1", "J2", "OUT"}
+    assert set(rows["filled_from"]) == {"estimate_rims"}
+    assert set(rows["source"]) == {"DEM dem.tif, median within 1 m, offset +0.050 m"}
+    assert rows.loc["C1", "value"] == estimate.rims["C1"]
+    assert rows.loc["C1", "detail"] == "no rim recorded"
 
 
-def test_earlier_subnetworks_are_out_of_date(network, recorded, dem):
+def test_a_plain_mapping_is_filled_from_rims(network, recorded):
     sub = network.subnetwork(nodes_of(DENDRITIC))
-    network.estimate_rims(dem)
-    with pytest.raises(RuntimeError, match="out of date"):
-        sub.data_gaps()
+    rows = no_rim_rows(sub.data_gaps(rims={"C1": 112.0}))
+    assert rows.loc["C1", "filled_from"] == "rims" and rows.loc["C1", "value"] == 112.0
+    assert rows["filled_from"].notna().sum() == 1
 
 
-def test_snapping_discards_the_estimates(network, recorded, dem):
-    network.estimate_rims(dem)
-    with pytest.warns(OptionWarning, match="rims estimated from the DEM were discarded"):
-        network.snap_nodes(tolerance=1e6, max_invert_difference=0.0)
-    assert network.estimated_rims == {}
+def test_the_model_takes_rim_minus_invert(network, recorded, dem):
+    estimate = network.estimate_rims(dem)
+    sub = network.subnetwork(nodes_of(DENDRITIC))
+    model = swmm.build_model(sub, ["OUT"], rims=estimate.rims)
+    depths = {j.name: j.max_depth for j in model.junctions}
+    invert = network.nodes.loc["C1", "invert"]
+    assert depths["C1"] == pytest.approx(round(estimate.rims["C1"] - invert, 4))
+    assert depths["A1"] == pytest.approx(
+        round(recorded["A1"] - network.nodes.loc["A1", "invert"], 4)
+    )
+    assert model.data_gaps["filled_from"].eq("estimate_rims").sum() == 4  # B2, C1, J2, OUT
+
+
+def test_estimated_rims_count_for_the_median_depth(network, recorded, dem):
+    sub = network.subnetwork(nodes_of(DENDRITIC))
+    before = swmm.build_model(sub, ["OUT"], max_depth="median")
+    assert {d.id for d in before.derived} == {"B2", "C1", "J2"}
+    estimate = network.estimate_rims(dem)
+    after = swmm.build_model(sub, ["OUT"], max_depth="median", rims=estimate.rims)
+    assert after.derived == []
+    inverts = swmm.node_inverts(sub)
+    junctions = [n for n in sub.nodes if n != "OUT"]
+    rims = {**recorded, **estimate.rims}
+    expected = np.median([round(rims[n] - inverts[n], 4) for n in junctions])
+    written = {j.name: j.max_depth for j in after.junctions}
+    assert np.median([written[n] for n in junctions]) == pytest.approx(expected)
+
+
+def test_a_given_rim_at_or_below_the_invert_is_refused_at_build_time(network, recorded):
+    sub = network.subnetwork(nodes_of(DENDRITIC))
+    invert = network.nodes.loc["C1", "invert"]
+    with pytest.warns(DataWarning, match="rims at or below the node invert, not used: C1"):
+        model = swmm.build_model(sub, ["OUT"], max_depth=1.5, rims={"C1": invert})
+    assert {j.name: j.max_depth for j in model.junctions}["C1"] == 1.5
+    rows = no_rim_rows(model.data_gaps)
+    assert pd.isna(rows.loc["C1", "filled_from"])
+
+
+def test_rims_for_unknown_nodes_are_named(network, recorded):
+    sub = network.subnetwork(nodes_of(DENDRITIC))
+    with pytest.warns(OptionWarning, match="rims: nodes not in the network, ignored: nowhere"):
+        sub.data_gaps(rims={"nowhere": 100.0})
 
 
 @pytest.mark.parametrize(
