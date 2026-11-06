@@ -205,6 +205,33 @@ import logging
 logging.basicConfig(level=logging.INFO)
 ```
 
+### Pipes crossing a catchment's boundary
+
+A subnetwork keeps only the pipes with both ends in it. So a node with two outlets, one draining to
+the catchment's outlet and one elsewhere, is in the catchment, but its other pipe is not, and the
+written model sends all of its flow to the outlet. `catchment()` checks for this, and for networks
+that end beside the outlet without joining it:
+
+```python
+sub = net.catchment("OUT")       # DataWarning for splits and force mains leaving, and nearby ends
+b = sub.boundary_pipes(values=alloc.nodes)   # every crossing pipe, classified
+net.ends()                       # every node with no outlet, by the size of what drains to it
+```
+
+- `boundary_pipes()` classifies each pipe as `force_main` (e.g. a station's second force main),
+  `split` (a gravity pipe leaving a node with area upstream), `summit` (one of two runs starting
+  at a maintenance hole on the ridge between catchments, with nothing upstream; only logged), or
+  `inflow` (entering). It gives the nodes (and, with `values`, e.g. the population) upstream of
+  each, the ends its flow reaches in the whole network, the nodes draining to them outside the
+  subnetwork, and their distance from the subnetwork's outlet. `validate().boundary` holds the
+  same table, and `summary()` its counts.
+- `catchment(near=100)` warns when another network ends within `near` metres of the outlet: on
+  London's data, the end of a 1,170-node network delivered to the Greenway plant by its own force
+  main lies 25 m from the low-level station that receives the rest. Join such an inlet to the
+  outlet (a pipe added to the data) if both reach the same plant.
+- `Network.ends()` lists where the network's flow ends. The treatment plants are the few large
+  ends, so the outlets you model can be checked against the city.
+
 ### Summaries
 
 The results of the main steps reduce to the numbers a report cites with `summary()`, a flat

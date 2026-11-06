@@ -20,6 +20,14 @@ earlier history is in the git log.
 
 ### Added
 
+- **Pipes crossing a subnetwork's boundary** (#152): `Subnetwork.boundary_pipes(values=None)`
+  lists the pipes with one end in the subnetwork, which it leaves out, classified as `force_main`,
+  `split`, `summit`, or `inflow`, with the nodes (or values) upstream, where a leaving pipe's flow
+  ends, and how far that is from the subnetwork's outlet. `TopologyReport.boundary` holds it and
+  `summary()` gains `boundary_outflows`, `boundary_inflows`, and `boundary_splits`.
+  `Network.catchment` warns (`DataWarning`) about splits and force mains leaving the catchment,
+  and about other networks ending within `near` (default 100 m) of its outlet, a likely second
+  inlet. `Network.ends()` lists every node with no outlet and the nodes draining to it.
 - **Pump every station found** (#135): `pump_stations` also takes `"found"` or a
   `PumpStationReport`, pumping every station of `Subnetwork.find_pump_stations()` with
   `default_pump` (given, or the schema's with `design="schema"`). `pump_stations_exclude` ({node: reason}) leaves out stations, stations with no
