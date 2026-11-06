@@ -23,6 +23,10 @@ earlier history is in the git log.
   to share by. Each share is placed at the pipe's upstream node, downstream node, or both. The
   result reports the population of polygons with no pipe, and its `nodes` feed
   `dwf_from_population`.
+- **Spreading a flow over the pipes**: `distribute_flow` shares a total flow (e.g. groundwater
+  infiltration) among the pipes of a network or catchment by length, diameter times length, or
+  any weight, or gives each pipe a rate per unit of weight, and places it at the upstream nodes
+  (or downstream, or half at each). Force mains take none unless asked (#100).
 - **Land-use flows**: `allocate_land_use` places flows given per hectare of each land use (e.g.
   commercial, institutional, and industrial design allowances) on the nodes of a network (#99).
   Pipes go to zoning polygons by the rules of `allocate_population`; each rated polygon's area,

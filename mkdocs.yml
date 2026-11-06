@@ -18,6 +18,7 @@ nav:
       - SWMM model: api/swmm.md
       - Population: api/population.md
       - Land-use flows: api/land_use.md
+      - Spreading a flow: api/distribute.md
       - Pumps and design rules: api/pumps.md
       - Data gaps: api/gaps.md
       - Diagnostics: api/diagnostics.md
