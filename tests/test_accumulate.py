@@ -1,11 +1,13 @@
 """Subnetwork.accumulate: totals of a node value upstream of each node and pipe (#107)."""
 
+import numpy as np
 import pandas as pd
 import pytest
 from conftest import DENDRITIC, subnetwork
 from test_population import make_network
 
 from swmmbuilder import UpstreamTotals
+from swmmbuilder.subnetwork import _trapped
 
 ONES = dict.fromkeys(["A1", "A2", "B1", "B2", "C1", "J1", "J2", "OUT"], 1.0)
 
@@ -89,3 +91,36 @@ def test_a_loop_with_no_exit():
     sub = make_network(pipes).subnetwork(["N1", "N2", "N3"])
     with pytest.raises(ValueError, match="has no exit"):
         sub.accumulate(dict.fromkeys(["N1", "N2", "N3"], 1.0))
+
+
+def two_way_chain(n):
+    """N0 ... N<n-1> joined by pipes both ways, with exits N0 -> A and N<n-1> -> B."""
+    pipes = []
+    for i in range(n - 1):
+        pipes.append((i + 1, f"N{i}", f"N{i + 1}", 10 * i, 10 * i + 10, 1))
+        pipes.append((1000 + i, f"N{i + 1}", f"N{i}", 10 * i + 10, 10 * i, 1, 60))
+    pipes.append((5000, "N0", "A", -10, 0, 1))
+    pipes.append((5001, f"N{n - 1}", "B", 10 * n - 10, 10 * n, 1))
+    return make_network(pipes).subnetwork([*(f"N{i}" for i in range(n)), "A", "B"])
+
+
+def test_a_long_loop_with_exits_is_solved():
+    # A determinant test refused this: det(I - A) = 61 / 2**60, about 5e-17 (#119).
+    n = 60
+    sub = two_way_chain(n)
+    totals = sub.accumulate({f"N{i}": 1.0 for i in range(n)})
+    assert totals.nodes["A"] == pytest.approx(n / 2)
+    assert totals.nodes["B"] == pytest.approx(n / 2)
+    assert totals.nodes["A"] + totals.nodes["B"] == pytest.approx(n)
+
+
+def test_only_the_nodes_with_no_exit_are_named():
+    # Shares within a loop: 0 -> 1 -> 2 -> 1 (nodes 1 and 2 send everything to each other), and
+    # node 0 sends half its total out.
+    a = np.zeros((3, 3))
+    a[1, 0] = 0.5
+    a[2, 1] = 1.0
+    a[1, 2] = 1.0
+    assert _trapped(["x", "y", "z"], a) == ["y", "z"]
+    a[1, 2] = 0.9  # z now sends a tenth out: every node reaches an exit
+    assert _trapped(["x", "y", "z"], a) == []
