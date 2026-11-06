@@ -23,6 +23,11 @@ earlier history is in the git log.
   to share by. Each share is placed at the pipe's upstream node, downstream node, or both. The
   result reports the population of polygons with no pipe, and its `nodes` feed
   `dwf_from_population`.
+- **Wet wells below the arriving sewers**: the opt-in design rule `station_invert='lowest_inlet'`
+  lowers a pump station's invert to the lowest end of the pipes arriving at it, extrapolating a
+  missing downstream invert at `headwater_slope`, so that a station whose invert would otherwise
+  come from its force main alone does not sit above its inlet sewer. Each change is listed in
+  `SwmmModel.derived` (#103).
 - **Default junction depth from the recorded depths**: `max_depth='median'` gives every junction
   with no usable rim the median rim - invert of the junctions that have one (the depths written);
   a function of those depths also works. Each junction given it is listed in
