@@ -266,3 +266,21 @@ def test_names_swmm_cannot_read_are_refused(name):
     model = swmm.SwmmModel(junctions=[swmm.Junction(name, 100.0, 0.0, 0.0, 0.0, 0.0)])
     with pytest.raises(ValueError, match="whitespace or ';'"):
         model.sections()
+
+
+def test_flows_keep_their_significant_figures():
+    """A small flow in CMS is not rounded to DECIMALS decimals (#123)."""
+    from swmmbuilder.swmm.records import _flow, _line
+
+    assert _line(("A", 0), (3.4e-6, 0)) == "A 3e-06\n"  # a length: 6 decimals
+    assert _flow(3.4e-6) == "3.4e-06" and _flow(4e-7) == "4e-07"
+    assert _flow(0.1 + 0.2) == "0.3" and _flow(12) == "12" and _flow(-0.0) == "0.0"
+    with pytest.raises(TypeError):
+        _flow(True)
+
+
+def test_small_flows_are_written_in_full(network, tmp_path):
+    from swmmbuilder import swmm
+
+    model = swmm.build_model(subnetwork(network, DENDRITIC), ["OUT"], dwf={"A1": 3.4e-6})
+    assert model.sections()["dwf"].split()[2] == "3.4e-06"
