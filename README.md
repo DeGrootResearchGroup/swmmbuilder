@@ -705,6 +705,10 @@ alloc = allocate_population(net, blocks, max_distance=15)
   [Statistics Canada Open Licence](https://www.statcan.gc.ca/en/reference/licence), which asks
   for a source notice, and CensusMapper asks that cancensus be cited. The cache records the
   source, dataset, regions, and fetch date.
+- A cache is read only for the request it was fetched for: the same level, an area it covers,
+  and, when a source is given, the same parameters (for `CensusMapper`, the dataset, regions, and
+  resolution; for `PolygonFile`, the file name and columns). A mismatch is refused, naming the
+  parameter that differs; `refresh=True` fetches it again.
 - With no `regions=`, `CensusMapper` finds the census subdivisions (municipalities) meeting the
   network with CensusMapper's intersecting-geometries query; `regions={"CSD": ["3539036"]}` names
   them instead.
@@ -831,6 +835,9 @@ est.samples                          # DEM value, difference, estimate and statu
 sub.to_inp("model.inp", rims=est.rims, max_depth="median")
 ```
 
+- Cells the raster masks (its nodata value, a mask band or file, or an alpha band) are left out.
+  Elevations are taken as metres unless the raster declares feet (in a vertical CRS or its band
+  units); `z_factor=0.3048` converts a DEM in feet that does not say so.
 - `window=0` (default) takes the cell at the node; `window=1.0` the median (or `statistic="mean"`)
   of the cells within 1 m, to soften curbs and ditches.
 - Only nodes with no usable rim are estimated, as the DEM value plus `offset` (a number, or

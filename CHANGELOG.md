@@ -11,6 +11,17 @@ earlier history is in the git log.
 
 ### Fixed
 
+- **Census cache and DEM checks** (#163): a `census_polygons` cache read with a source is
+  refused if it was fetched with other parameters, naming the one that differs. Before, a cache
+  for one dataset or set of regions was returned for another. `CensusMapper` and `PolygonFile`
+  gain a `provenance()` method (the dataset, regions, region level, and resolution, or the file
+  name and columns), compared with what the cache records; a cache that does not record them
+  gives a `DataWarning`. The cache now records the regions sorted, and the region level and the
+  file's columns. `sample_dem` reads rasters masked, so cells under a mask band, mask file, or
+  alpha band are left out (before, a masked DEM with no nodata value gave its fill values as
+  elevations). `sample_dem` and `Network.estimate_rims` take `z_factor` (metres per elevation
+  unit); by default a DEM whose vertical CRS or band units are in feet is converted to metres.
+
 - **Polygon allocation option validation** (issue #147): `population`, `sewered`, and
   `land_use` reject unindexed lists/arrays and Series with missing or repeated polygon IDs.
   These problems are reported together with other invalid options before allocation starts.
