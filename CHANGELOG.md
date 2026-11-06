@@ -82,6 +82,12 @@ earlier history is in the git log.
   structure. Every split is logged and listed in `Network.split_report`, and snapping never
   merges the structures of one ID again.
 
+### Fixed
+
+- **Pipes with no ID**: two or more pipes with a missing ID (or one of the schema's `null_values`)
+  no longer stop the data from loading as duplicates; they are dropped and counted in
+  `Network.removed['invalid']['no pipe_id']`, as one such pipe already was (#120).
+
 ## [0.1.0] - 2026-11-03
 
 ### Added

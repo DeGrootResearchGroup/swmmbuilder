@@ -373,9 +373,17 @@ class Schema:
         missing = [sources[c] for c in REQUIRED_COLUMNS if sources[c] not in data.columns]
         if missing:
             problems.append(f"missing required columns {missing}")
-        elif data[sources["pipe_id"]].duplicated().any():
-            duplicated = data.loc[data[sources["pipe_id"]].duplicated(), sources["pipe_id"]]
-            problems.append(f"duplicate {sources['pipe_id']} values {sorted(set(duplicated))}")
+        else:
+            # Missing IDs (and null values) are not duplicates: Network drops those pipes and
+            # counts them under removed['invalid']['no pipe_id'].
+            ids = data[sources["pipe_id"]]
+            if self.null_values:
+                ids = ids.where(~ids.isin(self.null_values))
+            ids = ids[ids.notna()]
+            duplicated = ids[ids.duplicated()]
+            if len(duplicated):
+                values = sorted(set(duplicated), key=str)
+                problems.append(f"duplicate {sources['pipe_id']} values {values}")
         if problems:
             raise ValueError(
                 f"Cannot load the data with schema {self.name!r}: {'; '.join(problems)}."
