@@ -122,6 +122,64 @@ class LandUseAllocation:
         table = self.pipes[self.pipes.index.isin(keys)]
         return _place_by_use(table, self.placement, list(self.nodes.columns))
 
+    def summary(self) -> dict[str, float | int]:
+        """Counts and totals of the allocation, to cite in a report.
+
+        Returns
+        -------
+        dict
+            Plain Python numbers (``int`` for counts, ``float`` for totals, NaN where there is
+            nothing to measure). For each land use with a rate, under its name as given (e.g.
+            ``COMMERCIAL``):
+
+            - ``<use>_polygons``: its polygons served by at least one pipe.
+            - ``<use>_area_ha``: their area counted, in ha.
+            - ``<use>_flow``: its flow placed at the nodes, in :attr:`flow_units`.
+            - ``<use>_nodes``: nodes given a flow above 0 from it.
+
+            And over all land uses:
+
+            - ``polygons``: polygons with a rate.
+            - ``polygons_served``: those served by at least one pipe.
+            - ``area_ha``: area counted of the polygons served, in ha.
+            - ``nearest``: polygons given their nearest pipe (:attr:`nearest`).
+            - ``nearest_median_distance``, ``nearest_max_distance``: the median and the
+              farthest of their distances to it (NaN if none).
+            - ``no_pipes``: polygons with a flow and no pipe (:attr:`no_pipes`).
+            - ``unallocated``: their design flow, placed nowhere (:attr:`unallocated`).
+            - ``scale``: the factor applied to every flow (:attr:`scale`).
+            - ``total``: flow placed at the nodes (:attr:`total`).
+
+        Examples
+        --------
+        ::
+
+            s = land.summary()
+            print(f"commercial: {s['COMMERCIAL_flow']:.1f} L/s at {s['COMMERCIAL_nodes']} nodes")
+        """
+        served = self.polygons[self.polygons["pipes"] > 0]
+        result: dict[str, float | int] = {}
+        for use in self.nodes.columns:
+            mine = served["land_use"] == use
+            result[f"{use}_polygons"] = int(mine.sum())
+            result[f"{use}_area_ha"] = float(served.loc[mine, "area_ha"].sum())
+            result[f"{use}_flow"] = float(self.nodes[use].sum())
+            result[f"{use}_nodes"] = int((self.nodes[use] > 0).sum())
+        nearest = self.nearest
+        result.update(
+            polygons=len(self.polygons),
+            polygons_served=len(served),
+            area_ha=float(served["area_ha"].sum()),
+            nearest=len(nearest),
+            nearest_median_distance=float(nearest.median()) if len(nearest) else math.nan,
+            nearest_max_distance=float(nearest.max()) if len(nearest) else math.nan,
+            no_pipes=len(self.no_pipes),
+            unallocated=float(self.unallocated),
+            scale=float(self.scale),
+            total=self.total,
+        )
+        return result
+
 
 def _place_by_use(table, placement, uses):
     """Nodes x land-use flows of the pipes of ``table`` (the ``pipes`` of a LandUseAllocation)."""
