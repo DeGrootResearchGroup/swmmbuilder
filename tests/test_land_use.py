@@ -1,11 +1,13 @@
 """Land-use flows (swmmbuilder.land_use) and pattern inflows (#99)."""
 
+import logging
+
 import geopandas as gpd
 import numpy as np
 import pandas as pd
 import pytest
 from shapely.geometry import box
-from test_population import CRS, X0, Y0, make_network
+from test_population import CRS, PIPES, X0, Y0, make_network
 
 from swmmbuilder import (
     LandUseAllocation,
@@ -269,3 +271,16 @@ def test_to_nearest_skips_polygons_with_no_flow(net):
         net, zoning(), land_use="use", rates=RATES, to_nearest=True, area_within=clip
     )
     assert flows.nearest.empty and "N5" not in flows.nodes.index
+
+
+def test_a_pipe_with_a_missing_node_is_left_out(caplog):
+    """Its zone's flow goes to the zone's other pipes, and the flow it would have taken is
+    logged (#122)."""
+    net = make_network([PIPES[0], (2, "N2", None, 60, 90, 6), *PIPES[2:]])
+    with caplog.at_level(logging.WARNING, logger="swmmbuilder.land_use"):
+        flows = allocate_land_use(net, zoning(), land_use="use", rates=RATES)
+    assert flows.nodes.loc["N1", "COMMERCIAL"] == pytest.approx(0.1)  # all of P, on pipe 1
+    assert flows.total == pytest.approx(0.3)
+    assert 2 not in flows.pipes.index
+    # With pipe 2, P's 0.1 L/s goes 50:30 to pipes 1 and 2, 0.0375 L/s to pipe 2.
+    assert "with them they would take 0.0375 LPS, in no catchment: [2]" in caplog.text

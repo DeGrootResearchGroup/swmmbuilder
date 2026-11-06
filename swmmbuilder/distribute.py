@@ -19,7 +19,7 @@ import geopandas as gpd
 import pandas as pd
 
 from .diagnostics import DataWarning, Problems
-from .population import PLACEMENTS, Placement, _pipes_of
+from .population import PLACEMENTS, Placement, _log_left_out, _missing_node, _pipes_of
 from .units import _is_real
 
 if TYPE_CHECKING:
@@ -63,7 +63,9 @@ def distribute_flow(
     ----------
     network : Network or Subnetwork
         The pipes to spread over: every pipe of a :class:`~swmmbuilder.Network`, or those of a
-        :class:`~swmmbuilder.Subnetwork`, such as a catchment.
+        :class:`~swmmbuilder.Subnetwork`, such as a catchment. A pipe with a missing
+        ``from_node`` or ``to_node`` is in no catchment, so it is left out, and the flow it would
+        have taken is logged.
 
     total : float, optional
         The flow to share, in the unit wanted for the result (e.g. L/s, the FLOW_UNITS of the
@@ -127,6 +129,9 @@ def distribute_flow(
     weights = pipe_weights(pipes, weight)
     if not serve_force_mains and "structure_type" in pipes.columns:
         weights = weights.where(pipes["structure_type"] != "force_main", 0.0)
+    no_node = _missing_node(pipes)
+    left_out = float(weights[no_node].fillna(0.0).sum())
+    everything, pipes, weights = pipes, pipes[~no_node], weights[~no_node]
     missing = weights.isna()
     label = weight if isinstance(weight, str) else "callable"
     if missing.any():
@@ -144,6 +149,17 @@ def distribute_flow(
         flows = weights / weight_sum * total if weight_sum > 0 else weights * 0.0
     else:
         flows = weights * rate
+    if no_node.any():
+        if total is not None:
+            taken = total * left_out / (float(weights.sum()) + left_out) if left_out > 0 else 0.0
+        else:
+            taken = left_out * float(rate or 0.0)
+        _log_left_out(
+            logger,
+            everything,
+            no_node,
+            f"with them they would take {taken:.6g}, in no catchment",
+        )
 
     if placement == "split":
         half = flows / 2

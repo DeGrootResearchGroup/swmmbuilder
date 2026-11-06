@@ -17,12 +17,17 @@ connections, serve no polygon unless asked. A polygon with no pipe contributes n
 flagged as sewered (e.g. by its zoning), when its people go to the nearest pipe; a polygon only
 partly sewered places all its people on the pipes it has. The population left out is reported.
 
+A pipe with a missing ``from_node`` or ``to_node`` (kept in a Network's ``full_data`` but not in
+its graph) is in no catchment, and may have no node to place a share at, so it is left out: its
+polygons' people go to their other pipes. The population it would have taken is logged.
+
 The result's ``nodes`` ({node: population}) is the input of
 :func:`~swmmbuilder.swmm.dwf.dwf_from_population`.
 """
 
 from __future__ import annotations
 
+import contextlib
 import logging
 import warnings
 from collections.abc import Callable
@@ -72,7 +77,7 @@ class PopulationAllocation:
 
     unallocated : float
         Population placed at no node: that of the polygons of ``no_pipes``, ``no_valid_weight``,
-        and ``zero_weight``, and the shares of pipes with no node at the end they are placed at.
+        and ``zero_weight``.
 
     no_pipes : list
         IDs of the polygons with people but no pipe: not flagged ``sewered``, or flagged but
@@ -225,6 +230,38 @@ def _pipes_of(network):
     return data.set_index("pipe_id", drop=False)
 
 
+def _missing_node(pipes) -> np.ndarray:
+    """Whether each pipe has a missing ``from_node`` or ``to_node``: such a pipe is in a
+    Network's ``full_data`` but not in its graph, so in no catchment."""
+    return (pipes["from_node"].isna() | pipes["to_node"].isna()).to_numpy()
+
+
+def _log_left_out(log, pipes, missing, effect):
+    """Log the pipes with a missing node, left out of the sharing, and the ``effect`` of
+    leaving them out."""
+    ids = list(pipes.index[missing])
+    log.warning(
+        "%d pipes (%.0f m) have a missing from_node or to_node and are left out; %s: %s",
+        len(ids),
+        float(pd.to_numeric(pipes["length"][missing], errors="coerce").sum()),
+        effect,
+        ids[:20],
+    )
+
+
+@contextlib.contextmanager
+def _quiet(log):
+    """Silence ``log`` and warnings, for a run made only to measure an effect."""
+    disabled = log.disabled
+    log.disabled = True
+    try:
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            yield
+    finally:
+        log.disabled = disabled
+
+
 def _weights(pipes, weight):
     """The weight of each pipe as given, as numbers (anything else missing)."""
     if weight is None:
@@ -298,11 +335,12 @@ def allocate_population(
     Parameters
     ----------
     network : Network or Subnetwork
-        The pipes to allocate to: every pipe of a :class:`~swmmbuilder.Network`, or those of a
-        :class:`~swmmbuilder.Subnetwork`. A polygon's population is shared over the pipes given,
-        so for a catchment whose boundary cuts polygons, allocate over the whole Network and take
-        the catchment's nodes with :meth:`PopulationAllocation.within`; allocating over the
-        catchment alone puts all the people of a cut polygon on its part inside.
+        The pipes to allocate to: every pipe of a :class:`~swmmbuilder.Network` (but those with a
+        missing node), or those of a :class:`~swmmbuilder.Subnetwork`. A polygon's population is
+        shared over the pipes given, so for a catchment whose boundary cuts polygons, allocate
+        over the whole Network and take the catchment's nodes with
+        :meth:`PopulationAllocation.within`; allocating over the catchment alone puts all the
+        people of a cut polygon on its part inside.
 
     polygons : geopandas.GeoDataFrame
         The areal units, indexed by a unique ID, with a CRS (they are reprojected to the
@@ -395,6 +433,52 @@ def allocate_population(
         )
     """
     pipes = _pipes_of(network)
+    options = dict(
+        polygons=polygons,
+        population=population,
+        max_distance=max_distance,
+        sewered=sewered,
+        max_nearest_distance=max_nearest_distance,
+        serve_force_mains=serve_force_mains,
+        weight=weight,
+        max_weight=max_weight,
+        impute=impute,
+        fallback_weight=fallback_weight,
+        placement=placement,
+    )
+    missing = _missing_node(pipes)
+    result = _allocate_population(pipes[~missing], **options)
+    if missing.any():
+        with _quiet(logger):
+            kept = _allocate_population(pipes, **options)
+        taken = float(
+            kept.pipes.loc[kept.pipes.index.isin(pipes.index[missing]), "population"].sum()
+        )
+        _log_left_out(
+            logger,
+            pipes,
+            missing,
+            f"with them they would take {taken:.0f} people, in no catchment "
+            f"(not allocated: {kept.unallocated:.0f} with them, {result.unallocated:.0f} without)",
+        )
+    return result
+
+
+def _allocate_population(
+    pipes,
+    polygons,
+    population,
+    max_distance,
+    sewered,
+    max_nearest_distance,
+    serve_force_mains,
+    weight,
+    max_weight,
+    impute,
+    fallback_weight,
+    placement,
+) -> PopulationAllocation:
+    """:func:`allocate_population` over ``pipes`` (indexed by pipe_id)."""
     _check(
         pipes,
         polygons,

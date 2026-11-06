@@ -93,6 +93,10 @@ earlier history is in the git log.
   and its vertices run downstream (#121).
 - **Disjoint MultiLineStrings**: `line_coords` keeps the parts of a pipe whose parts do not join
   in their order, as documented; `shapely.line_merge` could reorder them (#121).
+- **Pipes with a missing node**: given a `Network`, `allocate_population`, `allocate_land_use`, and
+  `distribute_flow` leave out the pipes with a missing `from_node` or `to_node`, which are in no
+  catchment, so their share goes to the other pipes instead of being lost; a warning lists them
+  with the people (or flow) they would have taken (#122).
 
 ## [0.1.0] - 2026-11-03
 

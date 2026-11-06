@@ -17,6 +17,8 @@ Force mains take no flow unless asked. A rated polygon with no pipe contributes 
 reported, unless it is given its nearest pipe (``to_nearest``, for sites on private sewers that the
 data do not show). The result's ``nodes`` is a table of nodes by land use, so that each land use can carry
 its own time pattern (see :func:`~swmmbuilder.pattern_inflows`).
+
+A pipe with a missing ``from_node`` or ``to_node`` is in no catchment, so it is left out (see :mod:`swmmbuilder.population`); the flow it would have taken is logged.
 """
 
 from __future__ import annotations
@@ -33,7 +35,18 @@ import pandas as pd
 from pyproj import CRS
 
 from .diagnostics import Problems
-from .population import PLACEMENTS, Placement, Weight, _assign, _nearest, _pipes_of, _weights
+from .population import (
+    PLACEMENTS,
+    Placement,
+    Weight,
+    _assign,
+    _log_left_out,
+    _missing_node,
+    _nearest,
+    _pipes_of,
+    _quiet,
+    _weights,
+)
 from .units import _FLOW_UNIT_LPS, _TIME_SECONDS, _VOLUME_LITRES, SI_FLOW_UNITS, _is_real
 
 if TYPE_CHECKING:
@@ -218,8 +231,9 @@ def allocate_land_use(
     Parameters
     ----------
     network : Network or Subnetwork
-        The pipes to allocate to: every pipe of a :class:`~swmmbuilder.Network`, or those of a
-        :class:`~swmmbuilder.Subnetwork`. Its CRS must be projected in metres.
+        The pipes to allocate to: every pipe of a :class:`~swmmbuilder.Network` (but those with a
+        missing node), or those of a :class:`~swmmbuilder.Subnetwork`. Its CRS must be projected
+        in metres.
 
     polygons : geopandas.GeoDataFrame
         Zoning polygons, indexed by a unique ID, with a CRS (they are reprojected to the
@@ -309,6 +323,53 @@ def allocate_land_use(
         flows.nodes  # nodes x land uses, L/s
     """
     pipes = _pipes_of(network)
+    options = dict(
+        polygons=polygons,
+        land_use=land_use,
+        rates=rates,
+        unit=unit,
+        total=total,
+        area_within=area_within,
+        max_distance=max_distance,
+        to_nearest=to_nearest,
+        max_nearest_distance=max_nearest_distance,
+        serve_force_mains=serve_force_mains,
+        weight=weight,
+        placement=placement,
+        flow_units=flow_units,
+    )
+    missing = _missing_node(pipes)
+    result = _allocate_land_use(pipes[~missing], **options)
+    if missing.any():
+        with _quiet(logger):
+            kept = _allocate_land_use(pipes, **options)
+        taken = float(kept.pipes.loc[kept.pipes.index.isin(pipes.index[missing]), "flow"].sum())
+        _log_left_out(
+            logger,
+            pipes,
+            missing,
+            f"with them they would take {taken:.6g} {result.flow_units}, in no catchment",
+        )
+    return result
+
+
+def _allocate_land_use(
+    pipes,
+    polygons,
+    land_use,
+    rates,
+    unit,
+    total,
+    area_within,
+    max_distance,
+    to_nearest,
+    max_nearest_distance,
+    serve_force_mains,
+    weight,
+    placement,
+    flow_units,
+) -> LandUseAllocation:
+    """:func:`allocate_land_use` over ``pipes`` (indexed by pipe_id)."""
     _check(
         pipes,
         polygons,
