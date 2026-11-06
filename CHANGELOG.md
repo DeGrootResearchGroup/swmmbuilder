@@ -11,6 +11,13 @@ earlier history is in the git log.
 
 ### Added
 
+- **Census polygons** (#128): `swmmbuilder.census.census_polygons` gets the polygons covering a
+  network (or any area) from a pluggable source, keeps those meeting the footprint of its gravity
+  pipes, and returns them with `population` and `parent` columns for `allocate_population`. A
+  GeoPackage cache, with the source, level, regions, and fetch date, makes later builds offline.
+  Sources: `CensusMapper` (Canadian census dissemination blocks or areas, through pycancensus,
+  in the new `census` extra) and `PolygonFile` (any local file). The CensusMapper API key is the
+  user's to provide, and citing the data is the user's responsibility.
 - **Rims from a ground-elevation model**: `Network.estimate_rims(dem)` samples a lidar DEM (a
   GeoTIFF or a list of tiles, in any CRS) at the nodes, at the cell or as the median within a
   window. It compares the DEM with the recorded rims (`RimEstimate.validation`, median offset and

@@ -30,6 +30,7 @@ What changed between versions is in
 pip install swmmbuilder                 # from PyPI
 pip install "swmmbuilder[maps]"         # + web-tile basemaps and Leaflet maps (contextily, xyzservices, folium)
 pip install "swmmbuilder[simulate]"     # + pyswmm, to run the .inp files
+pip install "swmmbuilder[census]"       # + pycancensus, for Canadian census polygons (CensusMapper)
 pip install "swmmbuilder[elevation]"    # + rasterio, to estimate missing rims from a DEM
 pip install -e .                        # from a clone of this repository (extras as above)
 ```
@@ -507,6 +508,44 @@ with the distance, and `alloc.fallback` those given the fallback weight. `alloc.
 one row per pipe and polygon it serves, `alloc.by_pipe()` sums each pipe's shares, and
 `alloc.polygons` has one row per polygon. `alloc.within(sub)` keeps the shares of the
 subnetwork's own pipes, so people on a pipe leaving it are not counted.
+
+### Census polygons
+
+`swmmbuilder.census.census_polygons` gets the polygons covering a network from a source, keeps
+those meeting the footprint of its gravity pipes (whole, not clipped), and returns them indexed by
+ID with `population` and `parent` columns, ready for `allocate_population`. For Canada's 2021
+Census, the source is CensusMapper, through pycancensus (`pip install "swmmbuilder[census]"`).
+The level is `"DB"` (dissemination blocks: usually one city block, bounded by streets) or `"DA"`
+(dissemination areas: groups of blocks with about 400 to 700 people).
+
+```python
+from swmmbuilder.census import CensusMapper, census_polygons
+
+blocks = census_polygons(
+    net,                                  # the whole Network
+    "DB",
+    CensusMapper(api_key=my_key),         # your own key; or set CENSUSMAPPER_API_KEY
+    cache="data/census/blocks_2021.gpkg", # read if present: later builds are offline
+    margin=200,                           # m around the pipes; at least max_nearest_distance
+)
+alloc = allocate_population(net, blocks, max_distance=15)
+```
+
+- **The API key is yours to provide.** swmmbuilder has none. A free key comes with a
+  [CensusMapper](https://censusmapper.ca) account, and its quota is yours. It is passed in, or read
+  from your `CENSUSMAPPER_API_KEY` (or `CANCENSUS_API_KEY`) environment variable, and only needed
+  when there is no cache. swmmbuilder never stores, logs, or shows it.
+- **Citing the data is your responsibility.** swmmbuilder ships no census data. Statistics
+  Canada's data are under the
+  [Statistics Canada Open Licence](https://www.statcan.gc.ca/en/reference/licence), which asks
+  for a source notice, and CensusMapper asks that cancensus be cited. The cache records the
+  source, dataset, regions, and fetch date.
+- With no `regions=`, `CensusMapper` finds the census subdivisions (municipalities) meeting the
+  network with CensusMapper's intersecting-geometries query; `regions={"CSD": ["3539036"]}` names
+  them instead.
+- The source is pluggable: `PolygonFile(path, id=..., population=...)` reads any local file (another
+  country's census, say), and any object with a `name` and a `fetch(area, crs, level)` method
+  returning such polygons will do.
 
 ## Conduit geometry
 

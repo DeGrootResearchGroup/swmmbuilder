@@ -34,6 +34,9 @@ elevation = ["rasterio"]
 # Running the written .inp files. swmmbuilder itself never imports pyswmm, and pyswmm pulls in
 # julian, an sdist-only package that fails to build on some Python 3.13 setups, so it is optional.
 simulate = ["pyswmm"]
+# Census polygons from the CensusMapper API (swmmbuilder.census.CensusMapper). pycancensus is young,
+# so its series is pinned.
+census = ["pycancensus>=0.2,<0.3"]
 # `lint` pins the linter (same series as aquakin) so a new ruff release cannot turn the gate red
 # without a deliberate bump.
 lint = ["ruff>=0.15,<0.16"]

@@ -3,11 +3,13 @@ import sys
 
 
 def test_import_needs_no_optional_dependency():
-    # pyswmm (only for running .inp files), gmplot (deprecated generate_gmap), and rasterio (DEMs)
-    # are optional extras, so importing the package must not import them.
+    # pyswmm (only for running .inp files), gmplot (deprecated generate_gmap), pycancensus
+    # (census polygons), and rasterio (DEMs) are optional extras, so importing the package must
+    # not import them.
+    optional = ("pyswmm", "gmplot", "folium", "contextily", "pycancensus", "rasterio")
     code = (
-        "import sys, swmmbuilder, swmmbuilder.maps; "
-        "print(sorted(m for m in ('pyswmm', 'gmplot', 'folium', 'contextily', 'rasterio') if m in sys.modules))"
+        "import sys, swmmbuilder, swmmbuilder.maps, swmmbuilder.census; "
+        f"print(sorted(m for m in {optional!r} if m in sys.modules))"
     )
     result = subprocess.run(
         [sys.executable, "-c", code], capture_output=True, text=True, check=True
