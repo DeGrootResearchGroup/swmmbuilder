@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 import numbers
 from dataclasses import dataclass, field
 
@@ -203,6 +204,81 @@ class SwmmModel:
         basis)."""
         columns = ["element", "id", "attribute", "value", "rule", "basis"]
         return pd.DataFrame([vars(d) for d in self.derived], columns=columns)
+
+    def summary(self) -> dict[str, float | int]:
+        """Counts of the model's records, gaps, and derived values, to cite in a report.
+
+        Returns
+        -------
+        dict
+            Plain Python numbers (``int`` for counts, ``float`` for values, NaN where there is
+            nothing to give), under these keys:
+
+            - ``junctions``, ``outfalls``, ``storage``, ``conduits``, ``pumps``: records
+              written.
+            - ``stations``: pump stations, the nodes that pumps draw from.
+            - ``outfall_links``: outfalls added by the ``outfall_link`` option of
+              :func:`~swmmbuilder.swmm.build_model`, found by their names (an outfall
+              ``<node>_OUT`` reached from ``<node>`` by the conduit ``<node>_DUMMY``).
+            - ``data_gaps``: gaps found in the data (rows of :attr:`data_gaps`; 0 without it).
+            - ``data_gaps_filled``: those filled by a rule.
+            - ``derived``: values derived by a design rule, not from the data (:attr:`derived`).
+            - ``derived_<element>_<attribute>``: those of each element and attribute, by any
+              rule, e.g. ``derived_junction_max_depth``, ``derived_station_invert`` (stations
+              lowered by ``station_invert``), or ``derived_storage_area``.
+            - ``derived_<element>_<attribute>[<rule>]``: those by each rule, with the rule as
+              :meth:`derived_report` gives it, e.g.
+              ``derived_junction_max_depth[max_depth='median']``.
+            - ``default_depth_junctions``: junctions given the ``max_depth`` rule's default
+              depth (no usable rim).
+            - ``default_depth``: that depth, in m (NaN if no junction has it, or if they were
+              given different depths).
+
+            The derived keys come from the rules used, so a model with none has only
+            ``derived``.
+
+        Examples
+        --------
+        ::
+
+            s = model.summary()
+            print(f"{s['data_gaps']} gaps ({s['data_gaps_filled']} filled)")
+        """
+        gaps = self.data_gaps
+        derived = self.derived_report()
+        outfalls = {o.name for o in self.outfalls}
+        links = sum(
+            1
+            for c in self.conduits
+            if c.name == f"{c.inlet}_DUMMY"
+            and c.outlet == f"{c.inlet}_OUT"
+            and c.outlet in outfalls
+        )
+        result: dict[str, float | int] = {
+            "junctions": len(self.junctions),
+            "outfalls": len(self.outfalls),
+            "storage": len(self.storage),
+            "conduits": len(self.conduits),
+            "pumps": len(self.pumps),
+            "stations": len({p.inlet for p in self.pumps}),
+            "outfall_links": links,
+            "data_gaps": 0 if gaps is None else len(gaps),
+            "data_gaps_filled": 0 if gaps is None else int(gaps["filled_from"].notna().sum()),
+            "derived": len(derived),
+        }
+        for (element, attribute), group in derived.groupby(["element", "attribute"], sort=True):
+            result[f"derived_{element}_{attribute}"] = len(group)
+            for rule, n in group["rule"].value_counts(sort=False).sort_index().items():
+                result[f"derived_{element}_{attribute}[{rule}]"] = int(n)
+        default = derived[
+            (derived["element"] == "junction")
+            & (derived["attribute"] == "max_depth")
+            & derived["rule"].astype(str).str.startswith("max_depth")
+        ]
+        depths = default["value"].astype(float).unique()
+        result["default_depth_junctions"] = len(default)
+        result["default_depth"] = float(depths[0]) if len(depths) == 1 else math.nan
+        return result
 
     def sections(self) -> dict[str, str]:
         """{placeholder: text} for every placeholder in :data:`TEMPLATE_PLACEHOLDERS`.

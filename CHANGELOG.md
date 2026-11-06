@@ -11,6 +11,12 @@ earlier history is in the git log.
 
 ### Added
 
+- **Summaries** (#137): `summary()` on `PopulationAllocation` (with an optional `sub`),
+  `LandUseAllocation`, `TopologyReport`, and `SwmmModel` returns a flat dict of the counts and
+  totals a report cites, under stable, documented keys, as plain numbers (NaN where undefined).
+  The population summary counts a pipe serving several polygons once, with the mean of its
+  imputed weights. The model summary counts derived values by element, attribute, and rule, so
+  new design rules are covered as they are added. `TopologyReport` gains `nodes` and `pipes`.
 - **Splits in a subnetwork** (#134): `Subnetwork.split_report()` returns the network's
   `split_report` with two more columns, `node` (the node each new ID resolves to after snapping)
   and `in_subnetwork`. `Subnetwork.split_summary()` returns `ids_split`, `nodes_made`, and

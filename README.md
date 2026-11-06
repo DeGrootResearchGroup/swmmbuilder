@@ -205,6 +205,28 @@ import logging
 logging.basicConfig(level=logging.INFO)
 ```
 
+### Summaries
+
+The results of the main steps reduce to the numbers a report cites with `summary()`, a flat
+dict of counts and totals under stable keys, documented in each method's docstring:
+
+- `PopulationAllocation.summary(sub=None)`: population and loaded nodes (within a catchment if
+  given), connections, and polygons served, given their nearest pipe, or with no pipe;
+- `LandUseAllocation.summary()`: polygons, area, flow, and nodes per land use, nearest-pipe
+  distances, and the scale;
+- `TopologyReport.summary()`: nodes, pipes, splits, cycles, and force mains;
+- `SwmmModel.summary()`: gaps found and filled, derived values by rule, the default depth,
+  stations, and outfall links.
+
+The values are plain numbers, NaN where there is nothing to measure, so they go straight into
+f-strings. The wording stays with the caller:
+
+```python
+s = alloc.summary(net.catchment("OUT"))
+print(f"{s['population']:,.0f} people at {s['nodes']} nodes; "
+      f"{s['nearest']} polygons given their nearest pipe (up to {s['nearest_max_distance']:.0f} m)")
+```
+
 ### Capturing the log of a build
 
 `logging.basicConfig` does nothing once the root logger has a handler, so a second build in the
