@@ -153,7 +153,7 @@ def distribute_flow(
         if total is not None:
             taken = total * left_out / (float(weights.sum()) + left_out) if left_out > 0 else 0.0
         else:
-            taken = left_out * rate
+            taken = left_out * float(rate or 0.0)
         _log_left_out(
             logger,
             everything,
