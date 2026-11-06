@@ -23,6 +23,11 @@ earlier history is in the git log.
   to share by. Each share is placed at the pipe's upstream node, downstream node, or both. The
   result reports the population of polygons with no pipe, and its `nodes` feed
   `dwf_from_population`.
+- **Outfalls with more than one link under DYNWAVE**: `write_inp` now refuses, before writing,
+  a dynamic-wave model with an outfall that has more than one link (SWMM's ERROR 141), naming
+  the outfalls and their links. With `outfall_link=True` (or a dict of `length`, `diameter`,
+  `slope`, and `roughness`), each such outfall is written as a junction draining through a dummy
+  conduit `<node>_DUMMY` to a new outfall `<node>_OUT` (#101).
 - **Spreading a flow over the pipes**: `distribute_flow` shares a total flow (e.g. groundwater
   infiltration) among the pipes of a network or catchment by length, diameter times length, or
   any weight, or gives each pipe a rate per unit of weight, and places it at the upstream nodes

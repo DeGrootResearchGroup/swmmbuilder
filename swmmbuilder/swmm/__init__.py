@@ -54,9 +54,11 @@ from ..units import (  # noqa: F401
 from .build import (  # noqa: F401
     BUILD_OPTIONS,
     FILL_OPTIONS,
+    OUTFALL_LINK_DEFAULTS,
     build_model,
     logger,
     node_inverts,
+    outfall_inlets,
     outfall_types,
     write_inp,
 )

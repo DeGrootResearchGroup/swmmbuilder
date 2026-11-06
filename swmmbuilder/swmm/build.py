@@ -21,7 +21,7 @@ from ..design import (
 from ..diagnostics import DataWarning, DesignWarning, Problems, check_options
 from ..gaps import _invert, fill_gaps, height_corrections, lowest_inverts, xsection
 from ..geometry import line_coords
-from ..units import _FLOW_UNIT_LPS
+from ..units import _FLOW_UNIT_LPS, _is_real
 from .dwf import resolve_dwf, resolve_dwf_patterns, resolve_patterns
 from .inflows import resolve_inflows, resolve_timeseries
 from .pumping import resolve_pump_stations, resolve_pumps, resolve_wet_wells
@@ -467,6 +467,77 @@ def _add_links(model, inputs, pipes, inverts, discharge_of, sections, roughness_
     return adverse
 
 
+# The dummy conduit of the outfall_link option of build_model.
+OUTFALL_LINK_DEFAULTS = {"length": 30.0, "diameter": 3.0, "slope": 0.01, "roughness": 0.01}
+
+
+def outfall_inlets(model: SwmmModel) -> dict[str, list[str]]:
+    """{outfall: names of the conduits and pumps that enter or leave it} of the outfalls of
+    ``model`` with more than one such link (SWMM's ERROR 141 under DYNWAVE)."""
+    names = {o.name for o in model.outfalls}
+    links: dict[str, list[str]] = {}
+    for link in model.conduits + model.pumps:
+        for end in (link.outlet, link.inlet):
+            if end in names:
+                links.setdefault(end, []).append(link.name)
+    return {node: found for node, found in links.items() if len(found) > 1}
+
+
+def _add_outfall_links(model, subnetwork, option, defaults):
+    """Write each outfall of ``model`` with more than one link as a junction draining to a new
+    outfall through a dummy conduit (the ``outfall_link`` option of :func:`build_model`)."""
+    params = dict(OUTFALL_LINK_DEFAULTS)
+    if isinstance(option, Mapping):
+        check_options(option, tuple(OUTFALL_LINK_DEFAULTS), "outfall_link")
+        params.update(option)
+    bad = [f"{k}={v!r}" for k, v in params.items() if not (_is_real(v) and v > 0)]
+    if bad:
+        raise ValueError(f"outfall_link values must be positive numbers: {', '.join(bad)}")
+    crowded = outfall_inlets(model)
+    taken = {*subnetwork.nodes, *(c.name for c in model.conduits), *(p.name for p in model.pumps)}
+    clash = sorted(
+        name for node in crowded for name in (f"{node}_OUT", f"{node}_DUMMY") if name in taken
+    )
+    if clash:
+        raise ValueError(f"outfall_link: names already used in the model: {', '.join(clash)}")
+    for node in crowded:
+        outfall = next(o for o in model.outfalls if o.name == node)
+        model.outfalls.remove(outfall)
+        depth = defaults.max_depth
+        rim = subnetwork.graph.nodes[node].get("rim_elevation")
+        if rim is not None and rim > outfall.invert:
+            depth = round(rim - outfall.invert, 4)
+        model.junctions.append(
+            Junction(
+                node,
+                outfall.invert,
+                depth,
+                defaults.init_depth,
+                defaults.surcharge_depth,
+                defaults.ponding_area,
+            )
+        )
+        new = f"{node}_OUT"
+        drop = params["slope"] * params["length"]
+        model.outfalls.append(Outfall(new, round(outfall.invert - drop, 6), outfall.type))
+        link = f"{node}_DUMMY"
+        model.conduits.append(
+            Conduit(link, node, new, params["length"], params["roughness"], 0.0, 0.0, 0.0, 0.0)
+        )
+        model.xsections.append(XSection(link, "CIRCULAR", params["diameter"], 0.0, 1.0))
+        if node in model.coordinates:
+            x, y = model.coordinates[node]
+            model.coordinates[new] = (x + 1.0, y)
+        logger.info(
+            "Outfall %s (%d links) written as a junction draining through %s (%g m) to %s",
+            node,
+            len(crowded[node]),
+            link,
+            params["length"],
+            new,
+        )
+
+
 def _check_ideal_pumps(model):
     """Raise ValueError if an ideal pump is not the only outlet link of its inlet node (SWMM's
     ERROR 134)."""
@@ -510,6 +581,7 @@ def build_model(
     timeseries: Mapping[str, Sequence[tuple[float, float]]] | None = None,
     wet_well_defaults: Mapping[str, float] | None = None,
     force_main_checks: Mapping[str, Any] | None = None,
+    outfall_link: bool | Mapping[str, float] | None = None,
     flow_units: str = "LPS",
     **fills: Any,
 ) -> SwmmModel:
@@ -661,6 +733,17 @@ def build_model(
         pump) over the full pipe area. London's preset is
         ``LONDON_ON.design['force_main_checks']``.
 
+    outfall_link : bool or dict, optional
+        Under dynamic-wave routing SWMM accepts only one link into an outfall (its ERROR 141), so
+        :func:`write_inp` refuses a DYNWAVE model with an outfall that has more than one. With
+        this option, each such outfall is written instead as a junction (its depth set like any
+        other junction's), joined by a short, wide dummy conduit ``<node>_DUMMY`` to a new
+        outfall ``<node>_OUT`` of the same type, 1 m east of it and lower by the conduit's
+        slope times its length. True uses :data:`OUTFALL_LINK_DEFAULTS` (a 30 m, 3 m diameter
+        circular conduit at a slope of 0.01 with Manning's n 0.01; a much shorter conduit sets
+        the dynamic-wave time step); a dict overrides any of ``length``, ``diameter``, ``slope``,
+        and ``roughness``. Outfalls with one inlet link are left as they are.
+
     flow_units : str
         The template's FLOW_UNITS, in which pump curves and ``design_flow`` are given (default
         LPS, the shipped template's; :func:`write_inp` sets it from the template).
@@ -729,6 +812,8 @@ def build_model(
         model, inputs, pipes, inverts, discharge_of, sections, roughness_of, defaults
     )
     _check_ideal_pumps(model)
+    if outfall_link:
+        _add_outfall_links(model, subnetwork, outfall_link, defaults)
 
     # Warned here, not in the helpers, so that they point at the caller of build_model.
     if force_main_checks is not None:
@@ -845,6 +930,15 @@ def write_inp(
             f"flow_units {options['flow_units']!r} is not the template's FLOW_UNITS {flow_units}."
         )
     model = build_model(subnetwork, outfalls, **{**options, "flow_units": flow_units})
+    if template_routing(template) == "DYNWAVE":
+        crowded = outfall_inlets(model)
+        if crowded:
+            raise ValueError(
+                "Under DYNWAVE routing an outfall may have only one link (SWMM ERROR 141); pass "
+                "outfall_link=True to write each of these as a junction draining to a new "
+                "outfall: "
+                + "; ".join(f"{n} ({', '.join(map(str, links))})" for n, links in crowded.items())
+            )
     needed = [
         name
         for name, records in (
