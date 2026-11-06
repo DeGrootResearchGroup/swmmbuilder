@@ -49,7 +49,9 @@ class Inflow:
     @classmethod
     def coerce(cls, value: Inflow | Fields) -> Inflow:
         """An Inflow from an Inflow or a dict of its fields."""
-        return value if isinstance(value, cls) else cls(**value)
+        if isinstance(value, Inflow):
+            return value
+        return cls(**value)
 
 
 def hourly_series(
