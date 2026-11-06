@@ -29,6 +29,8 @@ Issues = "https://github.com/DeGrootResearchGroup/swmmbuilder/issues"
 # Web-tile basemaps (maps.add_basemap), interactive maps (maps.to_leaflet) and the deprecated
 # Google Maps export (maps.generate_gmap).
 maps = ["contextily", "xyzservices", "folium", "gmplot"]
+# Rims estimated from a ground-elevation model (Network.estimate_rims): reading GeoTIFF DEMs.
+elevation = ["rasterio"]
 # Running the written .inp files. swmmbuilder itself never imports pyswmm, and pyswmm pulls in
 # julian, an sdist-only package that fails to build on some Python 3.13 setups, so it is optional.
 simulate = ["pyswmm"]
@@ -46,6 +48,7 @@ test = [
   "folium",
   "gmplot",
   "pyswmm",
+  "rasterio",
 ]
 
 # Found, not listed, so that subpackages (swmmbuilder.swmm, swmmbuilder.maps) are installed too.

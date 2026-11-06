@@ -15,10 +15,14 @@ The gap kinds (:data:`GAP_KINDS`):
 ``no_us_invert``    pipe with no upstream invert (written at the invert of its upstream node)
 ``no_ds_invert``    pipe with no downstream invert (written at the invert of its downstream node)
 ``no_node_invert``  node with no invert from any pipe
+``no_rim``          node with no usable rim, whose rim was estimated from a ground-elevation
+                    model by :meth:`Network.estimate_rims` (listed only when filled)
 ==================  =========================================================================
 
 ``unknown_shape``, ``no_size`` and ``no_node_invert`` stop a subnetwork from being written
-(:data:`BLOCKING_GAPS`); a pipe end with no invert is attached to its node with no offset.
+(:data:`BLOCKING_GAPS`); a pipe end with no invert is attached to its node with no offset. A node
+with no usable rim takes the default maximum depth of :func:`swmmbuilder.swmm.build_model`
+unless :meth:`Network.estimate_rims` filled its rim.
 """
 
 from __future__ import annotations
@@ -43,7 +47,14 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-GAP_KINDS = ("unknown_shape", "no_size", "no_us_invert", "no_ds_invert", "no_node_invert")
+GAP_KINDS = (
+    "unknown_shape",
+    "no_size",
+    "no_us_invert",
+    "no_ds_invert",
+    "no_node_invert",
+    "no_rim",
+)
 BLOCKING_GAPS = frozenset({"unknown_shape", "no_size", "no_node_invert"})
 REPORT_COLUMNS = ("element", "id", "gap", "detail", "filled_from", "value", "source", "order")
 
@@ -236,7 +247,9 @@ def fill_gaps(
 ) -> FilledData:
     """Find every gap in a subnetwork's pipes and node inverts, and fill those the rules cover.
 
-    The fills are made in this order, each logged and recorded in the report: overrides
+    Rims filled by :meth:`Network.estimate_rims` before this are recorded first (gap
+    ``no_rim``). The fills are then made in this order, each logged and recorded in the report:
+    overrides
     (``size_overrides``, ``height_correction``); ``shape_codes``; the round-pipe inference;
     ``size_fill``; node inverts from ``invert_fill`` and ``headwater_slope``;
     ``force_main_discharge``. Every rule except the round-pipe inference is off by default.
@@ -321,6 +334,12 @@ def fill_gaps(
             value,
             f" ({source})" if source else "",
         )
+
+    subnetwork_nodes = set(subnetwork.nodes)
+    for node, (rim, detail, source) in subnetwork.network.estimated_rims.items():
+        if node in subnetwork_nodes:
+            original[("node", node, "no_rim")] = detail
+            record("node", node, "no_rim", "estimate_rims", rim, source)
 
     for pipe_id, value in subnetwork.match_pipes(size_overrides or {}, "size_overrides").items():
         i = by_id[pipe_id]

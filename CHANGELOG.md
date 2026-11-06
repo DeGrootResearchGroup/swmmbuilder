@@ -11,6 +11,14 @@ earlier history is in the git log.
 
 ### Added
 
+- **Rims from a ground-elevation model**: `Network.estimate_rims(dem)` samples a lidar DEM (a
+  GeoTIFF or a list of tiles, in any CRS) at the nodes, at the cell or as the median within a
+  window. It compares the DEM with the recorded rims (`RimEstimate.validation`, median offset and
+  spread, and `largest_differences`), and fills only the rims that are missing or not above the
+  invert, optionally after adding an offset such as the median difference. A DEM rim at or below
+  the invert is not used. Each filled rim is listed in `data_gaps()` as a `no_rim` gap filled from
+  `estimate_rims`, with the DEM as its source. Reading rasters needs the new `elevation` extra
+  (rasterio) (#112).
 - Releases are published to PyPI from GitHub releases (`publish.yml`, trusted publishing), and the
   README installs from PyPI.
 - **Population allocation**: `allocate_population` places the population of polygons (census

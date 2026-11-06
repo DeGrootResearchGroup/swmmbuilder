@@ -16,7 +16,8 @@ import numpy as np
 import pandas as pd
 from shapely import Point
 
-from .diagnostics import DataWarning
+from .diagnostics import DataWarning, OptionWarning
+from .elevation import RimEstimate, dem_name, sample_dem
 from .gaps import lowest_inverts
 from .geometry import is_disjoint, line_coords, node_positions, reverse_line, to_geodataframe
 from .schema import LONDON_ON, NODE_COLUMNS, as_schema
@@ -252,9 +253,15 @@ class Network:
         (``Schema.invert_range``), treated as missing: ``pipe_id``, ``column``,
         ``source_column``, and ``value`` (in m), as recorded.
 
+    estimated_rims : dict
+        {node: (rim, detail, source)} of the rims filled from a DEM by :meth:`estimate_rims`:
+        the rim (in m), what was wrong with the recorded rim, and what the estimate came from.
+        Listed in the data-gaps report (gap ``no_rim``); emptied when :meth:`snap_nodes`
+        rebuilds the graph.
+
     version : int
-        Bumped each time the graph is rebuilt (by :meth:`snap_nodes`); subnetworks made from
-        an older version raise when used.
+        Bumped each time the graph is rebuilt (by :meth:`snap_nodes`) or its rims are filled
+        (by :meth:`estimate_rims`); subnetworks made from an older version raise when used.
     """
 
     def __init__(
@@ -282,6 +289,8 @@ class Network:
         self._split_points: dict[NodeId, Point] = {}
         self.split_report: pd.DataFrame | None = None
         self.reversed_pipes: list = []
+        self.estimated_rims: dict[NodeId, tuple[float, str, str]] = {}
+        self._recorded_rims: dict[NodeId, float] = {}
         if (
             split_tolerance is not None
             and snap_tolerance is not None
@@ -615,6 +624,15 @@ class Network:
         out of date (see :attr:`Subnetwork.network`).
         """
         self.version = getattr(self, "version", 0) + 1
+        if self.estimated_rims:
+            warnings.warn(
+                f"The network was rebuilt: the {len(self.estimated_rims)} rims estimated from the "
+                "DEM were discarded; call estimate_rims again.",
+                OptionWarning,
+                stacklevel=3,
+            )
+            self.estimated_rims = {}
+            self._recorded_rims = {}
         self.graph = self._build_graph(self.full_data)
         self.nodes = self._build_nodes()
         attrs = self.nodes.drop(columns="geometry").to_dict("index")
@@ -933,6 +951,165 @@ class Network:
         """{node: lowest invert of the network's pipes connected to it} for ``nodes`` (see
         :func:`swmmbuilder.gaps.lowest_inverts`)."""
         return lowest_inverts(self.full_data, nodes)
+
+    def estimate_rims(
+        self,
+        dem: StrPath | Any | Iterable[StrPath | Any],
+        window: float = 0.0,
+        statistic: str = "median",
+        offset: float | str = 0.0,
+        fill: bool = True,
+        nodes: Iterable[NodeId] | None = None,
+    ) -> RimEstimate:
+        """Compare the recorded rims with a ground-elevation model (DEM), and fill the missing
+        ones from it.
+
+        A maintenance-hole lid in a street is generally close to flush with the pavement, so the
+        ground elevation at a node estimates its rim (see :mod:`swmmbuilder.elevation` for the
+        caveats). The DEM is sampled at each node's point. Nodes with a usable rim (one that is
+        recorded and above the invert, or with no invert to compare) are compared with it: see
+        :attr:`RimEstimate.validation` and :meth:`RimEstimate.largest_differences`. Nodes with
+        no usable rim take the DEM value plus ``offset`` as their rim, unless that is at or below
+        their invert. Recorded rims are never replaced.
+
+        Each filled rim is logged, kept in :attr:`estimated_rims`, and listed in the data-gaps
+        report (gap ``no_rim``, filled from ``estimate_rims``, with the DEM as its source; see
+        :meth:`Subnetwork.data_gaps`); :meth:`Subnetwork.to_inp` then takes rim - invert as the
+        node's maximum depth. Filling changes the network: subnetworks made before it are out of
+        date and raise when used. Calling it again re-estimates the nodes it samples: their
+        earlier estimates are not treated as recorded rims.
+
+        Parameters
+        ----------
+        dem : path, rasterio dataset, or list of them
+            A single-band elevation raster (e.g. a GeoTIFF of a lidar bare-earth model) or a list
+            of tiles, in any CRS, with elevations in m in the vertical datum of the network's
+            data (see :func:`swmmbuilder.elevation.sample_dem`). Needs rasterio:
+            ``pip install 'swmmbuilder[elevation]'``.
+
+        window : float
+            0 (default): the cell at the node. Otherwise the ``statistic`` of the cells within
+            ``window`` metres of the node, to soften steep edges such as curbs and ditches.
+
+        statistic : {'median', 'mean'}
+            How the cells of a window are combined.
+
+        offset : float or 'median'
+            Added to the DEM value to estimate a rim, in m: a known datum shift or lid height,
+            or ``'median'`` for the median recorded rim - DEM over the nodes compared.
+
+        fill : bool
+            If False, only compare: no rim is filled.
+
+        nodes : iterable, optional
+            The nodes to sample (e.g. a catchment's); by default every node. With
+            ``offset='median'``, the median is over these nodes.
+
+        Returns
+        -------
+        RimEstimate
+            The DEM value, the comparison, and what was done at each node.
+
+        Raises
+        ------
+        ImportError
+            If rasterio is not installed.
+
+        ValueError
+            If a node is not in the network, ``offset`` is invalid, or ``offset='median'`` with
+            no node to compare (see also :func:`swmmbuilder.elevation.sample_dem`).
+        """
+        if isinstance(offset, str):
+            if offset != "median":
+                raise ValueError(f"offset must be a number or 'median'; got {offset!r}.")
+        elif not np.isfinite(offset):
+            raise ValueError(f"offset must be a finite number or 'median'; got {offset}.")
+        ids = list(self.graph) if nodes is None else sorted({self.resolve(n) for n in nodes})
+        self.check_nodes(ids)
+        table = self.nodes.loc[ids]
+        recorded = table["rim_elevation"].astype(float)
+        for node in set(ids) & set(self.estimated_rims):
+            recorded[node] = self._recorded_rims.get(node, np.nan)
+        invert = table["invert"].astype(float)
+        dem_values = sample_dem(dem, table.geometry, window, statistic)
+
+        usable = recorded.notna() & ~(recorded <= invert)
+        has_dem = dem_values.notna()
+        compared = usable & has_dem
+        difference = (recorded - dem_values).where(compared)
+        if offset == "median":
+            if not compared.any():
+                raise ValueError(
+                    "offset='median': no node has both a usable recorded rim and a DEM value."
+                )
+            offset = float(difference.median())
+        offset = float(offset)
+        estimate = (dem_values + offset).round(4)
+        below = has_dem & ~usable & (estimate <= invert)
+        status = pd.Series("no_dem_value", index=table.index, dtype=object)
+        status[compared] = "compared"
+        status[has_dem & ~usable] = "filled" if fill else "not_filled"
+        status[below] = "dem_not_above_invert"
+        samples = pd.DataFrame(
+            {
+                "recorded_rim": recorded,
+                "invert": invert,
+                "dem": dem_values,
+                "difference": difference,
+                "estimate": estimate,
+                "status": status,
+            }
+        )
+        source = f"DEM {dem_name(dem)}"
+        if window:
+            source += f", {statistic} within {window:g} m"
+        if offset:
+            source += f", offset {offset:+.3f} m"
+        result = RimEstimate(samples, offset, source)
+
+        if fill:
+            self._fill_rims(ids, recorded, invert, samples, source)
+        logger.info("%s", result.summary())
+        if below.any():
+            warnings.warn(
+                f"{int(below.sum())} rims from the DEM are at or below the invert and were not "
+                "used (status 'dem_not_above_invert' in RimEstimate.samples)",
+                DataWarning,
+                stacklevel=2,
+            )
+        missing = int((~usable & ~has_dem).sum())
+        if missing:
+            logger.warning("%d nodes with no usable rim have no DEM value", missing)
+        return result
+
+    def _fill_rims(self, ids, recorded, invert, samples, source):
+        """Set the rims of the nodes filled in ``samples``, after restoring the recorded rims
+        of the nodes in ``ids`` that an earlier estimate filled."""
+        changed = False
+        for node in set(ids) & set(self.estimated_rims):
+            self._set_rim(node, self._recorded_rims.pop(node, np.nan))
+            del self.estimated_rims[node]
+            changed = True
+        for node, row in samples[samples["status"] == "filled"].iterrows():
+            if pd.isna(recorded[node]):
+                detail = "no rim recorded"
+            else:
+                detail = f"recorded rim {recorded[node]:g} not above the invert {invert[node]:g}"
+            self._recorded_rims[node] = recorded[node]
+            self._set_rim(node, float(row["estimate"]))
+            self.estimated_rims[node] = (float(row["estimate"]), detail, source)
+            logger.info("Node %s: rim %s from %s (%s)", node, row["estimate"], source, detail)
+            changed = True
+        if changed:
+            self.version += 1
+
+    def _set_rim(self, node, rim):
+        """Set a node's rim in ``nodes`` and the graph (NaN: none)."""
+        self.nodes.loc[node, "rim_elevation"] = rim
+        if pd.isna(rim):
+            self.graph.nodes[node].pop("rim_elevation", None)
+        else:
+            self.graph.nodes[node]["rim_elevation"] = rim
 
     @staticmethod
     def _pipe_length(u, v, pipes):

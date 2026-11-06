@@ -30,6 +30,7 @@ What changed between versions is in
 pip install swmmbuilder                 # from PyPI
 pip install "swmmbuilder[maps]"         # + web-tile basemaps and Leaflet maps (contextily, xyzservices, folium)
 pip install "swmmbuilder[simulate]"     # + pyswmm, to run the .inp files
+pip install "swmmbuilder[elevation]"    # + rasterio, to estimate missing rims from a DEM
 pip install -e .                        # from a clone of this repository (extras as above)
 ```
 
@@ -109,7 +110,8 @@ sub.to_inp("model.inp")  # outfalls default to the outfall nodes of the subnetwo
 - **Maintenance-hole attributes.** `rim_elevation` is the layer's (London: `LidElevation`, or
   `HeadwallElevation` for outfalls), else `invert + depth`; rims outside the schema's
   `rim_range` (London: 150–350 m) are treated as missing. The `.inp` writer uses rim − invert
-  as a junction's maximum depth where it is known, and `max_depth` elsewhere. `has_drop`,
+  as a junction's maximum depth where it is known, and `max_depth` elsewhere (or a rim estimated
+  from a ground-elevation model: see [Rims from a DEM](#rims-from-a-dem)). `has_drop`,
   `overflow`, `weir`, `pipes_in`, `pipes_out`, `flow_monitor`, `access` and `verified` are passed
   through for downstream use, e.g. choosing accessible or flow-monitored sampling sites.
 
@@ -557,6 +559,39 @@ receiving node's invert (known, or filled first by `invert_fill`/`headwater_slop
 schema's optional `[design]` table, apart from the column mapping, and are used only when passed:
 London's (`london_on.toml`) is the Design Specifications & Requirements Manual's limit of 200 mm
 above the receiving maintenance hole's flow line (Ch. 4, s. 4.8).
+
+### Rims from a DEM
+
+A junction's maximum depth is rim − invert, so a junction with no usable rim (none recorded, or one
+at or below the invert) takes the default `max_depth`, whatever the ground above it.
+Maintenance-hole lids in streets are generally close to flush with the pavement, so a bare-earth
+ground-elevation model (DEM) from airborne lidar, such as the Ontario Digital Terrain Model
+(Lidar-Derived), estimates the missing rims. `Network.estimate_rims` samples a GeoTIFF (or a list
+of tiles, in any CRS) at the nodes, compares it with the recorded rims, and fills the missing ones.
+It needs the `elevation` extra (`pip install "swmmbuilder[elevation]"`: rasterio).
+
+```python
+check = net.estimate_rims("dtm.tif", window=1.0, fill=False)  # compare only
+print(check.summary())               # recorded rim - DEM: median, IQR, 5-95 %, largest
+check.largest_differences(10)        # recorded rims that are probably wrong, or raised lids
+est = net.estimate_rims(["tile_1.tif", "tile_2.tif"], window=1.0, offset="median")
+est.samples                          # DEM value, difference, estimate and status of each node
+```
+
+- `window=0` (default) takes the cell at the node; `window=1.0` the median (or `statistic="mean"`)
+  of the cells within 1 m, to soften curbs and ditches.
+- Only nodes with no usable rim are filled, with the DEM value plus `offset` (a number, or
+  `"median"`: the median recorded rim − DEM). A DEM rim at or below the invert is not used (a
+  `DataWarning` gives the count). Recorded rims are never replaced.
+- Each filled rim is logged, kept in `net.estimated_rims`, and listed in `data_gaps()` as a
+  `no_rim` gap filled from `estimate_rims`, with the DEM as its source. Subnetworks made before
+  the fill are out of date; `snap_nodes` discards the estimates.
+
+Caveats: lids in fields, ravines, or easements are often raised above grade, and structures under
+bridges, at creek crossings, or inside buildings cannot be read from the ground surface. A
+bare-earth model may smooth sharp features; the window and the comparison are the guard. The DEM
+and the City's elevations must share a vertical datum (CGVD28 and CGVD2013 differ by decimetres in
+Ontario): check, or convert, before comparing.
 
 ## Tests
 

@@ -785,7 +785,8 @@ class Subnetwork:
         A gap is a pipe with an unknown or missing shape code or a missing size, a pipe end with
         no invert, or a node with no invert from any pipe (see :mod:`swmmbuilder.gaps`). With no
         options nothing is filled, except that a round pipe with no diameter whose height equals
-        its width takes that value as its diameter.
+        its width takes that value as its diameter. Rims filled by :meth:`Network.estimate_rims`
+        are listed too (gap ``no_rim``).
 
         Parameters
         ----------
