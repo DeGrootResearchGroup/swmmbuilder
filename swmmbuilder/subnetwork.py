@@ -586,6 +586,57 @@ class Subnetwork:
             )
         return PumpStationReport(stations, no_force_main, unlisted)
 
+    def split_report(self) -> pd.DataFrame:
+        """The node IDs split by ``split_tolerance``, and which of them reach this subnetwork.
+
+        A copy of the network's ``split_report`` (one row per node made by splitting a reused
+        ID, across the whole network) with two more columns:
+
+        - ``node``, the node that ``new_id`` resolves to after snapping
+          (:meth:`Network.resolve <swmmbuilder.Network.resolve>`), which differs from
+          ``new_id`` where snapping merged the new node into another one.
+        - ``in_subnetwork``, whether ``node`` is a node of this subnetwork.
+
+        Without ``split_tolerance`` the network has no split report, and the result is an empty
+        frame with the same columns. :meth:`split_summary` counts the rows.
+
+        Returns
+        -------
+        pandas.DataFrame
+        """
+        from .network import SPLIT_REPORT_COLUMNS
+
+        network = self.network
+        report = network.split_report
+        if report is None:
+            report = pd.DataFrame(columns=list(SPLIT_REPORT_COLUMNS))
+        nodes = set(self.graph.nodes)
+        node = report["new_id"].map(network.resolve)
+        return report.assign(node=node, in_subnetwork=node.isin(nodes).astype(bool))
+
+    def split_summary(self) -> dict[str, int]:
+        """Counts of the reused node IDs split by ``split_tolerance`` (see :meth:`split_report`).
+
+        Returns
+        -------
+        dict
+            A flat dict with the keys
+
+            - ``ids_split``, the number of reused IDs split, across the whole network;
+            - ``nodes_made``, the number of nodes made by splitting them; and
+            - ``ids_in_subnetwork``, the number of reused IDs with at least one of their
+              structures in this subnetwork.
+
+            All are 0 without ``split_tolerance``.
+        """
+        report = self.split_report()
+        reached = report.groupby("node_id")["in_subnetwork"].any()
+        return {
+            "ids_split": len(self.network.splits),
+            "nodes_made": len(report),
+            "ids_in_subnetwork": int(reached.sum()),
+        }
+
     def accumulate(
         self,
         values: Mapping[NodeId, float] | pd.Series | pd.DataFrame,
