@@ -63,6 +63,7 @@ net.nodes            # GeoDataFrame: node_type, name, invert, rim_elevation, dep
 net.snap_report      # merged pairs: both IDs, distance, both inverts, kept ID or why not merged
 net.split_report     # split IDs: new ID, its pipes, distance to the other structures, attributes
 sub = net.catchment("WT6011")
+sub.split_report()   # the same, with the node after snapping and whether it is in the catchment
 sub.validate()       # dead ends classified as capped / outfall / pump_station / unexplained
 sub.to_inp("model.inp")  # outfalls default to the outfall nodes of the subnetwork
 ```
@@ -99,7 +100,10 @@ sub.to_inp("model.inp")  # outfalls default to the outfall nodes of the subnetwo
   `net.split_report`, and `net.splits` maps each original ID to its new IDs. Splitting runs
   before snapping, and the tolerance must exceed `snap_tolerance`: a mistyped end that lies on
   another structure is then merged into it by the snap, and the structures of one ID are never
-  merged again.
+  merged again. For one catchment, `sub.split_report()` adds the node each new ID
+  resolves to after snapping (`node`) and whether that node is in the subnetwork
+  (`in_subnetwork`), and `sub.split_summary()` counts the IDs split, the nodes made, and the IDs
+  with at least one structure in the subnetwork.
 - **ID normalisation.** `normalize_ids` is applied to the node IDs of the pipes, the node layers,
   and those passed to `catchment`, `subnetwork` and `Subnetwork.from_node_list`.
 - **Validation.** `TopologyReport` also has `dead_end_types`, `force_mains`, and

@@ -9,6 +9,7 @@ from conftest import FIXTURE
 from shapely.geometry import LineString, Point
 
 from swmmbuilder import Network
+from swmmbuilder.network import SPLIT_REPORT_COLUMNS
 
 CRS = "EPSG:2958"
 X0, Y0 = 480_000.0, 4_760_000.0
@@ -251,3 +252,50 @@ def test_geographic_coordinates_are_measured_in_metres():
     net = Network(data, maintenance_holes=holes(HOLES).to_crs("EPSG:4326"), split_tolerance=50.0)
     assert net.splits == {"X": ["Xa", "Xb"], "Y": ["Ya", "Yb"]}
     assert net.split_report["separation"].min() == pytest.approx(900.0, rel=1e-3)
+
+
+def test_subnetwork_split_report_marks_the_structures_in_it():
+    # X and Y are each split in two: the west structures drain to OUT, the east ones to E2.
+    net = load()
+    report = net.catchment("OUT").split_report().set_index("new_id")
+    assert list(report.columns[-2:]) == ["node", "in_subnetwork"]
+    assert report["node"].to_dict() == {"Xa": "Xa", "Xb": "Xb", "Ya": "Ya", "Yb": "Yb"}
+    assert report["in_subnetwork"].to_dict() == {"Xa": True, "Xb": False, "Ya": True, "Yb": False}
+    assert report["in_subnetwork"].dtype == bool
+    assert net.catchment("OUT").split_summary() == {
+        "ids_split": 2,
+        "nodes_made": 4,
+        "ids_in_subnetwork": 2,
+    }
+    # The network's report is left as it was.
+    assert "node" not in net.split_report.columns
+
+
+def test_subnetwork_split_summary_counts_each_id_once():
+    # The whole network holds both structures of X and of Y: still two IDs.
+    net = load()
+    sub = net.subnetwork(net.graph)
+    assert sub.split_report()["in_subnetwork"].all()
+    assert sub.split_summary() == {"ids_split": 2, "nodes_made": 4, "ids_in_subnetwork": 2}
+
+
+def test_subnetwork_split_report_follows_snapping():
+    # Wb is at V, so snapping merges it into V: its row names V, which is in V2's catchment.
+    spec = [
+        (40, "W1", "W", [(-100, 200), (0, 200)]),
+        (41, "W", "W2", [(0, 200), (100, 200)]),
+        (42, "V", "V2", [(500, 200), (600, 200)]),
+        (43, "V1", "W", [(400, 200), (500, 200)]),
+    ]
+    net = load(spec, points={"W": (0, 200), "V": (500, 200)}, snap_tolerance=0.5)
+    report = net.catchment("V2").split_report().set_index("new_id")
+    assert report["node"].to_dict() == {"Wa": "Wa", "Wb": "V"}
+    assert report["in_subnetwork"].to_dict() == {"Wa": False, "Wb": True}
+
+
+def test_subnetwork_split_report_without_split_tolerance():
+    sub = load(split_tolerance=None).catchment("OUT")
+    report = sub.split_report()
+    assert report.empty
+    assert list(report.columns) == [*SPLIT_REPORT_COLUMNS, "node", "in_subnetwork"]
+    assert sub.split_summary() == {"ids_split": 0, "nodes_made": 0, "ids_in_subnetwork": 0}

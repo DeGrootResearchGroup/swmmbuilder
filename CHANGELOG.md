@@ -11,6 +11,10 @@ earlier history is in the git log.
 
 ### Added
 
+- **Splits in a subnetwork** (#134): `Subnetwork.split_report()` returns the network's
+  `split_report` with two more columns, `node` (the node each new ID resolves to after snapping)
+  and `in_subnetwork`. `Subnetwork.split_summary()` returns `ids_split`, `nodes_made`, and
+  `ids_in_subnetwork`. Without `split_tolerance` both are empty (no rows, zero counts).
 - **Census polygons** (#128): `swmmbuilder.census.census_polygons` gets the polygons covering a
   network (or any area) from a pluggable source, keeps those meeting the footprint of its gravity
   pipes, and returns them with `population` and `parent` columns for `allocate_population`. A

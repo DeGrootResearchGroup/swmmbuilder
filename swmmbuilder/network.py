@@ -46,6 +46,17 @@ NODE_LAYERS = {
     "other_nodes": None,
 }
 
+# The columns of Network.split_report.
+SPLIT_REPORT_COLUMNS = (
+    "node_id",
+    "new_id",
+    "pipes",
+    "separation",
+    "layer",
+    "point_distance",
+    "attributes",
+)
+
 
 def strip_leading_zeros(node_id: NodeId) -> NodeId:
     """Node ID with the leading zeros of its number removed, e.g. 'OK0329' -> 'OK329'.
@@ -600,18 +611,7 @@ class Network:
             len(rows),
             tolerance,
         )
-        return pd.DataFrame(
-            rows,
-            columns=[
-                "node_id",
-                "new_id",
-                "pipes",
-                "separation",
-                "layer",
-                "point_distance",
-                "attributes",
-            ],
-        )
+        return pd.DataFrame(rows, columns=list(SPLIT_REPORT_COLUMNS))
 
     def _build(self):
         """(Re)build ``graph`` and ``nodes`` from ``full_data`` and the node layers.
