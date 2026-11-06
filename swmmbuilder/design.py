@@ -203,7 +203,15 @@ def wet_well_params(rule):
 
 
 def apply_wet_well_defaults(
-    subnetwork, pipes, stations, inverts, rule, flow_units, force_mains=(), pump_names=None
+    subnetwork,
+    pipes,
+    stations,
+    inverts,
+    rule,
+    flow_units,
+    force_mains=(),
+    pump_names=None,
+    rims=None,
 ):
     """Fill in the stations' missing wet wells and pump on/off depths from the
     ``wet_well_defaults`` rule of :func:`build_model`, in place.
@@ -224,7 +232,8 @@ def apply_wet_well_defaults(
     A station with a :class:`WetWell` keeps it, and a pump's own ``startup``/``shutoff`` are kept;
     the on/off depths are derived only for a pump with a curve (an ideal pump does not cycle).
     ``pump_names`` ({node: [pump link names]}, default the node) names the pumps in the
-    :class:`Derived` rows.
+    :class:`Derived` rows. ``rims`` ({node: rim}, e.g. :attr:`FilledData.rims`) defaults to the
+    recorded rims.
 
     Returns
     -------
@@ -278,7 +287,11 @@ def apply_wet_well_defaults(
                 continue
             volume = station.design_flow * _FLOW_UNIT_LPS[flow_units] / 1000 * fill_time * 60
             area = round(volume / (high - low), 4)
-            rim = subnetwork.graph.nodes[node].get("rim_elevation")
+            rim = (
+                subnetwork.graph.nodes[node].get("rim_elevation")
+                if rims is None
+                else rims.get(node)
+            )
             if rim is not None and rim > inlet:
                 max_depth, how = round(rim - floor, 4), "rim - floor"
             else:

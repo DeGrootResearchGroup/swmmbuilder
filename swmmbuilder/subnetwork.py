@@ -849,16 +849,17 @@ class Subnetwork:
         """Every gap in the data of the subnetwork, and how the fill rules would fill it.
 
         A gap is a pipe with an unknown or missing shape code or a missing size, a pipe end with
-        no invert, or a node with no invert from any pipe (see :mod:`swmmbuilder.gaps`). With no
-        options nothing is filled, except that a round pipe with no diameter whose height equals
-        its width takes that value as its diameter.
+        no invert, a node with no invert from any pipe, or a node with no usable rim (see
+        :mod:`swmmbuilder.gaps`). With no options nothing is filled, except that a round pipe
+        with no diameter whose height equals its width takes that value as its diameter.
 
         Parameters
         ----------
         **fills
             The fill options of :meth:`to_inp` (``height_correction``, ``size_overrides``,
             ``shape_codes``, ``size_fill``, ``invert_fill``, ``headwater_slope``,
-            ``force_main_discharge``, and ``pumps``, whose pipes need no cross-section); see
+            ``force_main_discharge``, ``rims``, and ``pumps``, whose pipes need no
+            cross-section); see
             :func:`swmmbuilder.gaps.fill_gaps`.
 
         Returns
