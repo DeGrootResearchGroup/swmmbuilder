@@ -23,6 +23,7 @@ from .gaps import lowest_inverts
 from .geometry import is_disjoint, line_coords, node_positions, reverse_line, to_geodataframe
 from .schema import LONDON_ON, NODE_COLUMNS, as_schema
 from .subnetwork import Subnetwork
+from .units import _is_real
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Collection, Mapping
@@ -1069,6 +1070,9 @@ class Network:
         statistic: str = "median",
         offset: float | str = 0.0,
         nodes: Iterable[NodeId] | None = None,
+        flag: float | None = None,
+        replace_above: float | None = None,
+        replace_below: float | None = None,
     ) -> RimEstimate:
         """Compare the recorded rims with a ground-elevation model (DEM), and estimate the
         missing ones from it.
@@ -1079,13 +1083,23 @@ class Network:
         recorded and above the invert, or with no invert to compare) are compared with it: see
         :attr:`RimEstimate.validation` and :meth:`RimEstimate.largest_differences`. Nodes with
         no usable rim are estimated as the DEM value plus ``offset``, unless that is at or below
-        their invert. Usable recorded rims are never replaced.
+        their invert.
+
+        A usable recorded rim far from the DEM is probably wrong (a typo, a rim from another
+        structure) or a lid not flush with the ground (raised in a field, a ravine, or an
+        easement). Its ``deviation`` is recorded rim - DEM minus the median of that difference,
+        so that a datum shift does not count. With ``flag``, the rims deviating by more than
+        ``flag`` metres either way are flagged as implausible; with ``replace_above`` or
+        ``replace_below``, those recorded more than that far above or below the ground are
+        replaced by the DEM estimate. Lids are more often raised than sunk, so the threshold
+        above can be the larger. Otherwise usable recorded rims are kept.
 
         The network is not changed. Pass :attr:`RimEstimate.rims` to the ``rims`` option of
         :meth:`Subnetwork.to_inp` (or :meth:`Subnetwork.data_gaps`, or
         :func:`swmmbuilder.gaps.fill_gaps`) to fill those nodes: each is listed in the data-gaps
         report (gap ``no_rim``, filled from ``estimate_rims``, with the DEM as its source), and
-        its maximum depth is rim - invert.
+        its maximum depth is rim - invert. The flagged rims are listed too (gap
+        ``implausible_rim``), filled where replaced.
 
         Parameters
         ----------
@@ -1110,6 +1124,15 @@ class Network:
             The nodes to sample (e.g. a catchment's); by default every node. With
             ``offset='median'``, the median is over these nodes.
 
+        flag : float, optional
+            Flag the recorded rims deviating from the DEM by more than this, in m (e.g. 1.0).
+
+        replace_above, replace_below : float, optional
+            Replace by the DEM estimate the recorded rims more than this far above, or below,
+            the ground (``deviation`` above ``replace_above`` or below ``-replace_below``), in
+            m. A replaced rim is flagged too. A DEM estimate at or below the invert does not
+            replace a rim.
+
         Returns
         -------
         RimEstimate
@@ -1121,14 +1144,19 @@ class Network:
             If rasterio is not installed.
 
         ValueError
-            If a node is not in the network, ``offset`` is invalid, or ``offset='median'`` with
-            no node to compare (see also :func:`swmmbuilder.elevation.sample_dem`).
+            If a node is not in the network, ``offset`` or a threshold is invalid, or
+            ``offset='median'`` (or a threshold) with no node to compare (see also
+            :func:`swmmbuilder.elevation.sample_dem`).
         """
         if isinstance(offset, str):
             if offset != "median":
                 raise ValueError(f"offset must be a number or 'median'; got {offset!r}.")
         elif not np.isfinite(offset):
             raise ValueError(f"offset must be a finite number or 'median'; got {offset}.")
+        thresholds = {"flag": flag, "replace_above": replace_above, "replace_below": replace_below}
+        for name, value in thresholds.items():
+            if value is not None and not (_is_real(value) and value >= 0):
+                raise ValueError(f"{name} must be a number of metres >= 0; got {value!r}.")
         ids = list(self.graph) if nodes is None else sorted({self.resolve(n) for n in nodes})
         self.check_nodes(ids)
         table = self.nodes.loc[ids]
@@ -1149,8 +1177,23 @@ class Network:
         offset = float(offset)
         estimate = (dem_values + offset).round(4)
         below = has_dem & ~usable & (estimate <= invert)
+        if any(v is not None for v in thresholds.values()) and not compared.any():
+            raise ValueError(
+                "flag/replace: no node has both a usable recorded rim and a DEM value."
+            )
+        deviation = difference - difference.median()
+        never = pd.Series(False, index=table.index)
+        replace = never.copy()
+        if replace_above is not None:
+            replace |= deviation > replace_above
+        if replace_below is not None:
+            replace |= deviation < -replace_below
+        replace &= estimate > invert.fillna(-np.inf)
+        flagged = (deviation.abs() > flag if flag is not None else never) | replace
         status = pd.Series("no_dem_value", index=table.index, dtype=object)
         status[compared] = "compared"
+        status[flagged] = "implausible"
+        status[replace] = "replaced"
         status[has_dem & ~usable] = "estimated"
         status[below] = "dem_not_above_invert"
         samples = pd.DataFrame(
@@ -1159,6 +1202,7 @@ class Network:
                 "invert": invert,
                 "dem": dem_values,
                 "difference": difference,
+                "deviation": deviation,
                 "estimate": estimate,
                 "status": status,
             }
@@ -1168,13 +1212,20 @@ class Network:
             source += f", {statistic} within {window:g} m"
         if offset:
             source += f", offset {offset:+.3f} m"
-        result = RimEstimate(samples, offset, source)
+        result = RimEstimate(samples, offset, source, flag, replace_above, replace_below)
 
         logger.info("%s", result.summary())
         if below.any():
             warnings.warn(
                 f"{int(below.sum())} rims from the DEM are at or below the invert and are not "
                 "used (status 'dem_not_above_invert' in RimEstimate.samples)",
+                DataWarning,
+                stacklevel=2,
+            )
+        if flagged.any():
+            warnings.warn(
+                f"{int(flagged.sum())} recorded rims are implausible against the DEM "
+                f"({int(replace.sum())} replaced); see RimEstimate.implausible",
                 DataWarning,
                 stacklevel=2,
             )

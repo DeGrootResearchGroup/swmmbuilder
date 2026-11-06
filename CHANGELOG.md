@@ -56,6 +56,12 @@ earlier history is in the git log.
   (`to_inp(rims=estimate.rims)`) fills them, flagged in `data_gaps()` as filled from
   `estimate_rims` with the DEM as their source. Filled rims count for `max_depth='median'`.
   Reading rasters needs the new `elevation` extra (rasterio) (#112).
+- **Implausible recorded rims**: `estimate_rims(flag=...)` flags the recorded rims that deviate
+  from the DEM by more than a threshold, measured from the median recorded rim − DEM so that a
+  datum shift does not count, and `replace_above` and `replace_below` replace by the DEM estimate
+  those recorded more than that far above or below the ground (separate thresholds, since raised
+  lids are commoner than sunk ones). Passing `estimate.rims` lists them in `data_gaps()` as the
+  new `implausible_rim` gap, filled from `estimate_rims` where replaced.
 - Releases are published to PyPI from GitHub releases (`publish.yml`, trusted publishing), and the
   README installs from PyPI.
 - **Population allocation**: `allocate_population` places the population of polygons (census

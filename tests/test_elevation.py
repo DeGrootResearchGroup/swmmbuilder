@@ -346,3 +346,64 @@ def test_invalid_offset(network, dem, offset, message):
 def test_median_offset_needs_recorded_rims(network, dem):
     with pytest.raises(ValueError, match="no node has both a usable recorded rim"):
         network.estimate_rims(dem, offset="median")
+
+
+# --- implausible recorded rims ----------------------------------------------------------------
+
+
+@pytest.fixture
+def odd(network, recorded):
+    """J1 recorded 3 m above where the others put it (a raised lid?), A2 1.5 m below (a wrong
+    rim?)."""
+    record_rims(network, {"J1": recorded["J1"] + 3.0, "A2": recorded["A2"] - 1.5})
+
+
+def test_implausible_rims_are_flagged_from_the_median(network, recorded, odd, dem):
+    with pytest.warns(DataWarning, match="2 recorded rims are implausible .*0 replaced"):
+        estimate = network.estimate_rims(dem, flag=1.0)
+    assert set(estimate.implausible.index) == {"J1", "A2"}
+    assert estimate.replaced.empty
+    deviation = estimate.samples["deviation"]
+    assert deviation["J1"] == pytest.approx(3.0, abs=5e-3)
+    assert deviation["A2"] == pytest.approx(-1.5, abs=5e-3)
+    assert estimate.validation["count"] == 4  # flagged rims are still compared
+    assert set(estimate.rims) == set(estimate.estimated.index)  # nothing replaced
+    assert set(estimate.rims.implausible) == {"J1", "A2"}
+    assert "implausible (more than 1 m from the median difference): 2, of which 0 replaced" in (
+        estimate.summary()
+    )
+
+
+def test_separate_thresholds_above_and_below_the_ground(network, recorded, odd, dem):
+    with pytest.warns(DataWarning, match="2 recorded rims are implausible .*1 replaced"):
+        estimate = network.estimate_rims(dem, flag=1.0, replace_above=5.0, replace_below=1.0)
+    assert list(estimate.replaced.index) == ["A2"]  # 1.5 m below; J1 is 3 m above, under 5
+    assert estimate.samples.loc["J1", "status"] == "implausible"
+    assert estimate.rims["A2"] == pytest.approx(ground_at(network, "A2"), abs=2e-3)
+    assert "J1" not in estimate.rims
+    with pytest.warns(DataWarning):
+        both = network.estimate_rims(dem, replace_above=2.0, replace_below=1.0)  # no flag needed
+    assert set(both.replaced.index) == {"J1", "A2"}
+
+
+def test_flagged_and_replaced_rims_in_the_data_gaps(network, recorded, odd, dem):
+    with pytest.warns(DataWarning):
+        estimate = network.estimate_rims(dem, flag=1.0, replace_below=1.0)
+    sub = network.subnetwork(nodes_of(DENDRITIC))
+    report = sub.data_gaps(rims=estimate.rims)
+    rows = report[report["gap"] == "implausible_rim"].set_index("id")
+    assert set(rows.index) == {"J1", "A2"}
+    assert pd.isna(rows.loc["J1", "filled_from"])
+    assert rows.loc["A2", "filled_from"] == "estimate_rims"
+    assert rows.loc["A2", "value"] == estimate.rims["A2"]
+    assert rows.loc["A2", "detail"].endswith("-1.50 m from the DEM")
+    model = swmm.build_model(sub, ["OUT"], rims=estimate.rims)
+    depths = {j.name: j.max_depth for j in model.junctions}
+    invert = network.nodes.loc["A2", "invert"]
+    assert depths["A2"] == pytest.approx(round(estimate.rims["A2"] - invert, 4))
+
+
+@pytest.mark.parametrize("name", ["flag", "replace_above", "replace_below"])
+def test_invalid_thresholds(network, recorded, dem, name):
+    with pytest.raises(ValueError, match=f"{name} must be a number of metres >= 0"):
+        network.estimate_rims(dem, **{name: -1.0})
