@@ -23,6 +23,13 @@ earlier history is in the git log.
   to share by. Each share is placed at the pipe's upstream node, downstream node, or both. The
   result reports the population of polygons with no pipe, and its `nodes` feed
   `dwf_from_population`.
+- **External inflows and time series**: the `inflows` and `timeseries` options of `to_inp`
+  write [INFLOWS] and [TIMESERIES] (#98). An `Inflow` is a time series times a scale plus a
+  baseline, optionally times a pattern, so a node can carry a second time-varying flow (e.g.
+  commercial flow with its own hourly pattern) or a steady one (e.g. infiltration) besides its
+  [DWF] flow. `hourly_series` gives a series that holds each hourly value for the whole hour. The
+  shipped template has the `{inflows}` and `{timeseries}` placeholders; a template needs them
+  only when these options are used.
 - **Reused node IDs**: `Network(split_tolerance=...)` splits a node ID used for structures far
   apart into one node per structure (`FH207a`, `FH207b`, ...), so that the network is not joined
   where the data are not. Pipe ends are grouped into structures by distance, pipes drawn against

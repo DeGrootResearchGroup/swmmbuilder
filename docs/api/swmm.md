@@ -8,6 +8,10 @@
 
 ::: swmmbuilder.swmm.dwf.dwf_from_population
 
+::: swmmbuilder.swmm.inflows.Inflow
+
+::: swmmbuilder.swmm.inflows.hourly_series
+
 ::: swmmbuilder.swmm.records.SwmmModel
 
 ::: swmmbuilder.swmm.template

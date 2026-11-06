@@ -46,6 +46,8 @@ def resolve(sub, **options):
         dwf=None,
         patterns=None,
         dwf_patterns=None,
+        timeseries=None,
+        inflows=None,
         flow_units="LPS",
     )
     return _resolve_inputs(sub, **{**args, **options})

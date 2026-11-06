@@ -4,7 +4,16 @@ from .network import Network, strip_leading_zeros
 from .population import PopulationAllocation, allocate_population
 from .schema import LAZY_PRESETS, LONDON_ON, Schema
 from .subnetwork import Subnetwork, TopologyReport
-from .swmm import Derived, Pump, PumpStation, SwmmModel, WetWell, dwf_from_population
+from .swmm import (
+    Derived,
+    Inflow,
+    Pump,
+    PumpStation,
+    SwmmModel,
+    WetWell,
+    dwf_from_population,
+    hourly_series,
+)
 
 __all__ = [
     "BARRIE_ON",
@@ -18,6 +27,7 @@ __all__ = [
     "DataWarning",
     "Derived",
     "DesignWarning",
+    "Inflow",
     "Network",
     "NodeId",
     "OptionWarning",
@@ -33,6 +43,7 @@ __all__ = [
     "WetWell",
     "allocate_population",
     "dwf_from_population",
+    "hourly_series",
     "strip_leading_zeros",
 ]
 

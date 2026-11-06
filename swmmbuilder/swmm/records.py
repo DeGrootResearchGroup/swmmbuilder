@@ -124,6 +124,27 @@ class Pattern:
     multipliers: tuple
 
 
+@dataclass(frozen=True)
+class ExternalInflow:
+    """A node's external flow ([INFLOWS]): ``scale`` x the time series ``timeseries`` (None for
+    none) plus ``baseline`` x the pattern ``baseline_pattern`` (None for none), in the
+    FLOW_UNITS."""
+
+    node: str
+    timeseries: str | None
+    scale: float
+    baseline: float
+    baseline_pattern: str | None = None
+
+
+@dataclass(frozen=True)
+class TimeSeries:
+    """A time series ([TIMESERIES]): (hours from the start of the run, value) points."""
+
+    name: str
+    points: tuple
+
+
 @dataclass
 class SwmmModel:
     """The SWMM objects of a subnetwork, ready to render into an .inp template.
@@ -132,8 +153,10 @@ class SwmmModel:
     ----------
     junctions, outfalls, storage, conduits, pumps, xsections, curves, dwf, patterns : list
         :class:`Junction`, :class:`Outfall`, :class:`Storage`, :class:`Conduit`,
-        :class:`PumpLink`, :class:`XSection`, :class:`Curve`, :class:`DryWeatherFlow` and
+        :class:`PumpLink`, :class:`XSection`, :class:`Curve`, :class:`DryWeatherFlow`, and
         :class:`Pattern` records, in the order they are written.
+    inflows, timeseries : list
+        :class:`ExternalInflow` and :class:`TimeSeries` records, in the order they are written.
     coordinates : dict
         {node: (x, y)}, in the units of the GIS geometry.
     vertices : dict
@@ -155,6 +178,8 @@ class SwmmModel:
     curves: list = field(default_factory=list)
     dwf: list = field(default_factory=list)
     patterns: list = field(default_factory=list)
+    inflows: list = field(default_factory=list)
+    timeseries: list = field(default_factory=list)
     coordinates: dict = field(default_factory=dict)
     vertices: dict = field(default_factory=dict)
     data_gaps: pd.DataFrame | None = None
@@ -278,6 +303,25 @@ class SwmmModel:
                 )
                 + "\n"
                 for p in self.patterns
+            ),
+            # Constituent FLOW, type FLOW, units factor 1; "" for no time series.
+            "inflows": "".join(
+                _line(
+                    (_name(i.node), 16),
+                    ("FLOW", 16),
+                    ('""' if i.timeseries is None else _name(i.timeseries), 16),
+                    ("FLOW", 8),
+                    (1.0, 8),
+                    (i.scale, 8),
+                    (i.baseline, 8),
+                    *(() if i.baseline_pattern is None else ((_name(i.baseline_pattern), 0),)),
+                )
+                for i in self.inflows
+            ),
+            # Times in decimal hours from the start of the run.
+            "timeseries": "".join(
+                "".join(_line((_name(s.name), 16), (t, 11), (v, 11)) for t, v in s.points) + "\n"
+                for s in self.timeseries
             ),
             "coordinates": "".join(
                 f"{_name(node):<16} {x:<18} {y:<18}\n" for node, (x, y) in self.coordinates.items()

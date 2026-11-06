@@ -2,12 +2,12 @@
 
 :func:`build_model` turns a subnetwork into a :class:`SwmmModel`: plain records of the junctions,
 outfalls, storage nodes, conduits, pumps, cross-sections, curves, dry-weather flows, time patterns,
-coordinates and vertices, with all the hydraulic decisions
+external inflows, time series, coordinates and vertices, with all the hydraulic decisions
 (node inverts, conduit offsets, cross-sections, Manning's n) already made.
 :meth:`SwmmModel.render` fills an .inp template with them, and :func:`write_inp` checks the
 template and the topology, builds the model and writes the file.
 
-The code is split into modules (template, pumping, dwf, records, build) and the
+The code is split into modules (template, pumping, dwf, inflows, records, build) and the
 shared :mod:`swmmbuilder.units`, :mod:`swmmbuilder.pumps` and :mod:`swmmbuilder.design`; every
 name is re-exported here, so ``from swmmbuilder.swmm import X`` keeps working.
 """
@@ -69,6 +69,12 @@ from .dwf import (  # noqa: F401
     resolve_dwf_patterns,
     resolve_patterns,
 )
+from .inflows import (  # noqa: F401
+    Inflow,
+    hourly_series,
+    resolve_inflows,
+    resolve_timeseries,
+)
 from .pumping import (  # noqa: F401
     resolve_pump_stations,
     resolve_pumps,
@@ -79,12 +85,14 @@ from .records import (  # noqa: F401
     Conduit,
     Curve,
     DryWeatherFlow,
+    ExternalInflow,
     Junction,
     Outfall,
     Pattern,
     PumpLink,
     Storage,
     SwmmModel,
+    TimeSeries,
     XSection,
     _line,
     _name,

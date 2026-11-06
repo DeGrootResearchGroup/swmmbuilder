@@ -27,6 +27,8 @@ TEMPLATE_PLACEHOLDERS = (
     "curves",
     "dwf",
     "patterns",
+    "inflows",
+    "timeseries",
     "coordinates",
     "vertices",
 )
