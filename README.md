@@ -463,7 +463,8 @@ is not in `pump_stations` gets a warning: its force mains are written as ordinar
   force main (`stations`), those with none (`no_force_main`), and force mains that climb from a
   node not in the station layer (`unlisted`, likely lift stations missing from it).
   `pump_stations="found"` (or a `PumpStationReport`, e.g. of `find_pump_stations(min_rise=1.0)`)
-  pumps every listed station with `default_pump`, which must then be given:
+  pumps every listed station with `default_pump`, which must then be given (or come from the
+  schema, with `design="schema"`):
 
   ```python
   model = sub.to_inp(
@@ -538,6 +539,19 @@ is not in `pump_stations` gets a warning: its force mains are written as ordinar
   stations feeding a shared main after a join; a shared pump feeding several force mains is not
   checked, as the split is unknown.
   London's preset (100 mm, 0.6–3.0 m/s) is `LONDON_ON.design["force_main_checks"]`.
+- **The schema's rules at once.** `design="schema"` takes `force_main_discharge`,
+  `force_main_roughness`, `force_main_checks`, and `default_pump` from the subnetwork's schema
+  (those its `[design]` table holds), so that a London build need not pass each preset:
+
+  ```python
+  sub.to_inp("model.inp", pump_stations={"SL6001": PumpStation()}, design="schema")
+  ```
+
+  `wet_well_defaults` is left out of `"schema"`, since it needs a `design_flow` or a wet well at
+  every station; name the rules to apply instead, e.g.
+  `design=["force_main_roughness", "default_pump", "wet_well_defaults"]` (each must be in the
+  schema). An option passed explicitly (not None) always wins, and the rules applied are logged.
+  The default, `design=None`, applies none.
 - A pipe in both `pumps` and a station's force main, a station with no force-main outlet, and a
   wet well given both in `wet_wells` and a station are errors. A schema's design-rule presets are
   checked when it is made, so a typo in a TOML preset is caught on loading.
@@ -766,7 +780,8 @@ sub.to_inp("model.inp", **fills)
 receiving node's invert (known, or filled first by `invert_fill`/`headwater_slope`), plus
 `height_above_receiving_invert` (default: `max_height_above_receiving_invert`); a callable
 `(pipe, receiving_invert) -> invert` can be passed instead. Design values like this sit in the
-schema's optional `[design]` table, apart from the column mapping, and are used only when passed:
+schema's optional `[design]` table, apart from the column mapping, and are used only when passed
+(one by one, or all at once with `design="schema"`; see [Pumping stations with force mains](#pumping-stations-with-force-mains)):
 London's (`london_on.toml`) is the Design Specifications & Requirements Manual's limit of 200 mm
 above the receiving maintenance hole's flow line (Ch. 4, s. 4.8).
 

@@ -125,8 +125,26 @@ def test_report_accepted(sub):
     assert {p.inlet for p in model.pumps} == {"PS"}
 
 
+def test_found_takes_the_schema_default_pump(sub, tmp_path):
+    """With design='schema' (#136), the found stations take London's default pump, an ideal one."""
+    common = dict(template_path=template(tmp_path), design="schema")
+    by_schema = sub.to_inp(
+        tmp_path / "schema.inp",
+        OUTFALLS,
+        pump_stations="found",
+        pump_stations_exclude=NOT_PUMPED,
+        pump_stations_extra=EXTRA_STATIONS,
+        **common,
+    )
+    assert {p.inlet: p.curve for p in by_schema.pumps} == {"PS": "*", "Q1": "*"}
+    explicit = tmp_path / "explicit.inp"
+    stations = {n: PumpStation(pump=IDEAL) for n in ("PS", "Q1")}
+    sub.to_inp(explicit, OUTFALLS, pump_stations=stations, **common)
+    assert (tmp_path / "schema.inp").read_text() == explicit.read_text()
+
+
 def test_found_needs_a_default_pump(sub):
-    with pytest.raises(ValueError, match="stations given without a pump need a default_pump: PS"):
+    with pytest.raises(ValueError, match=r"without a pump need a default_pump .*: PS"):
         build(sub, pump_stations="found", pump_stations_unlisted="ignore")
 
 

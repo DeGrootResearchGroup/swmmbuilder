@@ -13,12 +13,18 @@ earlier history is in the git log.
 
 - **Pump every station found** (#135): `pump_stations` also takes `"found"` or a
   `PumpStationReport`, pumping every station of `Subnetwork.find_pump_stations()` with
-  `default_pump`. `pump_stations_exclude` ({node: reason}) leaves out stations, stations with no
+  `default_pump` (given, or the schema's with `design="schema"`). `pump_stations_exclude` ({node: reason}) leaves out stations, stations with no
   force main, and unlisted climbing force mains; `pump_stations_extra` adds stations (a reason
   for the default pump, or a `PumpStation` used as given). A climbing force main left unpumped
   gives a `DataWarning` (`pump_stations_unlisted="raise"` or `"ignore"` to change that). The
   choices are logged and kept in `SwmmModel.station_choices`, and `SwmmModel.summary()` gains
   `stations_extra` and `stations_excluded`.
+- **Design rules from the schema** (#136): `build_model`, `write_inp`, and `Subnetwork.to_inp`
+  take `design="schema"`, which applies the schema's `force_main_discharge`,
+  `force_main_roughness`, `force_main_checks`, and `default_pump` (those its `[design]` table
+  holds), or a list of rule names, which applies just those (`wet_well_defaults` only by name,
+  since it needs station data). An option passed explicitly wins, and the rules applied are
+  logged. The default, None, applies none.
 - **Node loading** (#138): `NodeLoading` combines the three parts of a dry-weather load, sanitary
   flow from population (`[DWF]` with one diurnal pattern), flows that each follow their own hourly
   pattern such as land uses (`[INFLOWS]` time series), and steady flows such as infiltration (the
