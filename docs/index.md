@@ -19,6 +19,7 @@ the API reference, generated from the docstrings:
 - [Schemas](api/schema.md): how a city's GIS columns map to the canonical ones, and the presets;
 - [SWMM model](api/swmm.md): `build_model`, `write_inp` and the model records;
 - [Population](api/population.md): allocating the population of polygons to nodes;
+- [Census polygons](api/census.md): census polygons with their population, from a pluggable source;
 - [Land-use flows](api/land_use.md): allocating flows given per hectare of each land use to nodes;
 - [Spreading a flow](api/distribute.md): sharing a total flow, such as infiltration, over the pipes;
 - [Pumps and design rules](api/pumps.md);

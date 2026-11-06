@@ -11,6 +11,13 @@ earlier history is in the git log.
 
 ### Added
 
+- **Census polygons** (#128): `swmmbuilder.census.census_polygons` gets the polygons covering a
+  network (or any area) from a pluggable source, keeps those meeting the footprint of its gravity
+  pipes, and returns them with `population` and `parent` columns for `allocate_population`. A
+  GeoPackage cache, with the source, level, regions, and fetch date, makes later builds offline.
+  Sources: `CensusMapper` (Canadian census dissemination blocks or areas, through pycancensus,
+  in the new `census` extra) and `PolygonFile` (any local file). The CensusMapper API key is the
+  user's to provide, and citing the data is the user's responsibility.
 - Releases are published to PyPI from GitHub releases (`publish.yml`, trusted publishing), and the
   README installs from PyPI.
 - **Population allocation**: `allocate_population` places the population of polygons (census
