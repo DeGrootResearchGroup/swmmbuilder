@@ -23,6 +23,9 @@ earlier history is in the git log.
   to share by. Each share is placed at the pipe's upstream node, downstream node, or both. The
   result reports the population of polygons with no pipe, and its `nodes` feed
   `dwf_from_population`.
+- **Footprint over some of the pipes**: `maps.network_footprint`, `footprint_distance`, and
+  `network_extent` take `pipes`: `'gravity'` (every pipe but the force mains, for a service
+  area), a list of pipe IDs, or a function of the pipe rows (#106).
 - **Implausible pipe inverts**: a schema's `invert_range` (opt-in, e.g. London's `rim_range`)
   treats pipe and drop-structure inverts outside it as missing, such as 25089.0 keyed for 250.89
   or a drop height in the invert column; each is logged, a `DataWarning` gives the count, and
