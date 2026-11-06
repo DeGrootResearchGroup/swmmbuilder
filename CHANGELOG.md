@@ -11,6 +11,10 @@ earlier history is in the git log.
 
 ### Added
 
+- **Splits in a subnetwork** (#134): `Subnetwork.split_report()` returns the network's
+  `split_report` with two more columns, `node` (the node each new ID resolves to after snapping)
+  and `in_subnetwork`. `Subnetwork.split_summary()` returns `ids_split`, `nodes_made`, and
+  `ids_in_subnetwork`. Without `split_tolerance` both are empty (no rows, zero counts).
 - **Dominant category** (#139): `dominant_category(polygons, layer, column)` gives, for each
   polygon, the category of a layer (such as zoning) covering its largest area, and that area's
   share of the polygon. It is the usual source of `allocate_population`'s `sewered` flag, e.g.
