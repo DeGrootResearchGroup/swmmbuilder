@@ -11,6 +11,16 @@ earlier history is in the git log.
 
 ### Added
 
+- **Node loading** (#138): `NodeLoading` combines the three parts of a dry-weather load, sanitary
+  flow from population (`[DWF]` with one diurnal pattern), flows that each follow their own hourly
+  pattern such as land uses (`[INFLOWS]` time series), and steady flows such as infiltration (the
+  `[INFLOWS]` baseline). `options()` gives the matching `build_model` options, so
+  `sub.to_inp(path, outfalls, **loading.options())` writes them, and `table()` and `summary()`
+  give the load of each node by part and the totals. Zero loads are not written, and its hourly
+  patterns must have a mean of 1 unless `require_unit_mean=False`. `pattern_inflows` takes
+  `require_unit_mean` (True, or a tolerance) to refuse a pattern whose mean is not 1. The new
+  `examples/loaded_catchment.py`, and a README section, build a loaded catchment model from the
+  example pipes, from `Network` to `.inp`.
 - **Census polygons** (#128): `swmmbuilder.census.census_polygons` gets the polygons covering a
   network (or any area) from a pluggable source, keeps those meeting the footprint of its gravity
   pipes, and returns them with `population` and `parent` columns for `allocate_population`. A

@@ -545,6 +545,53 @@ alloc = allocate_population(net, blocks, max_distance=15)
   country's census, say), and any object with a `name` and a `fetch(area, crs, level)` method
   returning such polygons will do.
 
+### A loaded catchment model, end to end
+
+A dry-weather model has three kinds of load. Sanitary flow from population goes to `[DWF]` with
+a diurnal pattern; SWMM allows only one hourly pattern there, so flows with patterns of their own
+(commercial, institutional, and industrial land uses) go to `[INFLOWS]` as time series; and
+steady flows such as groundwater infiltration are the `[INFLOWS]` baseline. `NodeLoading` takes
+the three parts and returns the matching options of `to_inp`, a table of each node's load by
+part, and the totals. `examples/loaded_catchment.py` builds such a model from the example pipes
+(`python examples/loaded_catchment.py OUT_DIR`); its core is:
+
+```python
+from swmmbuilder import (
+    Network, NodeLoading, allocate_land_use, allocate_population, distribute_flow,
+)
+
+net = Network("examples/geojson_test_data/test_data_small.geojson")
+sub = net.catchment("WT1420")
+
+people = allocate_population(net, blocks, population="population")    # census-like polygons
+land = allocate_land_use(net, zoning, land_use="land_use",
+                         rates={"COMMERCIAL": 5000, "INDUSTRIAL": 8000})  # L/ha/d -> L/s
+infiltration = distribute_flow(sub, rate=0.0005)                       # L/s per metre of pipe
+
+loading = NodeLoading(
+    population=people.within(sub), per_capita=230, unit="L/d",
+    pattern=diurnal,                     # 24 hourly multipliers -> [DWF] and [PATTERNS]
+    patterned=land.within(sub),          # nodes x land uses, mean flows in L/s
+    patterns={"COMMERCIAL": business_hours, "INDUSTRIAL": [1.0] * 24},
+    days=3, prefix="LU_",                # -> [INFLOWS] and [TIMESERIES]
+    steady=infiltration,                 # -> [INFLOWS] baseline
+)
+sub.to_inp("loaded_catchment.inp", outfalls=["WT1420"], **loading.options())
+loading.table().to_csv("node_loading.csv")  # population, sanitary, steady, COMMERCIAL, ...
+loading.summary()                           # {'sanitary': ..., 'sanitary_nodes': ..., ...}
+```
+
+- `options()` holds only what is needed of `dwf`, `patterns`, `dwf_patterns`, `inflows`, and
+  `timeseries`; nodes with a population or flow of 0 are not written.
+- Each patterned flow follows its kind's pattern as an `[INFLOWS]` time series scaled by the
+  node's mean flow; a node where kinds mix gets its own series, their flow-weighted mean
+  (`pattern_inflows`, which can also be used on its own).
+- Every hourly pattern must have a mean of 1 (within 0.001), so that the mean flows in the table
+  are those of the model; `require_unit_mean` sets another tolerance, or `False` turns the check
+  off. `pattern` may also name a pattern of `patterns`.
+- `table(columns={"steady": "infiltration_L_s", ...})` renames the columns, to keep a build's own
+  names. Flows are in the template's `FLOW_UNITS` (`flow_units`, default `LPS`).
+
 ## Conduit geometry
 
 Cross-sections come from the schema's shape codes. For London (`PipeShape`, sizes in mm, written

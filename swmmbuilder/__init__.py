@@ -9,6 +9,7 @@ from .subnetwork import PumpStationReport, Subnetwork, TopologyReport, UpstreamT
 from .swmm import (
     Derived,
     Inflow,
+    NodeLoading,
     Pump,
     PumpStation,
     SwmmModel,
@@ -34,6 +35,7 @@ __all__ = [
     "LandUseAllocation",
     "Network",
     "NodeId",
+    "NodeLoading",
     "OptionWarning",
     "PipeId",
     "PopulationAllocation",
