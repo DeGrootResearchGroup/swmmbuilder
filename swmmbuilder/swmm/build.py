@@ -23,17 +23,20 @@ from ..gaps import _invert, fill_gaps, height_corrections, lowest_inverts, xsect
 from ..geometry import line_coords
 from ..units import _FLOW_UNIT_LPS
 from .dwf import resolve_dwf, resolve_dwf_patterns, resolve_patterns
+from .inflows import resolve_inflows, resolve_timeseries
 from .pumping import resolve_pump_stations, resolve_pumps, resolve_wet_wells
 from .records import (
     Conduit,
     Curve,
     DryWeatherFlow,
+    ExternalInflow,
     Junction,
     Outfall,
     Pattern,
     PumpLink,
     Storage,
     SwmmModel,
+    TimeSeries,
     XSection,
 )
 from .template import (
@@ -52,6 +55,7 @@ if TYPE_CHECKING:
     from .._types import Fields, NodeId, Outfalls, PipeId, StrPath
     from ..pumps import Pump, PumpStation, WetWell
     from ..subnetwork import Subnetwork
+    from .inflows import Inflow
 
 logger = logging.getLogger(__name__)
 
@@ -154,6 +158,8 @@ class ModelInputs:
     dwf: dict
     patterns: dict
     dwf_patterns: dict
+    timeseries: dict
+    inflows: dict
     flow_units: str
     inlets: dict
 
@@ -169,6 +175,8 @@ def _resolve_inputs(
     dwf,
     patterns,
     dwf_patterns,
+    timeseries,
+    inflows,
     flow_units,
 ):
     """The :class:`ModelInputs` of the options of :func:`build_model`; raise ValueError for an
@@ -210,6 +218,8 @@ def _resolve_inputs(
     dwf = resolve_dwf(subnetwork, dwf, outfalls)
     patterns = resolve_patterns(patterns)
     dwf_patterns = resolve_dwf_patterns(dwf_patterns, dwf, patterns, subnetwork)
+    timeseries = resolve_timeseries(timeseries)
+    inflows = resolve_inflows(subnetwork, inflows, timeseries, patterns, outfalls)
     pipes = subnetwork.pipes()
     inlets = dict(zip(pipes["pipe_id"], pipes["from_node"], strict=True))
     dry = sorted(
@@ -233,6 +243,8 @@ def _resolve_inputs(
         dwf=dwf,
         patterns=patterns,
         dwf_patterns=dwf_patterns,
+        timeseries=timeseries,
+        inflows=inflows,
         flow_units=flow_units,
         inlets=inlets,
     )
@@ -494,6 +506,8 @@ def build_model(
     dwf: Mapping[NodeId, float] | None = None,
     patterns: Mapping[str, Any] | None = None,
     dwf_patterns: str | Sequence[str] | Mapping[NodeId, str | Sequence[str]] | None = None,
+    inflows: Mapping[NodeId, Inflow | Fields] | None = None,
+    timeseries: Mapping[str, Sequence[tuple[float, float]]] | None = None,
     wet_well_defaults: Mapping[str, float] | None = None,
     force_main_checks: Mapping[str, Any] | None = None,
     flow_units: str = "LPS",
@@ -610,6 +624,19 @@ def build_model(
         ``dwf``, or {node: name or list of names}. SWMM allows up to four per node, one of each
         type.
 
+    inflows : dict, optional
+        {node: :class:`Inflow` or dict of its fields}: an external flow into each node, written to
+        [INFLOWS], in the template's FLOW_UNITS: ``scale`` times a time series of
+        ``timeseries`` plus a ``baseline`` (optionally times a pattern of ``patterns``), e.g.
+        ``{'N1': dict(timeseries='commercial', scale=2.5, baseline=0.4)}``. SWMM adds it to the
+        node's [DWF] flow, so a node can carry a second time-varying flow, or a steady one such
+        as groundwater infiltration, besides its dry-weather flow.
+
+    timeseries : dict, optional
+        {name: [(hours from the start of the run, value), ...]}, written to [TIMESERIES]. SWMM
+        interpolates linearly between the points and takes the value as zero after the last
+        one; :func:`hourly_series` gives a series that holds hourly values for whole hours.
+
     **fills
         Fill rules for gaps in the data, all off by default: ``size_overrides``, ``shape_codes``,
         ``size_fill``, ``invert_fill``, ``headwater_slope`` and ``force_main_discharge``; see
@@ -643,8 +670,8 @@ def build_model(
     ValueError
         If an outfall is not in the subnetwork, a gap that stops the model from being written
         remains after the fills (a conduit with no cross-section, a node with no invert; every
-        such gap is listed), a pump, wet well, pump station, dry-weather flow, pattern or fill
-        rule is invalid, a pipe is both pumped and part of a station's force main, a force main
+        such gap is listed), a pump, wet well, pump station, dry-weather flow, pattern, inflow,
+        time series, or fill rule is invalid, a pipe is both pumped and part of a station's force main, a force main
         has no roughness or is not circular, a pump's startup depth is not above its shutoff depth
         or not below its wet well's max depth, a PUMP1 station has no wet well, or an ideal pump
         is not the only outlet link of its inlet node (SWMM's ERROR 134).
@@ -673,6 +700,8 @@ def build_model(
         dwf,
         patterns,
         dwf_patterns,
+        timeseries,
+        inflows,
         flow_units,
     )
     filled = fill_gaps(
@@ -722,6 +751,11 @@ def build_model(
     model.patterns = [
         Pattern(name, kind, values) for name, (kind, values) in inputs.patterns.items()
     ]
+    model.inflows = [
+        ExternalInflow(node, i.timeseries, float(i.scale), float(i.baseline), i.baseline_pattern)
+        for node, i in inputs.inflows.items()
+    ]
+    model.timeseries = [TimeSeries(name, points) for name, points in inputs.timeseries.items()]
     return model
 
 
@@ -772,8 +806,9 @@ def write_inp(
         The .inp template (default: :func:`default_template_path`, which uses FLOW_UNITS LPS).
         It must use an SI FLOW_UNITS (CMS, LPS or MLD) and only the placeholders in
         :data:`TEMPLATE_PLACEHOLDERS`; {storage}, {pumps} and {curves} are needed only with the
-        ``wet_wells``, ``pumps`` and ``pump_stations`` options, and {dwf} and {patterns} only with
-        ``dwf`` and ``patterns``. The offsets are depths, so it should set LINK_OFFSETS DEPTH
+        ``wet_wells``, ``pumps`` and ``pump_stations`` options, {dwf} and {patterns} only with
+        ``dwf`` and ``patterns``, and {inflows} and {timeseries} only with ``inflows`` and
+        ``timeseries``. The offsets are depths, so it should set LINK_OFFSETS DEPTH
         (the default). A ``force_main_roughness`` rule that declares an ``equation`` must match
         its FORCE_MAIN_EQUATION (SWMM's default: H-W).
 
@@ -818,13 +853,16 @@ def write_inp(
             ("curves", model.curves),
             ("dwf", model.dwf),
             ("patterns", model.patterns),
+            ("inflows", model.inflows),
+            ("timeseries", model.timeseries),
         )
         if records and f"{{{name}}}" not in template
     ]
     if needed:
         raise ValueError(
             f"The template has no {', '.join(f'{{{n}}}' for n in needed)} placeholder, so the "
-            "pumps, pump stations, wet wells, dry-weather flows or patterns would not be written."
+            "pumps, pump stations, wet wells, dry-weather flows, patterns, inflows, or time series "
+            "would not be written."
         )
     if model.dwf:
         logger.info(
@@ -832,6 +870,14 @@ def write_inp(
             sum(d.base for d in model.dwf),
             template_flow_units(template),
             len(model.dwf),
+        )
+    if model.inflows:
+        logger.info(
+            "External inflows: total baseline %.6g %s at %d nodes, %d time series",
+            sum(i.baseline for i in model.inflows),
+            template_flow_units(template),
+            len(model.inflows),
+            len(model.timeseries),
         )
     logger.info("Writing %s", path)
     Path(path).write_text(model.render(template))
