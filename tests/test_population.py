@@ -4,6 +4,7 @@ import logging
 import math
 
 import geopandas as gpd
+import numpy as np
 import pandas as pd
 import pytest
 from conftest import FIXTURE
@@ -377,6 +378,25 @@ def test_nearest_pipe_within_a_cap():
         allocate(net, polygons, max_nearest_distance=-5)
 
 
+@pytest.mark.parametrize("flags", [[False, False, True], np.array([False, False, True])])
+def test_sewered_rejects_unindexed_flags(net, flags):
+    with pytest.raises(ValueError, match=r"sewered.*column name or pandas.Series"):
+        allocate(net, sewered=flags)
+
+
+def test_sewered_series_aligns_by_polygon_id(net):
+    flags = pd.Series([True, False, False], index=["R", "Q", "P"])
+    result = allocate(net, sewered=flags)
+    assert result.nearest.index.tolist() == ["R"]
+    assert result.unallocated == 0
+
+
+@pytest.mark.parametrize("ids", [["P", "Q"], [0, 1, 2]])
+def test_sewered_rejects_missing_polygon_ids(net, ids):
+    with pytest.raises(ValueError, match=r"sewered.*missing polygon IDs.*R"):
+        allocate(net, sewered=pd.Series(True, index=ids))
+
+
 # Pipe 2 (N2 to nowhere, 30 m, 6 connections) is in full_data but not in the graph.
 NO_NODE = [PIPES[0], (2, "N2", None, 60, 90, 6), *PIPES[2:]]
 
@@ -407,3 +427,34 @@ def test_no_pipe_is_left_out_of_a_complete_network(net, caplog):
     with caplog.at_level(logging.WARNING, logger="swmmbuilder.population"):
         allocate(net)
     assert "left out" not in caplog.text
+
+
+@pytest.mark.parametrize("values", [[80, 100, 30], np.array([80, 100, 30])])
+def test_population_rejects_unindexed_values(net, values):
+    with pytest.raises(ValueError, match=r"population.*column name or pandas.Series"):
+        allocate(net, population=values)
+
+
+def test_population_series_aligns_by_polygon_id(net):
+    result = allocate(net, population=pd.Series([30, 100, 80], index=["R", "Q", "P"]))
+    assert result.total == pytest.approx(180)
+    assert result.unallocated == pytest.approx(30)
+
+
+@pytest.mark.parametrize("option", ["population", "sewered"])
+def test_polygon_option_errors_listed_together(net, option):
+    values = pd.Series([80, 100], index=["P", "P"])
+    with pytest.raises(ValueError) as error:
+        allocate(net, **{option: values}, placement="middle")
+    message = str(error.value)
+    assert f"{option}: repeated polygon IDs: ['P']" in message
+    assert f"{option}: missing polygon IDs: ['Q', 'R']" in message
+    assert "placement" in message
+
+
+def test_polygon_option_types_listed_together(net):
+    with pytest.raises(ValueError) as error:
+        allocate(net, population=[80, 100, 30], sewered=[False, False, True])
+    message = str(error.value)
+    assert "population must be a column name or pandas.Series" in message
+    assert "sewered must be a column name or pandas.Series" in message

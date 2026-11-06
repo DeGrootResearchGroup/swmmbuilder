@@ -40,10 +40,12 @@ from .population import (
     Placement,
     Weight,
     _assign,
+    _check_polygon_values,
     _log_left_out,
     _missing_node,
     _nearest,
     _pipes_of,
+    _polygon_values,
     _quiet,
     _weights,
 )
@@ -232,8 +234,7 @@ def _check(
         problems.add(
             f"max_nearest_distance must be a distance >= 0 or None, not {max_nearest_distance!r}"
         )
-    if isinstance(land_use, str) and land_use not in polygons.columns:
-        problems.add(f"land_use: polygons has no column {land_use!r}")
+    _check_polygon_values(polygons, land_use, "land_use", problems)
     if not isinstance(rates, Mapping) or not rates:
         problems.add("rates must be a non-empty mapping {land use: rate}")
     else:
@@ -298,7 +299,9 @@ def allocate_land_use(
         network's).
 
     land_use : str or pandas.Series
-        Land use of each polygon: a column of ``polygons``, or a Series with the same index.
+        Land use of each polygon: a column of ``polygons``, or a Series indexed by polygon ID
+        (all IDs must be present and unique). Unindexed lists/arrays and missing or
+        repeated IDs raise ``ValueError``.
 
     rates : dict
         {land use: flow per hectare, in ``unit``}, e.g. ``{'COMMERCIAL': 23000,
@@ -447,8 +450,7 @@ def _allocate_land_use(
             f"flow_units must be one of {', '.join(SI_FLOW_UNITS)}, not {flow_units!r}."
         )
     to_units = per_second / _FLOW_UNIT_LPS[flow_units]
-    uses = pd.Series(polygons[land_use] if isinstance(land_use, str) else land_use)
-    uses = uses.reindex(polygons.index)
+    uses = _polygon_values(polygons, land_use)
     polygons = polygons.to_crs(pipes.crs)
 
     if serve_force_mains or "structure_type" not in pipes.columns:

@@ -73,6 +73,24 @@ def test_scaled_to_total(net):
     assert flows.polygons["allocated"].to_dict() == approx({"P": 0.2, "Q": 0.4, "R": 0.0})
 
 
+@pytest.mark.parametrize("values", [list(ZONES), np.array(list(ZONES))])
+def test_land_use_rejects_unindexed_values(net, values):
+    with pytest.raises(ValueError, match=r"land_use.*column name or pandas.Series"):
+        allocate_land_use(net, zoning(), land_use=values, rates=RATES)
+
+
+def test_land_use_series_aligns_by_polygon_id(net):
+    uses = zoning()["use"].iloc[::-1]
+    flows = allocate_land_use(net, zoning(), land_use=uses, rates=RATES)
+    assert flows.total == pytest.approx(0.3)
+    assert flows.polygons.loc["Q", "land_use"] == "INDUSTRIAL"
+
+
+def test_land_use_rejects_missing_polygon_ids(net):
+    with pytest.raises(ValueError, match=r"land_use.*missing polygon IDs.*R"):
+        allocate_land_use(net, zoning(), land_use=zoning()["use"].iloc[:2], rates=RATES)
+
+
 def test_area_within_clips_the_polygons(net):
     half_of_p = box(X0, Y0, X0 + 50, Y0 + 100).union(box(X0 + 100, Y0, X0 + 200, Y0 + 100))
     flows = allocate_land_use(net, zoning(), land_use="use", rates=RATES, area_within=half_of_p)
@@ -284,3 +302,17 @@ def test_a_pipe_with_a_missing_node_is_left_out(caplog):
     assert 2 not in flows.pipes.index
     # With pipe 2, P's 0.1 L/s goes 50:30 to pipes 1 and 2, 0.0375 L/s to pipe 2.
     assert "with them they would take 0.0375 LPS, in no catchment: [2]" in caplog.text
+
+
+@pytest.mark.parametrize("values", [list(ZONES), pd.Series("COMMERCIAL", index=["P", "P"])])
+def test_land_use_option_errors_listed_together(net, values):
+    with pytest.raises(ValueError) as error:
+        allocate_land_use(net, zoning(), land_use=values, rates={}, placement="middle")
+    message = str(error.value)
+    assert "rates" in message
+    assert "placement" in message
+    if isinstance(values, pd.Series):
+        assert "land_use: repeated polygon IDs: ['P']" in message
+        assert "land_use: missing polygon IDs: ['Q', 'R']" in message
+    else:
+        assert "land_use must be a column name or pandas.Series" in message
