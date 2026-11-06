@@ -100,6 +100,11 @@ def gaps_of(report):
 
 def test_report_lists_every_gap_and_fills_nothing_by_default(sub):
     gaps = gaps_of(sub.data_gaps())
+    # No node of this network has a rim: each is a no_rim gap, not filled (see test_elevation).
+    no_rim = {key for key in gaps if key[2] == "no_rim"}
+    assert no_rim == {("node", n, "no_rim") for n in sub.nodes}
+    assert all(gaps[key] is None for key in no_rim)
+    gaps = {key: rule for key, rule in gaps.items() if key[2] != "no_rim"}
     blocking = {key: rule for key, rule in gaps.items() if key[2] != "no_us_invert"}
     assert {k: v for k, v in blocking.items() if k[2] != "no_ds_invert"} == {
         ("pipe", NO_DIAMETER, "no_size"): "height_width",  # the one unambiguous inference
