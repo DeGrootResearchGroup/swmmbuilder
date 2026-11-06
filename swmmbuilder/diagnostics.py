@@ -144,7 +144,7 @@ def capture_log(level: int | str = "INFO", path: str | Path | None = None) -> It
     """Collect swmmbuilder's log and warnings while the ``with`` block runs::
 
         with swmmbuilder.capture_log(level="INFO", path=out / "build_log.txt") as captured:
-            model = SwmmModel(...)
+            model = sub.to_inp("model.inp", ...)
         print(captured.text)
 
     A handler is attached to the ``swmmbuilder`` logger (not the root logger) for the block and
