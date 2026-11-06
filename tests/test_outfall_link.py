@@ -74,3 +74,11 @@ def test_swmm_runs_with_the_link(sub, tmp_path):
     assert [r[0] for r in s["OUTFALLS"]] == ["J1_OUT"]
     assert "J1" in {r[0] for r in s["JUNCTIONS"]}
     assert run_swmm(path, tmp_path) == []
+
+
+def test_a_linked_outfall_given_the_rule_depth_is_derived(sub):
+    """An outfall written as a junction with no usable rim takes the max_depth rule's depth and
+    is listed in derived, like the other junctions (#123)."""
+    model = swmm.build_model(sub, ["J1"], outfall_link=True, max_depth=lambda d: 2.0)
+    assert next(j for j in model.junctions if j.name == "J1").max_depth == 2.0
+    assert "J1" in set(model.derived_report()["id"])

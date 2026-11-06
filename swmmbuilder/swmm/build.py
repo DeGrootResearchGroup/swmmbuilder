@@ -579,7 +579,8 @@ def outfall_inlets(model: SwmmModel) -> dict[str, list[str]]:
 
 def _add_outfall_links(model, subnetwork, option, defaults):
     """Write each outfall of ``model`` with more than one link as a junction draining to a new
-    outfall through a dummy conduit (the ``outfall_link`` option of :func:`build_model`)."""
+    outfall through a dummy conduit (the ``outfall_link`` option of :func:`build_model`). Return
+    the junctions given ``defaults.max_depth`` (no usable rim)."""
     params = dict(OUTFALL_LINK_DEFAULTS)
     if isinstance(option, Mapping):
         check_options(option, tuple(OUTFALL_LINK_DEFAULTS), "outfall_link")
@@ -594,6 +595,7 @@ def _add_outfall_links(model, subnetwork, option, defaults):
     )
     if clash:
         raise ValueError(f"outfall_link: names already used in the model: {', '.join(clash)}")
+    given_default = []
     for node in crowded:
         outfall = next(o for o in model.outfalls if o.name == node)
         model.outfalls.remove(outfall)
@@ -601,6 +603,8 @@ def _add_outfall_links(model, subnetwork, option, defaults):
         rim = subnetwork.graph.nodes[node].get("rim_elevation")
         if rim is not None and rim > outfall.invert:
             depth = round(rim - outfall.invert, 4)
+        else:
+            given_default.append(node)
         model.junctions.append(
             Junction(
                 node,
@@ -630,6 +634,7 @@ def _add_outfall_links(model, subnetwork, option, defaults):
             params["length"],
             new,
         )
+    return given_default
 
 
 def _check_ideal_pumps(model):
@@ -714,7 +719,8 @@ def build_model(
         subnetwork's junctions whose rim is above their invert (the depths written), given to
         every junction with no usable rim. A function of those depths (a pandas Series indexed by
         node) returning one depth also works, e.g. ``lambda d: d.quantile(0.25)``. Each junction
-        given that depth is listed in :attr:`SwmmModel.derived`.
+        given that depth, including pump-station discharge nodes and outfalls written as
+        junctions by ``outfall_link``, is listed in :attr:`SwmmModel.derived`.
 
     manning_n : float
         Manning's n of every conduit (default 0.01) or, with ``manning_n_by_material``, of those
@@ -877,7 +883,7 @@ def build_model(
     check_options(fills, BUILD_OPTIONS, "build_model")
     defaults = _Defaults(
         # A rule ('median' or a function) is resolved once the inverts are known.
-        max_depth=float(max_depth) if isinstance(max_depth, (int, float)) else 0.0,
+        max_depth=float(max_depth) if _is_real(max_depth) else 0.0,
         init_depth=init_depth,
         surcharge_depth=surcharge_depth,
         ponding_area=ponding_area,
@@ -921,10 +927,12 @@ def build_model(
     pipes, inverts = filled.pipes, filled.inverts
     derived = _apply_design_rules(subnetwork, inputs, pipes, inverts, wet_well_defaults)
     derived += lowered
-    if not isinstance(max_depth, (int, float)):
+    depth_rule = None
+    if not _is_real(max_depth):
         depth, defaulted, basis = _default_depth(subnetwork, inputs, inverts, max_depth)
         defaults = replace(defaults, max_depth=depth)
         rule = "max_depth='median'" if max_depth == "median" else "max_depth function"
+        depth_rule = (depth, rule, basis)
         derived += [
             Derived("junction", node, "max_depth", depth, rule, basis) for node in defaulted
         ]
@@ -947,8 +955,17 @@ def build_model(
         model, inputs, pipes, inverts, discharge_of, sections, roughness_of, defaults
     )
     _check_ideal_pumps(model)
+    linked = []
     if outfall_link:
-        _add_outfall_links(model, subnetwork, outfall_link, defaults)
+        linked = _add_outfall_links(model, subnetwork, outfall_link, defaults)
+    if depth_rule is not None:
+        # The other junctions given the rule's depth: station discharge nodes, and outfalls
+        # written as junctions with no usable rim.
+        depth, rule, basis = depth_rule
+        model.derived.extend(
+            Derived("junction", node, "max_depth", depth, rule, basis)
+            for node in [link.discharge for link in inputs.station_pumps] + linked
+        )
 
     # Warned here, not in the helpers, so that they point at the caller of build_model.
     if force_main_checks is not None:

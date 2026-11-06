@@ -248,7 +248,7 @@ class Network:
         was reversed (found with ``split_tolerance``; empty without it).
 
     invert_report : pandas.DataFrame
-        The pipe and drop-structure inverts outside the schema's plausible range
+        The pipe and drop-structure inverts of the pipes kept that are outside the schema's plausible range
         (``Schema.invert_range``), treated as missing: ``pipe_id``, ``column``,
         ``source_column``, and ``value`` (in m), as recorded.
 
@@ -293,24 +293,7 @@ class Network:
             )
         raw = _read(source)
         self.full_data = schema.normalize(raw)
-        self.invert_report = schema.implausible_inverts(raw)
-        if len(self.invert_report) and schema.invert_range is not None:
-            low, high = schema.invert_range
-            for row in self.invert_report.itertuples():
-                logger.info(
-                    "Pipe %s: %s %s outside %g-%g m, treated as missing",
-                    row.pipe_id,
-                    row.source_column,
-                    row.value,
-                    low,
-                    high,
-                )
-            warnings.warn(
-                f"{len(self.invert_report)} pipe inverts outside {low:g}-{high:g} m treated as "
-                "missing (see Network.invert_report)",
-                DataWarning,
-                stacklevel=2,
-            )
+        implausible = schema.implausible_inverts(raw)
         if normalize_ids is not None:
             for column in ("from_node", "to_node"):
                 self.full_data[column] = self.full_data[column].map(
@@ -337,6 +320,28 @@ class Network:
         if not include_overflows:
             keep = self.full_data["structure_type"] != "overflow"
             self._drop(keep, "structure_type", "include_overflows=False")
+
+        # Report only the pipes kept (not, say, the storm sewers filtered out above).
+        kept = set(self.full_data["pipe_id"].astype(str))
+        self.invert_report = implausible[implausible["pipe_id"].astype(str).isin(kept)]
+        self.invert_report = self.invert_report.reset_index(drop=True)
+        if len(self.invert_report) and schema.invert_range is not None:
+            low, high = schema.invert_range
+            for row in self.invert_report.itertuples():
+                logger.info(
+                    "Pipe %s: %s %s outside %g-%g m, treated as missing",
+                    row.pipe_id,
+                    row.source_column,
+                    row.value,
+                    low,
+                    high,
+                )
+            warnings.warn(
+                f"{len(self.invert_report)} pipe inverts outside {low:g}-{high:g} m treated as "
+                "missing (see Network.invert_report)",
+                DataWarning,
+                stacklevel=2,
+            )
 
         self._layers = self._read_layers(
             dict(

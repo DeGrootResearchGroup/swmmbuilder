@@ -75,3 +75,12 @@ def test_no_rims_to_take_a_median_of(network):
 def test_invalid(sub, rule, message):
     with pytest.raises(ValueError, match=message):  # before any junction is written
         swmm.build_model(sub, ["OUT"], max_depth=rule)
+
+
+def test_a_numpy_number_is_a_number(sub):
+    """np.int64 and np.float64 are depths, not rules (#123)."""
+    np = pytest.importorskip("numpy")
+    for depth in (np.int64(3), np.float64(1.5)):
+        with pytest.warns(DataWarning):
+            model = swmm.build_model(sub, ["OUT"], max_depth=depth)
+        assert depths(model)["J1"] == float(depth) and model.derived == []

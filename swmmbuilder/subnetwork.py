@@ -4,6 +4,7 @@ them."""
 from __future__ import annotations
 
 import logging
+import warnings
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -13,7 +14,7 @@ import numpy as np
 import pandas as pd
 
 from . import gaps, swmm
-from .diagnostics import check_options
+from .diagnostics import DataWarning, check_options
 from .geometry import node_positions, to_geodataframe
 
 if TYPE_CHECKING:
@@ -231,6 +232,8 @@ class Subnetwork:
         self._ends = {pipe: (up, down) for up, down, pipe in self.graph.edges(keys=True)}
         self._by_text: dict[str, NodeId] | None = None
         self._pipes_by_text: dict[str, PipeId] | None = None
+        # The text of every node of the whole network, for in_network.
+        self._network_text: set[str] | None = None
 
     @classmethod
     def from_node_list(cls, network: Network, path: StrPath) -> Subnetwork:
@@ -292,7 +295,9 @@ class Subnetwork:
         network = self.network
         if key in network.graph or network.resolve(key) in network.graph:
             return True
-        return str(key) in {str(n) for n in network.graph}
+        if self._network_text is None:
+            self._network_text = {str(n) for n in network.graph}
+        return str(key) in self._network_text
 
     def match_nodes(self, mapping: Mapping[Any, V], option: str) -> dict[Any, V]:
         """``mapping`` with its keys replaced by :meth:`match_node`.
@@ -560,7 +565,8 @@ class Subnetwork:
               at a split);
             - {pipe ID: fraction}: given fractions, e.g. from simulated flows. Outlet pipes not
               given share what is left at their node equally. The fractions at a node must not
-              be negative or add up to more than 1.
+              be negative or add up to more than 1. Where every outlet of a node is given and
+              they add up to less than 1, the rest leaves the totals (with a warning).
 
             Loops are handled exactly: within each strongly connected part of the network the
             totals are solved as a linear system, which needs every loop to have an exit (it
@@ -625,17 +631,26 @@ class Subnetwork:
         problems = [f"{p} ({f})" for p, f in given.items() if not (np.isfinite(f) and f >= 0)]
         if problems:
             raise ValueError(f"split: fractions must be finite and >= 0: {', '.join(problems)}")
-        fractions, over = {}, []
+        fractions, over, under = {}, [], []
         for node in self.graph.nodes:
             outlets = [key for _, _, key in self.graph.out_edges(node, keys=True)]
             known = sum(given[p] for p in outlets if p in given)
             if known > 1 + 1e-9:
                 over.append(f"{node} ({known:.6g})")
             rest = [p for p in outlets if p not in given]
+            if outlets and not rest and known < 1 - 1e-9:
+                under.append(f"{node} ({known:.6g})")
             for p in outlets:
                 fractions[p] = given[p] if p in given else max(1.0 - known, 0.0) / len(rest)
         if over:
             raise ValueError(f"split: fractions add up to more than 1 at {', '.join(over)}")
+        if under:
+            warnings.warn(
+                f"split: the fractions of every outlet add up to less than 1 at {len(under)} "
+                f"nodes, so the rest leaves the totals: {', '.join(under[:20])}",
+                DataWarning,
+                stacklevel=3,
+            )
         return fractions
 
     def _shared_totals(self, nodes, index, matrix, edges, fractions):

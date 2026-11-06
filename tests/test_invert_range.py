@@ -70,3 +70,13 @@ def test_read_from_a_schema_file(tmp_path):
 
 
 LONDON_ON_TOML = Path(swmmbuilder.__file__).parent / "schemas" / "london_on.toml"
+
+
+def test_only_the_pipes_kept_are_reported(pipes):
+    """A pipe filtered out (here by flow type) is not in the report or its count (#123)."""
+    data, first, second = pipes
+    data.loc[data["OBJECTID"] == first, "FlowType"] = "STM"
+    schema = dataclasses.replace(LONDON_ON, invert_range=RANGE)
+    with pytest.warns(DataWarning, match="1 pipe inverts outside"):
+        net = Network(data, schema=schema, flow_types=["SAN"])
+    assert list(net.invert_report["pipe_id"]) == [second]
