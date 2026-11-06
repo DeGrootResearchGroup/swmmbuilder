@@ -154,6 +154,63 @@ def test_barrie_force_main(tmp_path):
     assert (data["structure_type"] == "force_main").sum() == 2
 
 
+# Each city's status column and an in-service code that maps to 'built' (#154).
+STATUS_COLUMNS = {
+    "barrie": ("STATUS", "ACTIVE"),
+    "kitchener": ("STATUS", "ACTIVE"),
+    "sarnia": ("Lifecycle_Status", "Active"),
+    "waterloo": ("LIFECYCLESTATUS", "Active"),
+    "windsor": ("SERV_STAT", "IN SERVICE"),
+}
+
+
+@pytest.mark.parametrize("name", sorted(STATUS_COLUMNS))
+def test_status_column_is_mapped(name, tmp_path):
+    """The status filter works: a code the schema does not map is dropped by default."""
+    city = by_name(name)
+    column, code = STATUS_COLUMNS[name]
+    assert city.schema.columns["status"] == column
+    assert city.schema.statuses[code] == "built"
+    path = edited(city, tmp_path, [0], **{column: "RETIRED"})
+    network = Network(path, schema=city.schema)
+    assert network.removed["status"] == {"RETIRED": 1}
+    assert len(network.full_data) == city.pipes - 1
+    kept = Network(path, schema=city.schema, status=None).full_data
+    assert set(kept["status"]) == {"built", "RETIRED"}
+
+
+def test_windsor_statuses(tmp_path):
+    """IN MAINTENANCE PERIOD (the fixture's code) is built; TEMP. OUT-NEW CONSTRUCTION and PRIVATE
+    pass through, and a missing SERV_STAT is taken as built."""
+    windsor = by_name("windsor")
+    path = edited(windsor, tmp_path, [0, 1, 2, 3], SERV_STAT="IN SERVICE")
+    data = gpd.read_file(path)
+    data.loc[1, "SERV_STAT"] = "TEMP. OUT-NEW CONSTRUCTION"
+    data.loc[2, "SERV_STAT"] = "PRIVATE"
+    data.loc[3, "SERV_STAT"] = None
+    data.to_file(path, driver="GeoJSON")
+    network = Network(path, schema=windsor.schema)
+    assert network.removed["status"] == {"TEMP. OUT-NEW CONSTRUCTION": 1, "PRIVATE": 1}
+    assert set(network.full_data["status"]) == {"built"}
+    assert len(network.full_data) == windsor.pipes - 2
+
+
+def test_waterloo_structure_types(tmp_path):
+    waterloo = by_name("waterloo")
+    path = edited(waterloo, tmp_path, [0], TYPE="Trunk Main")
+    data = gpd.read_file(path)
+    data.loc[1, "TYPE"] = "WWTP Outfall"
+    data.to_file(path, driver="GeoJSON")
+    types = Network(path, schema=waterloo.schema).full_data["structure_type"]
+    assert types.value_counts().to_dict() == {"gravity": waterloo.pipes - 1, "WWTP Outfall": 1}
+
+
+def test_peterborough_has_no_status_or_structure_columns():
+    """Peterborough's dataset has neither column (nor a flow type), so none is mapped."""
+    columns = by_name("peterborough").schema.columns
+    assert not {"status", "structure_type", "flow_type"} & set(columns)
+
+
 def test_sarnia_non_circular_size(tmp_path):
     """Sarnia gives non-circular sizes as "W x H": those pipes get no diameter."""
     sarnia = by_name("sarnia")

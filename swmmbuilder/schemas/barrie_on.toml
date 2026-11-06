@@ -4,7 +4,9 @@
 # than they are tall, so ELLIPSE is taken to be a horizontal ellipse. TYPE is the structure type
 # (force mains are kept, and reported by validate); the Storm Linear dataset has the same columns
 # but other TYPE codes (CULVERT, DITCH, ...), which pass through. An invert of 0 means none. Lengths are computed from the geometry, reprojected to UTM zone 17N
-# (EPSG:26917, metres).
+# (EPSG:26917, metres). STATUS is ACTIVE for every pipe of the Sanitary Pipes and Storm Linear
+# datasets (checked November 2026). There is no flow-type column; the dataset holds sanitary pipes
+# only.
 name = "Barrie, ON"
 nonpositive_inverts_missing = true
 size_unit = "mm"
@@ -20,6 +22,7 @@ shape = "PIPESHP"
 diameter = "WIDTH"
 height = "HEIGHT"
 width = "WIDTH"
+status = "STATUS"
 structure_type = "TYPE"
 material = "MATERIAL"
 
@@ -27,6 +30,9 @@ material = "MATERIAL"
 CIRCULAR = "CIRCULAR"
 CLOSED_RECT = "RECT_CLOSED"
 ELLIPSE = "HORIZ_ELLIPSE"
+
+[statuses]
+ACTIVE = "built"
 
 [structure_types]
 LOCAL = "gravity"

@@ -294,16 +294,19 @@ only those (see `swmmbuilder/schema.py`). These schemas ship with the package, a
   .inp coordinates are in metres. Toronto publishes only a diameter, so only circular pipes get a
   cross-section; the other shapes are reported on loading. Flow types other than `SAN`, `Storm`
   and `Combined` (`CSO`, `SCSO`, `FD`, `EO`) pass through unchanged, so e.g.
-  `flow_types={"sanitary", "combined"}` keeps sanitary and combined sewers.
+  `flow_types={"sanitary", "combined"}` keeps sanitary and combined sewers. Structure types
+  use London's codes (`SL` gravity, `OVF` overflow), so `include_overflows=False` works.
 - Six more Ontario cities' open data, each reprojected to its UTM zone 17N CRS:
-  - `WINDSOR_ON`: the SanitarySewer, StormSewer and CombinedSewer layers.
-  - `KITCHENER_ON`: Sanitary Pipes. `CATEGORY` is the structure type.
+  - `WINDSOR_ON`: the SanitarySewer, StormSewer and CombinedSewer layers. `SERV_STAT` is the
+    status; `TEMP. OUT-NEW CONSTRUCTION` and `PRIVATE` pipes are dropped by the default status
+    filter.
+  - `KITCHENER_ON`: Sanitary Pipes. `CATEGORY` is the structure type, `STATUS` the status.
   - `WATERLOO_ON`: Sanitary Sewer Gravity Mains. All pipes are taken as circular, and an invert
-    of 111.111 means none.
+    of 111.111 means none. `TYPE` is the structure type, `LIFECYCLESTATUS` the status.
   - `PETERBOROUGH_ON`: Sanitary (and Storm) Sewer Pipes. Only circular pipes get a cross-section.
-  - `BARRIE_ON`: Sanitary Pipes. `TYPE` is the structure type.
+  - `BARRIE_ON`: Sanitary Pipes. `TYPE` is the structure type, `STATUS` the status.
   - `SARNIA_ON`: Sanitary and Storm Sewers. All pipes are taken as circular; non-circular sizes
-    (`"W x H"`) are rejected if written.
+    (`"W x H"`) are rejected if written. `Lifecycle_Status` is the status.
 
   Each TOML file's header gives the dataset's URL and its quirks. The layers are ArcGIS services
   that return at most 1,000–2,000 pipes per query, so download them from the portal (GeoJSON) or
