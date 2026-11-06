@@ -380,7 +380,7 @@ def test_nearest_pipe_within_a_cap():
 
 @pytest.mark.parametrize("flags", [[False, False, True], np.array([False, False, True])])
 def test_sewered_rejects_unindexed_flags(net, flags):
-    with pytest.raises(TypeError, match=r"sewered.*column name or pandas.Series"):
+    with pytest.raises(ValueError, match=r"sewered.*column name or pandas.Series"):
         allocate(net, sewered=flags)
 
 
@@ -427,3 +427,34 @@ def test_no_pipe_is_left_out_of_a_complete_network(net, caplog):
     with caplog.at_level(logging.WARNING, logger="swmmbuilder.population"):
         allocate(net)
     assert "left out" not in caplog.text
+
+
+@pytest.mark.parametrize("values", [[80, 100, 30], np.array([80, 100, 30])])
+def test_population_rejects_unindexed_values(net, values):
+    with pytest.raises(ValueError, match=r"population.*column name or pandas.Series"):
+        allocate(net, population=values)
+
+
+def test_population_series_aligns_by_polygon_id(net):
+    result = allocate(net, population=pd.Series([30, 100, 80], index=["R", "Q", "P"]))
+    assert result.total == pytest.approx(180)
+    assert result.unallocated == pytest.approx(30)
+
+
+@pytest.mark.parametrize("option", ["population", "sewered"])
+def test_polygon_option_errors_listed_together(net, option):
+    values = pd.Series([80, 100], index=["P", "P"])
+    with pytest.raises(ValueError) as error:
+        allocate(net, **{option: values}, placement="middle")
+    message = str(error.value)
+    assert f"{option}: repeated polygon IDs: ['P']" in message
+    assert f"{option}: missing polygon IDs: ['Q', 'R']" in message
+    assert "placement" in message
+
+
+def test_polygon_option_types_listed_together(net):
+    with pytest.raises(ValueError) as error:
+        allocate(net, population=[80, 100, 30], sewered=[False, False, True])
+    message = str(error.value)
+    assert "population must be a column name or pandas.Series" in message
+    assert "sewered must be a column name or pandas.Series" in message

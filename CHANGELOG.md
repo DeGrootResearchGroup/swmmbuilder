@@ -11,8 +11,12 @@ earlier history is in the git log.
 
 ### Fixed
 
-- Population `sewered` and `land_use` options reject unindexed lists/arrays and Series missing
-  polygon IDs instead of silently dropping flags or land-use values. Series remain aligned by ID.
+- **Polygon allocation option validation** (issue #147): `population`, `sewered`, and
+  `land_use` reject unindexed lists/arrays and Series with missing or repeated polygon IDs.
+  These problems are reported together with other invalid options before allocation starts.
+  Partial `land_use` Series now raise `ValueError`; previously, missing polygons were left
+  unrated and contributed no flow. Complete Series remain aligned by ID, and explicitly
+  missing or non-numeric population values still count as zero.
 
 ### Added
 

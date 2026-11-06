@@ -273,16 +273,25 @@ def _weights(pipes, weight):
     return pd.to_numeric(values, errors="coerce").astype(float)
 
 
-def _polygon_values(polygons, values, option):
-    """Read a named column or align an explicitly indexed polygon option."""
+def _check_polygon_values(polygons, values, option, problems):
+    """Collect invalid types and polygon IDs before allocation starts."""
     if isinstance(values, str):
-        return polygons[values]
-    if not isinstance(values, pd.Series):
-        raise TypeError(f"{option} must be a column name or pandas.Series indexed by polygon ID")
-    missing = polygons.index.difference(values.index)
-    if len(missing):
-        raise ValueError(f"{option}: missing polygon IDs: {list(missing)[:20]}")
-    return values.reindex(polygons.index)
+        if values not in polygons.columns:
+            problems.add(f"{option}: polygons has no column {values!r}")
+    elif isinstance(values, pd.Series):
+        repeated = values.index[values.index.duplicated()].unique()
+        if len(repeated):
+            problems.add(f"{option}: repeated polygon IDs: {list(repeated)[:20]}")
+        missing = polygons.index.difference(values.index)
+        if len(missing):
+            problems.add(f"{option}: missing polygon IDs: {list(missing)[:20]}")
+    else:
+        problems.add(f"{option} must be a column name or pandas.Series indexed by polygon ID")
+
+
+def _polygon_values(polygons, values):
+    """Read a validated column or Series aligned by polygon ID."""
+    return polygons[values] if isinstance(values, str) else values.reindex(polygons.index)
 
 
 def _check(
@@ -302,8 +311,8 @@ def _check(
         problems.add(
             f"max_nearest_distance must be a distance >= 0 or None, not {max_nearest_distance!r}"
         )
-    if isinstance(sewered, str) and sewered not in polygons.columns:
-        problems.add(f"sewered: polygons has no column {sewered!r}")
+    if sewered is not None:
+        _check_polygon_values(polygons, sewered, "sewered", problems)
     if max_distance is not None and not max_distance >= 0:
         problems.add(f"max_distance must be a distance >= 0 or None, not {max_distance!r}")
     if impute not in IMPUTATIONS:
@@ -312,8 +321,7 @@ def _check(
         problems.add(f"placement must be one of {', '.join(PLACEMENTS)}, not {placement!r}")
     if isinstance(weight, str) and weight not in pipes.columns:
         problems.add(f"weight: the pipes have no column {weight!r}")
-    if isinstance(population, str) and population not in polygons.columns:
-        problems.add(f"population: polygons has no column {population!r}")
+    _check_polygon_values(polygons, population, "population", problems)
     repeated = polygons.index[polygons.index.duplicated()].unique()
     if len(repeated):
         problems.add(f"polygon IDs (the index of polygons) repeated: {list(repeated)[:20]}")
@@ -360,7 +368,8 @@ def allocate_population(
 
     population : str or pandas.Series
         Population of each polygon: a column of ``polygons``, or a Series with the same index.
-        A missing or non-numeric value counts as 0.
+        All polygon IDs must be present and unique; unindexed lists/arrays and missing or
+        repeated IDs raise ``ValueError``. A missing or non-numeric value counts as 0.
 
     max_distance : float, optional
         None (default) assigns each pipe to the polygon containing its midpoint. A distance, in
@@ -373,7 +382,7 @@ def allocate_population(
     sewered : str or pandas.Series, optional
         Polygons known to be sewered (e.g. residentially zoned): a column of booleans of
         ``polygons``, or a Series indexed by polygon ID (all IDs must be present).
-        Unindexed lists and arrays raise ``TypeError``; missing IDs raise ``ValueError``.
+        Unindexed lists/arrays and missing or repeated IDs raise ``ValueError``.
         A flagged polygon left with no pipe by the
         midpoint or distance rule (a development on private sewers, say) is given its nearest
         pipe, within ``max_nearest_distance``; an unflagged one contributes no one. By default no
@@ -504,8 +513,7 @@ def _allocate_population(
         impute,
         placement,
     )
-    people = polygons[population] if isinstance(population, str) else population
-    people = pd.to_numeric(pd.Series(people).reindex(polygons.index), errors="coerce")
+    people = pd.to_numeric(_polygon_values(polygons, population), errors="coerce")
     negative = people.index[people < 0]
     if len(negative):
         raise ValueError(f"Negative population in polygons {list(negative)[:20]}")
@@ -529,7 +537,7 @@ def _allocate_population(
         )
     nearest = pd.Series(dtype=float)
     if sewered is not None:
-        flag = _polygon_values(polygons, sewered, "sewered").fillna(False).astype(bool)
+        flag = _polygon_values(polygons, sewered).fillna(False).astype(bool)
         unserved = flag & ~polygons.index.isin(rows["polygon"].dropna())
         if unserved.any():
             found = _nearest(pipes, polygons[unserved], serving)

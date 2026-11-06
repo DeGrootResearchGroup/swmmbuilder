@@ -75,7 +75,7 @@ def test_scaled_to_total(net):
 
 @pytest.mark.parametrize("values", [list(ZONES), np.array(list(ZONES))])
 def test_land_use_rejects_unindexed_values(net, values):
-    with pytest.raises(TypeError, match=r"land_use.*column name or pandas.Series"):
+    with pytest.raises(ValueError, match=r"land_use.*column name or pandas.Series"):
         allocate_land_use(net, zoning(), land_use=values, rates=RATES)
 
 
@@ -302,3 +302,17 @@ def test_a_pipe_with_a_missing_node_is_left_out(caplog):
     assert 2 not in flows.pipes.index
     # With pipe 2, P's 0.1 L/s goes 50:30 to pipes 1 and 2, 0.0375 L/s to pipe 2.
     assert "with them they would take 0.0375 LPS, in no catchment: [2]" in caplog.text
+
+
+@pytest.mark.parametrize("values", [list(ZONES), pd.Series("COMMERCIAL", index=["P", "P"])])
+def test_land_use_option_errors_listed_together(net, values):
+    with pytest.raises(ValueError) as error:
+        allocate_land_use(net, zoning(), land_use=values, rates={}, placement="middle")
+    message = str(error.value)
+    assert "rates" in message
+    assert "placement" in message
+    if isinstance(values, pd.Series):
+        assert "land_use: repeated polygon IDs: ['P']" in message
+        assert "land_use: missing polygon IDs: ['Q', 'R']" in message
+    else:
+        assert "land_use must be a column name or pandas.Series" in message
