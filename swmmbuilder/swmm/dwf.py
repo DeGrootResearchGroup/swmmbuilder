@@ -169,7 +169,9 @@ def dwf_from_population(
 
     flow_units : {'LPS', 'CMS', 'MLD'}
         FLOW_UNITS of the template the flows are written with (default LPS, as in the shipped
-        template).
+        template). The flows carry no unit, so it must match the template's: pass the same
+        ``flow_units`` to :func:`~swmmbuilder.swmm.write_inp`, or use
+        :class:`~swmmbuilder.NodeLoading`, whose options carry it.
 
     Returns
     -------

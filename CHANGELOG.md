@@ -11,6 +11,13 @@ earlier history is in the git log.
 
 ### Fixed
 
+- **Flow units and link offsets checked against the template** (#158): `NodeLoading.options()` now
+  includes `flow_units`, so `to_inp` refuses a template whose `FLOW_UNITS` differ from the load's
+  (an L/s load in a CMS template was written 1000 times too large). `NodeLoading` refuses an invalid
+  `flow_units` even without a population (upper or lower case is accepted). `check_template` refuses
+  a `LINK_OFFSETS` other than `DEPTH`, since offsets are written as depths. Force mains written
+  under routing other than `DYNWAVE` give an `OptionWarning`, since SWMM then treats them as open
+  channels.
 - **Topology checks on looped areas** (#159): `Subnetwork.validate()` finds cycles as strongly
   connected components rather than listing every simple cycle, whose number grows exponentially
   with the size of a looped area (a 7 × 7 grid of pipes drawn both ways did not finish). It now
@@ -188,6 +195,8 @@ earlier history is in the git log.
 
 ### Changed
 
+- **`NodeLoading.options()` includes `flow_units`** (#158): the dictionary always has a
+  `flow_units` key, even when there is nothing else to write.
 - **Data-gaps reports list nodes with no usable rim**: `data_gaps()`, `model.data_gaps`, and
   `TopologyReport.data_gaps` now have a `no_rim` row (not blocking) for every node with no rim
   recorded, or one at or below the invert, so existing reports gain rows. Unless the `rims` option

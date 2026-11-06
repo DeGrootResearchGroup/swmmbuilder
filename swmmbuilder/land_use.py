@@ -349,7 +349,10 @@ def allocate_land_use(
         at each.
 
     flow_units : {'LPS', 'CMS', 'MLD'}
-        Unit of the flows returned, and of ``total`` (default LPS, the shipped template's).
+        Unit of the flows returned, and of ``total`` (default LPS, the shipped template's). It
+        must be the FLOW_UNITS of the template the model is written with, and the ``flow_units``
+        of the :class:`~swmmbuilder.NodeLoading` the flows go to; nothing checks the flows
+        themselves.
 
     Returns
     -------

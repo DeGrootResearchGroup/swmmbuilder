@@ -59,8 +59,10 @@ def check_template(content: str) -> None:
     Raises
     ------
     ValueError
-        If FLOW_UNITS is missing or not an SI unit (the GIS data are metric), or if the template
-        contains a placeholder the writer does not fill (see :data:`TEMPLATE_PLACEHOLDERS`).
+        If FLOW_UNITS is missing or not an SI unit (the GIS data are metric), if LINK_OFFSETS is
+        set to anything but DEPTH (the conduit offsets are written as depths above the node
+        invert), or if the template contains a placeholder the writer does not fill (see
+        :data:`TEMPLATE_PLACEHOLDERS`).
     """
     flow_units = template_flow_units(content)
     if flow_units is None:
@@ -73,6 +75,13 @@ def check_template(content: str) -> None:
             f"The template sets FLOW_UNITS {flow_units}, a US unit, so SWMM would read the metric "
             "GIS lengths, elevations and sizes as feet. "
             f"Set FLOW_UNITS to one of {', '.join(SI_FLOW_UNITS)}."
+        )
+    offsets = re.search(r"^\s*LINK_OFFSETS\s+(\S+)", content, flags=re.MULTILINE | re.IGNORECASE)
+    if offsets and offsets.group(1).upper() != "DEPTH":
+        raise ValueError(
+            f"The template sets LINK_OFFSETS {offsets.group(1).upper()}, but the conduit offsets "
+            "are written as depths above the node invert, so SWMM would read them as elevations. "
+            "Set LINK_OFFSETS DEPTH (SWMM's default)."
         )
 
     unknown = sorted(set(re.findall(r"\{(\w+)\}", content)) - set(TEMPLATE_PLACEHOLDERS))

@@ -419,7 +419,9 @@ sync by a test). It uses SI units, `FLOW_UNITS LPS`, because the GIS lengths, in
 in metres. A custom template (`template_path=`) must use `CMS`, `LPS` or `MLD`, and may only
 contain the `{nodes}`, `{outfalls}`, `{storage}`, `{conduits}`, `{pumps}`, `{xsections}`,
 `{curves}`, `{dwf}`, `{patterns}`, `{coordinates}` and `{vertices}` placeholders; anything else
-(including US units) raises `ValueError`. Node `[COORDINATES]` and pipe `[VERTICES]` are written in
+(including US units) raises `ValueError`. Conduit offsets are written as depths above the node
+invert, so a template must keep `LINK_OFFSETS DEPTH` (SWMM's default); `ELEVATION` raises
+`ValueError`. A `flow_units` option passed to `to_inp` must match the template's `FLOW_UNITS`. Node `[COORDINATES]` and pipe `[VERTICES]` are written in
 the units of the GIS geometry.
 
 ## Pumps
@@ -474,7 +476,8 @@ given, else a junction) to it. The force-main pipes leaving the station (`Struct
 London), followed downstream through every node whose only outlet is a force main
 (`Subnetwork.force_main_chain`), start at `<node>_D` and stay conduits with their GIS lengths and a
 `FORCE_MAIN` cross-section; their interior nodes and `<node>_D` get `force_main_surcharge_depth`
-(default 100 m) so that the main can run pressurised under `DYNWAVE`. Where two stations' force
+(default 100 m) so that the main can run pressurised under `DYNWAVE`. Under any other routing
+SWMM treats a `FORCE_MAIN` as an open channel, so writing force mains gives an `OptionWarning`. Where two stations' force
 mains join, the shared main downstream is a force main of both; a chain stops at the next pump
 station, whose own pump starts its force main. Other outlets of the station, such as overflows,
 stay conduits (`include_overflows=False` drops them). A pump-station node with force mains that
@@ -612,7 +615,8 @@ defined, of the right length and positive; otherwise `ValueError` is raised befo
 written. An hourly pattern whose mean is not 1 gives a warning, since it scales the base flows.
 The total base flow and the number of loaded nodes are logged, for comparison with the plant's
 measured dry-weather flow. `dwf_from_population` converts a per-capita flow (`unit` `L/d`,
-`m3/d`, `L/s`, or `m3/s`) to the template's `flow_units` (default `LPS`).
+`m3/d`, `L/s`, or `m3/s`) to the template's `flow_units` (default `LPS`). Its result carries no
+unit, so pass the same `flow_units` to `to_inp`, or use `NodeLoading`, whose options carry it.
 
 ### Population from polygons
 
@@ -758,7 +762,10 @@ loading.summary()                           # {'sanitary': ..., 'sanitary_nodes'
   are those of the model; `require_unit_mean` sets another tolerance, or `False` turns the check
   off. `pattern` may also name a pattern of `patterns`.
 - `table(columns={"steady": "infiltration_L_s", ...})` renames the columns, to keep a build's own
-  names. Flows are in the template's `FLOW_UNITS` (`flow_units`, default `LPS`).
+  names. Flows are in the template's `FLOW_UNITS` (`flow_units`, default `LPS`). `options()`
+  includes `flow_units`, so `to_inp` refuses a template with other `FLOW_UNITS`. The
+  `patterned` and `steady` flows must already be in that unit (e.g. `allocate_land_use` with the
+  same `flow_units`).
 
 ## Conduit geometry
 
