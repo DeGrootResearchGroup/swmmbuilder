@@ -33,6 +33,42 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+# The kinds of pipe crossing a subnetwork's boundary (Subnetwork.boundary_pipes), most serious first.
+BOUNDARY_KINDS = ("force_main", "split", "summit", "inflow")
+BOUNDARY_COLUMNS = (
+    "pipe_id",
+    "direction",
+    "node",
+    "other",
+    "kind",
+    "structure_type",
+    "diameter",
+    "length",
+    "upstream_nodes",
+    "upstream_value",
+    "ends",
+    "end_types",
+    "beyond_nodes",
+    "end_distance",
+)
+
+
+def metric_positions(network, nodes) -> pd.DataFrame:
+    """x and y (m) of ``nodes`` from the pipe geometry, in the network's CRS, or in an estimated
+    UTM zone if that CRS is geographic; nodes with no pipe geometry are left out."""
+    positions = node_positions(network.full_data, nodes)
+    frame = pd.DataFrame.from_dict(positions, orient="index", columns=["x", "y"])
+    crs = network.full_data.crs
+    if frame.empty or crs is None or crs.is_projected:
+        return frame
+    import geopandas
+
+    points = geopandas.GeoSeries(
+        geopandas.points_from_xy(frame["x"], frame["y"]), index=frame.index, crs=crs
+    )
+    points = points.to_crs(points.estimate_utm_crs())
+    return pd.DataFrame({"x": points.x, "y": points.y})
+
 
 SPLITS = ("equal", "full")
 
@@ -167,6 +203,12 @@ class TopologyReport:
 
     nodes, pipes : int
         Number of nodes and pipes of the subnetwork.
+
+    boundary : pandas.DataFrame
+        The pipes of the network with one end in the subnetwork, which the subnetwork leaves out
+        (see :meth:`Subnetwork.boundary_pipes`). A pipe leaving a node with area upstream (kind
+        ``'split'`` or ``'force_main'``) takes flow that the written model sends down the node's
+        other outlets instead.
     """
 
     splits: dict = field(default_factory=dict)
@@ -182,6 +224,7 @@ class TopologyReport:
     data_gaps: dict = field(default_factory=dict)
     nodes: int = 0
     pipes: int = 0
+    boundary: pd.DataFrame = field(default_factory=lambda: pd.DataFrame(columns=BOUNDARY_COLUMNS))
 
     @property
     def is_dendritic(self) -> bool:
@@ -207,6 +250,10 @@ class TopologyReport:
             - ``force_main_ends``: force-main chains that join another or end at a dead end.
             - ``pipe_count_mismatches``: nodes whose recorded pipe counts differ from the graph.
             - ``data_gaps``: gaps in the data, all kinds (:attr:`data_gaps`).
+            - ``boundary_outflows``, ``boundary_inflows``: pipes leaving and entering the
+              subnetwork (:attr:`boundary`).
+            - ``boundary_splits``: the leaving pipes of kind ``'split'`` or ``'force_main'``,
+              whose flow the written model sends elsewhere.
 
         Examples
         --------
@@ -228,6 +275,9 @@ class TopologyReport:
             "force_main_ends": len(self.force_main_ends),
             "pipe_count_mismatches": len(self.pipe_count_mismatches),
             "data_gaps": sum(self.data_gaps.values()),
+            "boundary_outflows": int((self.boundary["direction"] == "out").sum()),
+            "boundary_inflows": int((self.boundary["direction"] == "in").sum()),
+            "boundary_splits": int(self.boundary["kind"].isin(("split", "force_main")).sum()),
         }
 
 
@@ -812,6 +862,118 @@ class Subnetwork:
                 totals[index[n]] = total
         return totals
 
+    def boundary_pipes(
+        self, values: Mapping[NodeId, float] | None = None, ends: bool = True
+    ) -> pd.DataFrame:
+        """The pipes of the network with one end in the subnetwork, which it leaves out.
+
+        A subnetwork keeps only the pipes with both ends in it. A pipe that leaves one of its
+        nodes for a node outside (a diversion, a relief pipe, an interconnection, a second force
+        main) is dropped, and the written model sends all of that node's flow down its other
+        outlets. Each such pipe is classified:
+
+        - ``'force_main'``: a force main leaving the subnetwork, e.g. a station's second main.
+        - ``'split'``: a gravity pipe leaving a node with nodes of the subnetwork upstream of it,
+          so that their flow is redirected.
+        - ``'summit'``: a gravity pipe leaving a node with nothing upstream of it in the
+          subnetwork, typically one of two runs starting at a maintenance hole on the ridge
+          between two catchments. Only the flow entering along the pipe itself is concerned.
+        - ``'inflow'``: a pipe entering the subnetwork from outside.
+
+        Parameters
+        ----------
+        values : dict, optional
+            {node: value}, e.g. a :class:`~swmmbuilder.PopulationAllocation`'s ``nodes``, summed
+            over the subnetwork's nodes upstream of each pipe's inside node (itself included), as
+            ``upstream_value``.
+
+        ends : bool
+            Also say where a leaving pipe's flow ends (default True): ``ends``, the nodes with
+            no outlet that it drains to in the whole network, their ``end_types``, the number of
+            nodes outside the subnetwork that drain to them (``beyond_nodes``), and the distance
+            from the nearest end to the nearest outlet of the subnetwork (``end_distance``, m;
+            an outlet being a node with no outlet pipe in the subnetwork). A large network that
+            ends near the subnetwork's outlet may be a second inlet of the same plant; one that
+            ends at another plant's inlet is a real transfer; a small one that ends nowhere is
+            often the end of the mapped data.
+
+        Returns
+        -------
+        pandas.DataFrame
+            One row per pipe, most serious kind first and then by the number of nodes upstream:
+            ``pipe_id``, ``direction`` ('out' or 'in'), ``node`` (its end in the subnetwork),
+            ``other`` (its end outside), ``kind``, ``structure_type``, ``diameter`` (m),
+            ``length`` (m), ``upstream_nodes`` (nodes of the subnetwork draining to ``node``,
+            itself excluded), ``upstream_value``, and the ``ends`` columns above (empty for an
+            inflow).
+        """
+        full = self.network.graph
+        inside = set(self.graph)
+        data = self.network.full_data.set_index("pipe_id")
+        outlets = [n for n in self.graph if self.graph.out_degree(n) == 0]
+        rows = []
+        for up, down, pipe, structure in full.edges(inside, keys=True, data="structure_type"):
+            if down in inside:
+                continue
+            rows.append((pipe, "out", up, down, structure))
+        for up, down, pipe, structure in full.in_edges(inside, keys=True, data="structure_type"):
+            if up not in inside:
+                rows.append((pipe, "in", down, up, structure))
+        records = []
+        for pipe, direction, node, other, structure in rows:
+            upstream = nx.ancestors(self.graph, node)
+            if direction == "in":
+                kind = "inflow"
+            elif structure == "force_main":
+                kind = "force_main"
+            else:
+                kind = "split" if upstream else "summit"
+            row = data.loc[pipe] if pipe in data.index else None
+            if isinstance(row, pd.DataFrame):
+                row = row.iloc[0]
+            record = {
+                "pipe_id": pipe,
+                "direction": direction,
+                "node": node,
+                "other": other,
+                "kind": kind,
+                "structure_type": structure,
+                "diameter": None if row is None else row.get("diameter"),
+                "length": None if row is None else row.get("length"),
+                "upstream_nodes": len(upstream),
+                "upstream_value": (
+                    float(sum(values.get(n, 0.0) for n in upstream | {node}))
+                    if values is not None
+                    else np.nan
+                ),
+            }
+            if ends and direction == "out":
+                reach = nx.descendants(full, other) | {other}
+                end_nodes = sorted((n for n in reach if full.out_degree(n) == 0), key=str)
+                beyond = set().union(*(nx.ancestors(full, e) | {e} for e in end_nodes)) - inside
+                record["ends"] = ", ".join(map(str, end_nodes))
+                record["end_types"] = ", ".join(
+                    str(full.nodes[e].get("node_type")) for e in end_nodes
+                )
+                record["beyond_nodes"] = len(beyond)
+                pos = metric_positions(self.network, end_nodes + outlets)
+                distances = [
+                    float(np.hypot(*(pos.loc[e, ["x", "y"]] - pos.loc[o, ["x", "y"]])))
+                    for e in end_nodes
+                    for o in outlets
+                    if e in pos.index and o in pos.index
+                ]
+                record["end_distance"] = min(distances) if distances else np.nan
+            records.append(record)
+        frame = pd.DataFrame(records, columns=list(BOUNDARY_COLUMNS))
+        if frame.empty:
+            return frame
+        frame["_rank"] = frame["kind"].map({k: i for i, k in enumerate(BOUNDARY_KINDS)})
+        frame = frame.sort_values(
+            ["_rank", "upstream_nodes"], ascending=[True, False], kind="stable"
+        )
+        return frame.drop(columns="_rank").reset_index(drop=True)
+
     def validate(self, outfalls: Iterable[NodeId] | None = None) -> TopologyReport:
         """Check the topology before the subnetwork is written to an .inp file.
 
@@ -826,7 +988,8 @@ class Subnetwork:
             Flow splits, cycles, dead ends (classified by node type) and parallel pipes, plus the
             force mains (with the pump stations that have none, the force mains that start at no
             pump station and the chains that end badly), the nodes whose recorded pipe counts
-            differ from the graph and the counts of gaps in the data. Splits and cycles are only
+            differ from the graph, the counts of gaps in the data, and the pipes crossing the
+            subnetwork's boundary (:meth:`boundary_pipes`). Splits and cycles are only
             allowed with dynamic-wave routing; dead ends are never valid.
         """
         outfalls = set(self.outfalls if outfalls is None else outfalls)
@@ -892,6 +1055,7 @@ class Subnetwork:
 
         counts = self.data_gaps()["gap"].value_counts()
         report.data_gaps = {gap: int(counts[gap]) for gap in gaps.GAP_KINDS if gap in counts}
+        report.boundary = self.boundary_pipes()
         return report
 
     def data_gaps(self, **fills: Any) -> pd.DataFrame:

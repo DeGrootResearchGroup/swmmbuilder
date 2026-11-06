@@ -22,7 +22,7 @@ from .elevation import RimEstimate, dem_name, sample_dem
 from .gaps import lowest_inverts
 from .geometry import is_disjoint, line_coords, node_positions, reverse_line, to_geodataframe
 from .schema import LONDON_ON, NODE_COLUMNS, as_schema
-from .subnetwork import Subnetwork
+from .subnetwork import Subnetwork, metric_positions
 from .units import _is_real
 
 if TYPE_CHECKING:
@@ -965,11 +965,19 @@ class Network:
         max_hops: int | None = None,
         max_length: float | None = None,
         outlet: NodeId | Iterable[NodeId] | None = None,
+        near: float | None = 100.0,
     ) -> Subnetwork:
         """The :class:`Subnetwork` of ``node``'s catchment: every node that drains to it.
 
         With ``max_hops`` or ``max_length`` the catchment is truncated, and with ``outlet`` the
         path from ``node`` down to the outlet(s) is added, so that the subnetwork discharges there.
+
+        A node with two outlets, one draining to ``node`` and one elsewhere, is in the catchment,
+        but its other outlet pipe is not, so the written model sends its flow to ``node``. Pipes
+        leaving the catchment from nodes with area upstream, and force mains leaving it, are
+        warned about (see :meth:`Subnetwork.boundary_pipes`). So is any other network whose end
+        lies within ``near`` of ``node`` without draining to it, which may be a second inlet of
+        the same plant (see :meth:`ends`).
 
         Parameters
         ----------
@@ -985,6 +993,16 @@ class Network:
         outlet : node ID or list of node IDs, optional
             Outlet(s) downstream of ``node``. A shortest path (by length) is added to every listed
             outlet that ``node`` drains to.
+
+        near : float, optional
+            Distance (m) within which another network's end is reported (default 100 m); None
+            skips the check.
+
+        Warns
+        -----
+        DataWarning
+            If pipes leave the catchment from nodes with area upstream or as force mains, or a
+            network ends within ``near`` of ``node`` without draining to it.
 
         Raises
         ------
@@ -1018,7 +1036,84 @@ class Network:
             for o in reachable:
                 selected.update(nx.dijkstra_path(self.graph, node, o, weight=self._pipe_length))
 
-        return self.subnetwork(selected)
+        sub = self.subnetwork(selected)
+        self._check_catchment(sub, node, near)
+        return sub
+
+    def _check_catchment(self, sub, node, near):
+        """Warn about the pipes leaving ``sub`` with flow to take, and the networks ending near
+        ``node`` that do not drain to it."""
+        leaving = sub.boundary_pipes(ends=False)
+        leaving = leaving[leaving["direction"] == "out"]
+        serious = leaving[leaving["kind"].isin(("split", "force_main"))]
+        summits = int((leaving["kind"] == "summit").sum())
+        if summits:
+            logger.info(
+                "%d pipes leave the catchment of %s from summit nodes (nothing upstream)",
+                summits,
+                node,
+            )
+        if len(serious):
+            listed = ", ".join(
+                f"{r.pipe_id} ({r.kind}, from {r.node}, {r.upstream_nodes} nodes upstream)"
+                for r in serious.head(5).itertuples()
+            )
+            warnings.warn(
+                f"{len(serious)} pipes leave the catchment of {node} from nodes with area "
+                f"upstream ({int((serious['kind'] == 'force_main').sum())} force mains), so the "
+                f"written model sends their flow down the nodes' other outlets: {listed}"
+                f"{', ...' if len(serious) > 5 else ''}. See Subnetwork.boundary_pipes().",
+                DataWarning,
+                stacklevel=3,
+            )
+        if near is None:
+            return
+        for end, upstream, distance in self._ends_near(node, near, exclude=set(sub.graph)):
+            warnings.warn(
+                f"{end} ends a network of {upstream} nodes {distance:.0f} m from {node} without "
+                "draining to it: if both reach the same plant, it is a second inlet to join.",
+                DataWarning,
+                stacklevel=3,
+            )
+
+    def _ends_near(self, node, distance, exclude=()):
+        """(end, nodes draining to it, distance in m) of each node with no outlet pipe, not in
+        ``exclude``, within ``distance`` of ``node``."""
+        ends = [n for n in self.graph if self.graph.out_degree(n) == 0 and n not in exclude]
+        pos = metric_positions(self, [*ends, node])
+        if node not in pos.index:
+            return []
+        x0, y0 = pos.loc[node, "x"], pos.loc[node, "y"]
+        found = []
+        for end in ends:
+            if end in pos.index:
+                d = float(np.hypot(pos.loc[end, "x"] - x0, pos.loc[end, "y"] - y0))
+                if d <= distance:
+                    found.append((end, len(nx.ancestors(self.graph, end)), d))
+        return sorted(found, key=lambda f: f[2])
+
+    def ends(self) -> pd.DataFrame:
+        """Every node with no outlet pipe: where the network's flow ends.
+
+        The treatment plants' inlets are the few ends with many nodes draining to them, so
+        listing them checks that the outlets being modelled account for the city; the many
+        small ends are caps, outfalls, and ends of the mapped data.
+
+        Returns
+        -------
+        pandas.DataFrame
+            Indexed by node, with ``node_type`` and ``upstream_nodes`` (the nodes draining to
+            it, itself excluded), the largest first.
+        """
+        ends = [n for n in self.graph if self.graph.out_degree(n) == 0]
+        frame = pd.DataFrame(
+            {
+                "node_type": [self.graph.nodes[n].get("node_type") for n in ends],
+                "upstream_nodes": [len(nx.ancestors(self.graph, n)) for n in ends],
+            },
+            index=pd.Index(ends, name="node"),
+        )
+        return frame.sort_values("upstream_nodes", ascending=False, kind="stable")
 
     def to_geodataframe(
         self, kind: str = "pipes", values: Values | None = None
