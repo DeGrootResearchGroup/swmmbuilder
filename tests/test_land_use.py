@@ -73,6 +73,24 @@ def test_scaled_to_total(net):
     assert flows.polygons["allocated"].to_dict() == approx({"P": 0.2, "Q": 0.4, "R": 0.0})
 
 
+@pytest.mark.parametrize("values", [list(ZONES), np.array(list(ZONES))])
+def test_land_use_rejects_unindexed_values(net, values):
+    with pytest.raises(TypeError, match=r"land_use.*column name or pandas.Series"):
+        allocate_land_use(net, zoning(), land_use=values, rates=RATES)
+
+
+def test_land_use_series_aligns_by_polygon_id(net):
+    uses = zoning()["use"].iloc[::-1]
+    flows = allocate_land_use(net, zoning(), land_use=uses, rates=RATES)
+    assert flows.total == pytest.approx(0.3)
+    assert flows.polygons.loc["Q", "land_use"] == "INDUSTRIAL"
+
+
+def test_land_use_rejects_missing_polygon_ids(net):
+    with pytest.raises(ValueError, match=r"land_use.*missing polygon IDs.*R"):
+        allocate_land_use(net, zoning(), land_use=zoning()["use"].iloc[:2], rates=RATES)
+
+
 def test_area_within_clips_the_polygons(net):
     half_of_p = box(X0, Y0, X0 + 50, Y0 + 100).union(box(X0 + 100, Y0, X0 + 200, Y0 + 100))
     flows = allocate_land_use(net, zoning(), land_use="use", rates=RATES, area_within=half_of_p)

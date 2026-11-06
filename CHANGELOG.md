@@ -9,6 +9,11 @@ earlier history is in the git log.
 
 ## [Unreleased]
 
+### Fixed
+
+- Population `sewered` and `land_use` options reject unindexed lists/arrays and Series missing
+  polygon IDs instead of silently dropping flags or land-use values. Series remain aligned by ID.
+
 ### Added
 
 - **Capturing the log of a build** (#140): `swmmbuilder.capture_log(level="INFO", path=None)` is

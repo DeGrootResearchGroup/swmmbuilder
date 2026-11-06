@@ -273,6 +273,18 @@ def _weights(pipes, weight):
     return pd.to_numeric(values, errors="coerce").astype(float)
 
 
+def _polygon_values(polygons, values, option):
+    """Read a named column or align an explicitly indexed polygon option."""
+    if isinstance(values, str):
+        return polygons[values]
+    if not isinstance(values, pd.Series):
+        raise TypeError(f"{option} must be a column name or pandas.Series indexed by polygon ID")
+    missing = polygons.index.difference(values.index)
+    if len(missing):
+        raise ValueError(f"{option}: missing polygon IDs: {list(missing)[:20]}")
+    return values.reindex(polygons.index)
+
+
 def _check(
     pipes,
     polygons,
@@ -360,7 +372,9 @@ def allocate_population(
 
     sewered : str or pandas.Series, optional
         Polygons known to be sewered (e.g. residentially zoned): a column of booleans of
-        ``polygons``, or a Series with the same index. A flagged polygon left with no pipe by the
+        ``polygons``, or a Series indexed by polygon ID (all IDs must be present).
+        Unindexed lists and arrays raise ``TypeError``; missing IDs raise ``ValueError``.
+        A flagged polygon left with no pipe by the
         midpoint or distance rule (a development on private sewers, say) is given its nearest
         pipe, within ``max_nearest_distance``; an unflagged one contributes no one. By default no
         polygon is flagged.
@@ -515,8 +529,7 @@ def _allocate_population(
         )
     nearest = pd.Series(dtype=float)
     if sewered is not None:
-        flag = polygons[sewered] if isinstance(sewered, str) else sewered
-        flag = pd.Series(flag).reindex(polygons.index).fillna(False).astype(bool)
+        flag = _polygon_values(polygons, sewered, "sewered").fillna(False).astype(bool)
         unserved = flag & ~polygons.index.isin(rows["polygon"].dropna())
         if unserved.any():
             found = _nearest(pipes, polygons[unserved], serving)

@@ -44,6 +44,7 @@ from .population import (
     _missing_node,
     _nearest,
     _pipes_of,
+    _polygon_values,
     _quiet,
     _weights,
 )
@@ -240,7 +241,9 @@ def allocate_land_use(
         network's).
 
     land_use : str or pandas.Series
-        Land use of each polygon: a column of ``polygons``, or a Series with the same index.
+        Land use of each polygon: a column of ``polygons``, or a Series indexed by polygon ID
+        (all IDs must be present). Unindexed lists and arrays raise ``TypeError``;
+        missing IDs raise ``ValueError``.
 
     rates : dict
         {land use: flow per hectare, in ``unit``}, e.g. ``{'COMMERCIAL': 23000,
@@ -389,8 +392,7 @@ def _allocate_land_use(
             f"flow_units must be one of {', '.join(SI_FLOW_UNITS)}, not {flow_units!r}."
         )
     to_units = per_second / _FLOW_UNIT_LPS[flow_units]
-    uses = pd.Series(polygons[land_use] if isinstance(land_use, str) else land_use)
-    uses = uses.reindex(polygons.index)
+    uses = _polygon_values(polygons, land_use, "land_use")
     polygons = polygons.to_crs(pipes.crs)
 
     if serve_force_mains or "structure_type" not in pipes.columns:

@@ -4,6 +4,7 @@ import logging
 import math
 
 import geopandas as gpd
+import numpy as np
 import pandas as pd
 import pytest
 from conftest import FIXTURE
@@ -375,6 +376,25 @@ def test_nearest_pipe_within_a_cap():
     assert free.no_pipes == ["N"]
     with pytest.raises(ValueError, match="max_nearest_distance must be"):
         allocate(net, polygons, max_nearest_distance=-5)
+
+
+@pytest.mark.parametrize("flags", [[False, False, True], np.array([False, False, True])])
+def test_sewered_rejects_unindexed_flags(net, flags):
+    with pytest.raises(TypeError, match=r"sewered.*column name or pandas.Series"):
+        allocate(net, sewered=flags)
+
+
+def test_sewered_series_aligns_by_polygon_id(net):
+    flags = pd.Series([True, False, False], index=["R", "Q", "P"])
+    result = allocate(net, sewered=flags)
+    assert result.nearest.index.tolist() == ["R"]
+    assert result.unallocated == 0
+
+
+@pytest.mark.parametrize("ids", [["P", "Q"], [0, 1, 2]])
+def test_sewered_rejects_missing_polygon_ids(net, ids):
+    with pytest.raises(ValueError, match=r"sewered.*missing polygon IDs.*R"):
+        allocate(net, sewered=pd.Series(True, index=ids))
 
 
 # Pipe 2 (N2 to nowhere, 30 m, 6 connections) is in full_data but not in the graph.
