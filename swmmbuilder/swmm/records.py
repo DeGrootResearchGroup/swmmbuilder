@@ -181,6 +181,11 @@ class SwmmModel:
     derived : list
         :class:`Derived` records: every value that comes from a design rule (e.g.
         ``wet_well_defaults``), not from the data.
+    station_choices : pandas.DataFrame or None
+        With ``pump_stations='found'`` (see :func:`~swmmbuilder.swmm.build_model`), the
+        stations pumped and left out, one row per node: ``node``, ``source`` (``'found'``,
+        ``'extra'``, or ``'excluded'``), and ``reason`` (the reason given, else ``''``). None
+        when the stations were given as a dict.
     """
 
     junctions: list = field(default_factory=list)
@@ -198,12 +203,18 @@ class SwmmModel:
     vertices: dict = field(default_factory=dict)
     data_gaps: pd.DataFrame | None = None
     derived: list = field(default_factory=list)
+    station_choices: pd.DataFrame | None = None
 
     def derived_report(self) -> pd.DataFrame:
         """DataFrame of :attr:`derived`, one row per value (element, id, attribute, value, rule,
         basis)."""
         columns = ["element", "id", "attribute", "value", "rule", "basis"]
         return pd.DataFrame([vars(d) for d in self.derived], columns=columns)
+
+    def _station_count(self, source: str) -> int:
+        """The number of rows of :attr:`station_choices` from ``source``."""
+        choices = self.station_choices
+        return 0 if choices is None else int((choices["source"] == source).sum())
 
     def summary(self) -> dict[str, float | int]:
         """Counts of the model's records, gaps, and derived values, to cite in a report.
@@ -217,6 +228,9 @@ class SwmmModel:
             - ``junctions``, ``outfalls``, ``storage``, ``conduits``, ``pumps``: records
               written.
             - ``stations``: pump stations, the nodes that pumps draw from.
+            - ``stations_extra``, ``stations_excluded``: stations added and left out by
+              ``pump_stations_extra`` and ``pump_stations_exclude`` (see
+              :attr:`station_choices`; 0 without them).
             - ``outfall_links``: outfalls added by the ``outfall_link`` option of
               :func:`~swmmbuilder.swmm.build_model`, found by their names (an outfall
               ``<node>_OUT`` reached from ``<node>`` by the conduit ``<node>_DUMMY``).
@@ -261,6 +275,8 @@ class SwmmModel:
             "conduits": len(self.conduits),
             "pumps": len(self.pumps),
             "stations": len({p.inlet for p in self.pumps}),
+            "stations_extra": self._station_count("extra"),
+            "stations_excluded": self._station_count("excluded"),
             "outfall_links": links,
             "data_gaps": 0 if gaps is None else len(gaps),
             "data_gaps_filled": 0 if gaps is None else int(gaps["filled_from"].notna().sum()),

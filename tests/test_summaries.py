@@ -214,6 +214,8 @@ def test_model_summary_of_records():
         "conduits": 2,
         "pumps": 2,
         "stations": 1,
+        "stations_extra": 0,
+        "stations_excluded": 0,
         "outfall_links": 1,
         "data_gaps": 3,
         "data_gaps_filled": 2,

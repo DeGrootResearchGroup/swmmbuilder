@@ -46,9 +46,10 @@ def resolve_wet_wells(subnetwork, wet_wells, outfalls=()):
     return {node: WetWell.coerce(node, v) for node, v in wet_wells.items()}
 
 
-def resolve_pump_stations(subnetwork, pump_stations, outfalls=(), default_pump=None):
+def resolve_pump_stations(subnetwork, pump_stations, outfalls=(), default_pump=None, excluded=()):
     """({node: PumpStation}, [StationPump]) from the ``pump_stations`` option of
-    :func:`build_model`.
+    :func:`build_model`. Station nodes in ``excluded`` (left out on purpose, by
+    ``pump_stations_exclude``) are not warned of as missing from ``pump_stations``.
 
     Raises
     ------
@@ -115,7 +116,9 @@ def resolve_pump_stations(subnetwork, pump_stations, outfalls=(), default_pump=N
             links.append(StationPump(name, node, discharge, chains))
     if problems:
         raise ValueError(Problems("Invalid pump stations", problems).message())
-    undeclared = sorted(str(n) for n in typed - set(stations) if subnetwork.force_main_outlets(n))
+    undeclared = sorted(
+        str(n) for n in typed - set(stations) - set(excluded) if subnetwork.force_main_outlets(n)
+    )
     if undeclared:
         warnings.warn(
             f"Pump-station nodes with force mains not in pump_stations: {', '.join(undeclared)}; "

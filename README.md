@@ -459,6 +459,33 @@ is not in `pump_stations` gets a warning: its force mains are written as ordinar
   without one; London's preset, an ideal pump for its variable-speed stations (s. 4.3.5), is
   `LONDON_ON.design["default_pump"]`. A startup depth must be above the shutoff depth and below
   the wet well's max depth, or the writer refuses.
+- **Every station found.** `Subnetwork.find_pump_stations()` lists the station nodes with a
+  force main (`stations`), those with none (`no_force_main`), and force mains that climb from a
+  node not in the station layer (`unlisted`, likely lift stations missing from it).
+  `pump_stations="found"` (or a `PumpStationReport`, e.g. of `find_pump_stations(min_rise=1.0)`)
+  pumps every listed station with `default_pump`, which must then be given:
+
+  ```python
+  model = sub.to_inp(
+      "model.inp",
+      pump_stations="found",
+      pump_stations_exclude={"WO6001": "gravity pass-through"},
+      pump_stations_extra={"SH93": "force main climbs 20 m; no station in the layer"},
+      default_pump=LONDON_ON.design["default_pump"],
+      force_main_roughness=LONDON_ON.design["force_main_roughness"],
+  )
+  print(model.station_choices)
+  ```
+
+  `pump_stations_exclude={node: reason}` leaves out a station (its force mains become ordinary
+  conduits), a station with no force main, or an `unlisted` node. `pump_stations_extra` adds a
+  station, or gives a found one its own pump: `{node: reason}` takes `default_pump`, and
+  `{node: PumpStation(...)}` or a dict is used as given. A climbing force main whose node is
+  neither excluded nor added gives a `DataWarning` naming its node, pipes, and rise, since the
+  model would have it pumped by gravity (`pump_stations_unlisted="raise"` raises instead,
+  `"ignore"` says nothing). Each choice is logged and kept in `model.station_choices` (node,
+  `source` of `found`, `extra`, or `excluded`, and reason), and `model.summary()` counts
+  `stations_extra` and `stations_excluded`. A dict `pump_stations` works as before.
 - **Twin force mains.** `force_mains=` picks the force mains to pump into (the others are written
   as ordinary conduits, with a warning). With more than one, `discharge="shared"` writes one pump
   feeding them all and `discharge="separate"` one pump each (`<node>_P1`, `<node>_D1`, ...);
