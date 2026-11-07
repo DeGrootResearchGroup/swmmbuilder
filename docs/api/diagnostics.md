@@ -105,7 +105,8 @@ give the same as text):
 | `splits`, `cycles`, `dead_ends`, `parallel_pipes` | nodes with more than one outlet, directed cycles, dead ends, and node pairs joined by more than one pipe |
 | `force_mains`, `stations_without_force_main`, `orphan_force_mains`, `force_main_ends` | force mains, and their problems |
 | `pipe_count_mismatches` | nodes whose recorded pipe counts differ from the graph |
-| `data_gaps` | gaps in the data, all kinds |
+| `data_gaps` | gaps in the data, all kinds, including the non-blocking `no_rim` |
+| `data_gaps_blocking`, `data_gaps_no_rim` | those that block a build, and those of kind `no_rim` |
 | `boundary_outflows`, `boundary_inflows`, `boundary_splits` | pipes leaving and entering the subnetwork, and the leaving ones whose flow the model sends elsewhere |
 
 [`SwmmModel.summary()`][swmmbuilder.swmm.records.SwmmModel.summary]:
@@ -113,9 +114,10 @@ give the same as text):
 | Key | Meaning |
 | --- | --- |
 | `junctions`, `outfalls`, `storage`, `conduits`, `pumps` | records written |
-| `stations`, `stations_extra`, `stations_excluded` | pump stations, and those added and left out |
+| `stations`, `stations_extra`, `stations_excluded` | pump stations (not pipes written as pumps by `pumps=`), and those added and left out |
 | `outfall_links` | outfalls added by `outfall_link` |
-| `data_gaps`, `data_gaps_filled` | gaps found, and those filled |
+| `data_gaps`, `data_gaps_filled` | gaps found (all kinds, including `no_rim`), and those filled |
+| `data_gaps_blocking`, `data_gaps_no_rim` | gaps that block a build, and those of kind `no_rim` |
 | `derived`, `derived_<element>_<attribute>`, `derived_<element>_<attribute>[<rule>]` | values derived by a design rule, in all, by element and attribute, and by rule |
 | `default_depth_junctions`, `default_depth` | junctions given the default depth, and that depth (m) |
 
