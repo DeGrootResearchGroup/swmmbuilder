@@ -3,7 +3,8 @@
 :func:`census_polygons` gets the polygons covering a network (or any area) from a *source*, keeps
 those near its pipes, and returns them with standard columns. A cache file makes a model rebuild
 offline. The source is pluggable: anything with a ``name`` and a ``fetch`` method (see
-:class:`PolygonSource`) will do. Two are provided:
+:class:`PolygonSource`) will do, and a source with a ``provenance`` method has its cache checked
+against its parameters. Two are provided:
 
 - :class:`CensusMapper`, Canada's 2021 Census (or another CensusMapper dataset) through the
   CensusMapper API, with pycancensus (``pip install 'swmmbuilder[census]'``);
@@ -61,6 +62,14 @@ class PolygonSource(Protocol):
     ----------
     name : str
         A short name, recorded in the cache, e.g. ``"CensusMapper"``.
+
+    Notes
+    -----
+    A source may also have a ``provenance()`` method, returning a dict of str of the parameters
+    that decide what it fetches (e.g. the dataset, or a file and its columns). When a cache is
+    read with such a source, :func:`census_polygons` compares them with those recorded in the
+    cache and refuses a cache fetched with other values. :class:`CensusMapper` and
+    :class:`PolygonFile` have one.
     """
 
     name: str
@@ -114,6 +123,17 @@ def _frame(ids, population, parent, geometry, crs):
     )
 
 
+def _regions_text(regions: Any) -> str:
+    """Regions ({level: [IDs]}) as JSON text with the levels and IDs sorted, so that the same
+    regions are always recorded the same way."""
+    if isinstance(regions, str):
+        regions = json.loads(regions)
+    return json.dumps(
+        {str(level): sorted(str(i) for i in ids) for level, ids in regions.items()},
+        sort_keys=True,
+    )
+
+
 def _missing_columns(data, columns, what):
     missing = [c for c in columns if c is not None and c not in data.columns]
     if missing:
@@ -161,6 +181,22 @@ class CensusMapper:
     region_level: str = "CSD"
     resolution: Literal["high", "simplified"] = "high"
     name: str = field(default="CensusMapper", init=False)
+
+    def provenance(self) -> dict[str, str]:
+        """The parameters that decide what is fetched, as recorded in a cache: ``dataset``,
+        ``resolution``, and ``regions`` (as JSON text) if given, or else ``region_level``.
+
+        Returns
+        -------
+        dict of str
+            Compared with a cache's provenance when the cache is read with this source.
+        """
+        found = {"dataset": self.dataset, "resolution": self.resolution}
+        if self.regions:
+            found["regions"] = _regions_text(self.regions)
+        else:
+            found["region_level"] = self.region_level
+        return found
 
     def _key(self) -> str:
         if self.api_key:
@@ -225,7 +261,8 @@ class CensusMapper:
         )
         out.attrs["provenance"] = {
             "dataset": self.dataset,
-            "regions": json.dumps(regions, sort_keys=True),
+            "regions": _regions_text(regions),
+            "region_level": self.region_level,
             "resolution": self.resolution,
             "pycancensus": _version("pycancensus"),
         }
@@ -253,7 +290,9 @@ class PolygonFile:
     Notes
     -----
     The whole file is read; :func:`census_polygons` keeps the polygons meeting the area. The
-    ``level`` asked for is recorded but not used.
+    ``level`` asked for is recorded but not used. A cache records the file's name (not its
+    folder, so a project can move) and the columns, and is refused for another file or
+    other columns.
     """
 
     path: str | os.PathLike
@@ -262,6 +301,23 @@ class PolygonFile:
     parent: str | None = None
     layer: str | None = None
     name: str = field(default="file", init=False)
+
+    def provenance(self) -> dict[str, str]:
+        """The file's name and the columns read, as recorded in a cache: ``file``, ``id``,
+        ``population``, ``parent``, and ``layer`` (an empty string where not given).
+
+        Returns
+        -------
+        dict of str
+            Compared with a cache's provenance when the cache is read with this source.
+        """
+        return {
+            "file": Path(self.path).name,
+            "id": self.id,
+            "population": self.population,
+            "parent": self.parent or "",
+            "layer": self.layer or "",
+        }
 
     def fetch(self, area: shapely.Geometry, crs: CRS, level: str) -> gpd.GeoDataFrame:
         """Every polygon of the file, with ``population`` and ``parent``."""
@@ -274,7 +330,7 @@ class PolygonFile:
             data.geometry.to_numpy(),
             data.crs,
         )
-        out.attrs["provenance"] = {"file": Path(self.path).name}
+        out.attrs["provenance"] = self.provenance()
         return out
 
 
@@ -357,6 +413,8 @@ def _read_cache(path, level, source, region, crs):
             f"{path} was fetched from {provenance.get('source')!r}, not {source.name!r}; use "
             "another cache file, or refresh=True to replace it."
         )
+    if source is not None:
+        _check_provenance(path, provenance, source)
     asked = gpd.GeoSeries([region], crs=crs).to_crs(area.crs).iloc[0]
     if not area.geometry.iloc[0].buffer(COVER_TOLERANCE).covers(asked):
         raise ValueError(
@@ -365,6 +423,36 @@ def _read_cache(path, level, source, region, crs):
         )
     polygons = polygons.set_index("id")
     return _standard(polygons, _Named(provenance.get("source", "the cache"))), provenance
+
+
+def _check_provenance(path, cached, source):
+    """Refuse a cache whose recorded parameters differ from those of ``source`` (its
+    ``provenance()``, if it has one); warn about those the cache does not record."""
+    method = getattr(source, "provenance", None)
+    if not callable(method):
+        return
+    asked = {k: str(v) for k, v in method().items()}
+    if "regions" in cached and "regions" in asked:
+        try:
+            cached = {**cached, "regions": _regions_text(cached["regions"])}
+        except (ValueError, AttributeError, TypeError):
+            pass  # not JSON of {level: [IDs]}: compared as text
+    differ = [
+        f"{k}={cached[k]!r}, not {v!r}" for k, v in asked.items() if k in cached and cached[k] != v
+    ]
+    if differ:
+        raise ValueError(
+            f"{path} was fetched with {'; '.join(differ)}; use another cache file, or "
+            "refresh=True to replace it."
+        )
+    unrecorded = [k for k in asked if k not in cached]
+    if unrecorded:
+        warnings.warn(
+            f"{path} does not record {', '.join(unrecorded)} (written by an older swmmbuilder?), "
+            "so the cache could not be checked against them; refresh=True records them",
+            DataWarning,
+            stacklevel=4,
+        )
 
 
 @dataclass
@@ -404,7 +492,9 @@ def census_polygons(
     cache : str or path, optional
         A GeoPackage. If it exists (and ``refresh`` is False), the polygons are read from it and
         nothing is fetched, so no network access or key is needed; it must be for the same level
-        and cover the area. Otherwise they are fetched and written to it, with the area and the
+        and cover the area, and, if ``source`` is given, have been fetched from it with the
+        same parameters (for :class:`CensusMapper`, the dataset, regions, and resolution; for
+        :class:`PolygonFile`, the file name and columns). Otherwise they are fetched and written to it, with the area and the
         provenance (source, level, dataset, regions, fetch date, versions; never the key).
 
     refresh : bool
@@ -432,12 +522,13 @@ def census_polygons(
     ValueError
         If the area is empty or has no CRS, the polygons are invalid (no CRS, no population,
         repeated IDs), a CensusMapper key is needed and none is given, or the cache does not
-        match the request.
+        match the request (naming the parameter that differs).
 
     Warns
     -----
     DataWarning
         If some polygons have no population (e.g. suppressed by the census); they count as 0.
+        If a cache does not record a parameter of the source, so it cannot be checked.
 
     Examples
     --------

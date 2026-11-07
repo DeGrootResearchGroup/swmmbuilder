@@ -5,7 +5,11 @@
 # height is PIPE_HGT (0 for circular pipes). Every published EL pipe is taller than it is wide, so
 # EL is taken to be a vertical ellipse. An invert of 0 means none. Node IDs containing J (e.g.
 # 2CJ941) are pipe junctions with no maintenance hole. The geometry is reprojected to UTM zone 17N
-# (EPSG:26917, metres).
+# (EPSG:26917, metres). SERV_STAT is the status (codes checked November 2026). IN SERVICE and IN
+# MAINTENANCE PERIOD (built, not yet assumed by the City) are built; TEMP. OUT-NEW CONSTRUCTION and
+# PRIVATE pass through, so the default status filter drops them (pass e.g.
+# status={'built', 'PRIVATE'} to keep them); a missing SERV_STAT is taken as built. There is no
+# structure-type column, and the City publishes no force mains.
 name = "Windsor, ON"
 nonpositive_inverts_missing = true
 size_unit = "mm"
@@ -23,6 +27,7 @@ diameter = "PIPE_SIZE"
 height = "PIPE_HGT"
 width = "PIPE_SIZE"
 flow_type = "SEWER_TYPE"
+status = "SERV_STAT"
 material = "PIPE_TYPE"
 
 [shapes]
@@ -35,3 +40,7 @@ RECT = "RECT_CLOSED"
 SANITARY = "sanitary"
 STORM = "storm"
 COMBINED = "combined"
+
+[statuses]
+"IN SERVICE" = "built"
+"IN MAINTENANCE PERIOD" = "built"

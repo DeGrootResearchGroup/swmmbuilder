@@ -115,6 +115,7 @@ def test_land_use_summary(net):
         "nearest_max_distance",
         "no_pipes",
         "zero_weight",
+        "fallback",
         "unallocated_design_flow",
         "scale",
     ]
@@ -138,6 +139,7 @@ def test_land_use_summary(net):
         "nearest": 0,
         "no_pipes": 1,
         "zero_weight": 0,
+        "fallback": 0,
         "unallocated_design_flow": 0.1,
         "scale": 1.0,
     }

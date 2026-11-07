@@ -247,7 +247,8 @@ docs, and in each method's docstring:
   flow placed and the nodes given them (within a catchment if given), per land use, and the
   polygons served, given their nearest pipe, or left out;
 - `NodeLoading.summary()`: flow and nodes of each part of the load, and of each patterned kind;
-- `TopologyReport.summary()`: nodes, pipes, splits, cycles, force mains, and boundary pipes;
+- `TopologyReport.summary()`: nodes, pipes, splits, cycles (counted as loops, sets of nodes that
+  can all reach one another), force mains, and boundary pipes;
 - `SwmmModel.summary()`: gaps found and filled, derived values by rule, the default depth,
   stations, and outfall links;
 - `UpstreamTotals.summary()`, `PumpStationReport.summary()`, and `RimEstimate.summary()`.
@@ -306,16 +307,19 @@ only those (see `swmmbuilder/schema.py`). These schemas ship with the package, a
   .inp coordinates are in metres. Toronto publishes only a diameter, so only circular pipes get a
   cross-section; the other shapes are reported on loading. Flow types other than `SAN`, `Storm`
   and `Combined` (`CSO`, `SCSO`, `FD`, `EO`) pass through unchanged, so e.g.
-  `flow_types={"sanitary", "combined"}` keeps sanitary and combined sewers.
+  `flow_types={"sanitary", "combined"}` keeps sanitary and combined sewers. Structure types
+  use London's codes (`SL` gravity, `OVF` overflow), so `include_overflows=False` works.
 - Six more Ontario cities' open data, each reprojected to its UTM zone 17N CRS:
-  - `WINDSOR_ON`: the SanitarySewer, StormSewer and CombinedSewer layers.
-  - `KITCHENER_ON`: Sanitary Pipes. `CATEGORY` is the structure type.
+  - `WINDSOR_ON`: the SanitarySewer, StormSewer and CombinedSewer layers. `SERV_STAT` is the
+    status; `TEMP. OUT-NEW CONSTRUCTION` and `PRIVATE` pipes are dropped by the default status
+    filter.
+  - `KITCHENER_ON`: Sanitary Pipes. `CATEGORY` is the structure type, `STATUS` the status.
   - `WATERLOO_ON`: Sanitary Sewer Gravity Mains. All pipes are taken as circular, and an invert
-    of 111.111 means none.
+    of 111.111 means none. `TYPE` is the structure type, `LIFECYCLESTATUS` the status.
   - `PETERBOROUGH_ON`: Sanitary (and Storm) Sewer Pipes. Only circular pipes get a cross-section.
-  - `BARRIE_ON`: Sanitary Pipes. `TYPE` is the structure type.
+  - `BARRIE_ON`: Sanitary Pipes. `TYPE` is the structure type, `STATUS` the status.
   - `SARNIA_ON`: Sanitary and Storm Sewers. All pipes are taken as circular; non-circular sizes
-    (`"W x H"`) are rejected if written.
+    (`"W x H"`) are rejected if written. `Lifecycle_Status` is the status.
 
   Each TOML file's header gives the dataset's URL and its quirks. The layers are ArcGIS services
   that return at most 1,000–2,000 pipes per query, so download them from the portal (GeoJSON) or
@@ -431,7 +435,9 @@ sync by a test). It uses SI units, `FLOW_UNITS LPS`, because the GIS lengths, in
 in metres. A custom template (`template_path=`) must use `CMS`, `LPS` or `MLD`, and may only
 contain the `{nodes}`, `{outfalls}`, `{storage}`, `{conduits}`, `{pumps}`, `{xsections}`,
 `{curves}`, `{dwf}`, `{patterns}`, `{coordinates}` and `{vertices}` placeholders; anything else
-(including US units) raises `ValueError`. Node `[COORDINATES]` and pipe `[VERTICES]` are written in
+(including US units) raises `ValueError`. Conduit offsets are written as depths above the node
+invert, so a template must keep `LINK_OFFSETS DEPTH` (SWMM's default); `ELEVATION` raises
+`ValueError`. A `flow_units` option passed to `to_inp` must match the template's `FLOW_UNITS`. Node `[COORDINATES]` and pipe `[VERTICES]` are written in
 the units of the GIS geometry.
 
 ## Pumps
@@ -486,7 +492,8 @@ given, else a junction) to it. The force-main pipes leaving the station (`Struct
 London), followed downstream through every node whose only outlet is a force main
 (`Subnetwork.force_main_chain`), start at `<node>_D` and stay conduits with their GIS lengths and a
 `FORCE_MAIN` cross-section; their interior nodes and `<node>_D` get `force_main_surcharge_depth`
-(default 100 m) so that the main can run pressurised under `DYNWAVE`. Where two stations' force
+(default 100 m) so that the main can run pressurised under `DYNWAVE`. Under any other routing
+SWMM treats a `FORCE_MAIN` as an open channel, so writing force mains gives an `OptionWarning`. Where two stations' force
 mains join, the shared main downstream is a force main of both; a chain stops at the next pump
 station, whose own pump starts its force main. Other outlets of the station, such as overflows,
 stay conduits (`include_overflows=False` drops them). A pump-station node with force mains that
@@ -624,7 +631,8 @@ defined, of the right length and positive; otherwise `ValueError` is raised befo
 written. An hourly pattern whose mean is not 1 gives a warning, since it scales the base flows.
 The total base flow and the number of loaded nodes are logged, for comparison with the plant's
 measured dry-weather flow. `dwf_from_population` converts a per-capita flow (`unit` `L/d`,
-`m3/d`, `L/s`, or `m3/s`) to the template's `flow_units` (default `LPS`).
+`m3/d`, `L/s`, or `m3/s`) to the template's `flow_units` (default `LPS`). Its result carries no
+unit, so pass the same `flow_units` to `to_inp`, or use `NodeLoading`, whose options carry it.
 
 ### Population from polygons
 
@@ -647,14 +655,17 @@ sub = net.catchment("OUT")
 dwf = dwf_from_population(alloc.within(sub), per_capita=230, unit="L/d")
 ```
 
+- A midpoint on the edge two polygons share goes to the first of them. The network's CRS must
+  be projected in metres.
 - `max_distance` replaces the midpoint rule with a distance rule: each polygon is served by every
   pipe within that distance of it (in the CRS's units), with each pipe's whole weight. This suits
   small units such as census blocks, whose edges follow the streets the sewers run under: a pipe
   then serves the blocks on both sides. A polygon with no pipe that close contributes no one,
   unless it is flagged in `sewered` (a column of booleans, e.g. residential zoning): a flagged
   polygon left with no pipe, such as a development on private sewers, is given its nearest pipe,
-  up to `max_nearest_distance` away (no limit by default). `dominant_category` gives such a
-  flag from a zoning layer, the category covering the largest area of each polygon:
+  up to `max_nearest_distance` away (no limit by default). The flags must be booleans (or 0 and
+  1); text such as `"N"` raises `ValueError` rather than reading as true. `dominant_category`
+  gives such a flag from a zoning layer, the category covering the largest area of each polygon:
 
   ```python
   from swmmbuilder import dominant_category
@@ -668,7 +679,12 @@ dwf = dwf_from_population(alloc.within(sub), per_capita=230, unit="L/d")
   is False).
 - Force mains take no service connections: they serve no polygon and weigh 0, unless
   `serve_force_mains=True`.
-- `weight` is a pipe column, a function of the pipes, or None for the length.
+- `weight` is None or `"length"` for the length, `"diameter_length"` (diameter times length; for
+  a non-circular pipe, the mean of its height and width), a pipe column, or a function of the
+  pipes returning an array in their order or a Series indexed exactly like them (anything else
+  raises). `allocate_land_use` and `distribute_flow` take the same `weight` and `max_weight`, and
+  `allocate_land_use` the same `impute` and `fallback_weight`. Invalid weights give a
+  `DataWarning` in all three, and so does a key of `rates` that is the land use of no polygon.
 - `impute` is `"per_length"` (default: an invalid weight becomes the pipe's length times the
   median weight per metre of the valid pipes of its own polygon) or `"zero"`. The polygons passed
   serve for both the share and the imputation.
@@ -722,6 +738,10 @@ alloc = allocate_population(net, blocks, max_distance=15)
   [Statistics Canada Open Licence](https://www.statcan.gc.ca/en/reference/licence), which asks
   for a source notice, and CensusMapper asks that cancensus be cited. The cache records the
   source, dataset, regions, and fetch date.
+- A cache is read only for the request it was fetched for: the same level, an area it covers,
+  and, when a source is given, the same parameters (for `CensusMapper`, the dataset, regions, and
+  resolution; for `PolygonFile`, the file name and columns). A mismatch is refused, naming the
+  parameter that differs; `refresh=True` fetches it again.
 - With no `regions=`, `CensusMapper` finds the census subdivisions (municipalities) meeting the
   network with CensusMapper's intersecting-geometries query; `regions={"CSD": ["3539036"]}` names
   them instead.
@@ -774,7 +794,10 @@ loading.summary()                           # {'total': ..., 'nodes': ..., 'sani
   are those of the model; `require_unit_mean` sets another tolerance, or `False` turns the check
   off. `pattern` may also name a pattern of `patterns`.
 - `table(columns={"steady": "infiltration_L_s", ...})` renames the columns, to keep a build's own
-  names. Flows are in the template's `FLOW_UNITS` (`flow_units`, default `LPS`).
+  names. Flows are in the template's `FLOW_UNITS` (`flow_units`, default `LPS`). `options()`
+  includes `flow_units`, so `to_inp` refuses a template with other `FLOW_UNITS`. The
+  `patterned` and `steady` flows must already be in that unit (e.g. `allocate_land_use` with the
+  same `flow_units`).
 
 ## Conduit geometry
 
@@ -849,6 +872,9 @@ est.samples                          # DEM value, difference, estimate and statu
 sub.to_inp("model.inp", rims=est.rims, max_depth="median")
 ```
 
+- Cells the raster masks (its nodata value, a mask band or file, or an alpha band) are left out.
+  Elevations are taken as metres unless the raster declares feet (in a vertical CRS or its band
+  units); `z_factor=0.3048` converts a DEM in feet that does not say so.
 - `window=0` (default) takes the cell at the node; `window=1.0` the median (or `statistic="mean"`)
   of the cells within 1 m, to soften curbs and ditches.
 - Only nodes with no usable rim are estimated, as the DEM value plus `offset` (a number, or

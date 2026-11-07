@@ -21,7 +21,7 @@ import pandas as pd
 
 from .._summary import Summary
 from ..diagnostics import Problems
-from ..units import _is_finite_number
+from ..units import SI_FLOW_UNITS, _is_finite_number
 from .dwf import dwf_from_population
 from .inflows import Inflow, pattern_inflows, pattern_mean_problem, unit_mean_tolerance
 
@@ -107,15 +107,19 @@ class NodeLoading:
 
     flow_units : {'LPS', 'CMS', 'MLD'}
         FLOW_UNITS of the template (default LPS, the shipped template's): the unit of the
-        sanitary flow, and of ``patterned`` and ``steady``.
+        sanitary flow, and of ``patterned`` and ``steady``. :meth:`options` carries it, so that
+        :func:`~swmmbuilder.swmm.write_inp` refuses a template with other FLOW_UNITS. The
+        ``patterned`` and ``steady`` flows must already be in this unit (e.g. a
+        :class:`~swmmbuilder.LandUseAllocation` made with the same ``flow_units``).
 
     Raises
     ------
     ValueError
-        If no part is given, ``population`` comes without ``per_capita``, ``patterned`` without
-        ``days`` or with a kind named after a part (``population``, ``sanitary``, ``steady``, or
-        ``patterned``), or ``pattern`` without ``population``; a pattern is missing or its mean is not
-        1; or a population or flow is negative or not finite.
+        If ``flow_units`` is not an SI flow unit, no part is given, ``population`` comes without
+        ``per_capita``, ``patterned`` without ``days`` or with a kind named after a part
+        (``population``, ``sanitary``, ``steady``, or ``patterned``), or ``pattern`` without
+        ``population``; a pattern is missing or its mean is not 1; or a population or flow is
+        negative or not finite.
 
     Examples
     --------
@@ -147,6 +151,10 @@ class NodeLoading:
         patterns = dict(patterns or {})
         tolerance = unit_mean_tolerance(require_unit_mean)
         problems = Problems("Invalid node loading")
+        flow_units = str(flow_units).upper()
+        if flow_units not in SI_FLOW_UNITS:
+            units = ", ".join(SI_FLOW_UNITS)
+            problems.add(f"flow_units must be one of {units}, not {flow_units!r}")
         if population is not None and per_capita is None:
             problems.add("population needs per_capita")
         if pattern is not None and population is None:
@@ -215,7 +223,9 @@ class NodeLoading:
     def options(self) -> dict[str, Any]:
         """The options of :func:`~swmmbuilder.swmm.build_model` for this load: ``dwf``,
         ``patterns``, ``dwf_patterns``, ``inflows``, and ``timeseries``, each only when there is
-        something to write, so that ``sub.to_inp(path, outfalls, **loading.options())`` works.
+        something to write, and always ``flow_units``, so that
+        ``sub.to_inp(path, outfalls, **loading.options())`` works and refuses a template whose
+        FLOW_UNITS are not those of the load.
 
         Returns
         -------
@@ -233,6 +243,7 @@ class NodeLoading:
             options["inflows"] = dict(self.inflows)
         if self.timeseries:
             options["timeseries"] = {k: list(v) for k, v in self.timeseries.items()}
+        options["flow_units"] = self.flow_units
         return options
 
     def table(self, columns: Mapping[str, str] | None = None) -> pd.DataFrame:

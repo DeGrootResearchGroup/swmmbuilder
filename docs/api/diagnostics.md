@@ -55,6 +55,7 @@ A key renamed to fit these rules before the first release still reads, with a
 | `polygons`, `polygons_served`, `area_ha` | polygons with a rate, those with a pipe, and their area (ha) |
 | `nearest`, `nearest_median_distance`, `nearest_max_distance` | polygons given their nearest pipe, and their distances (m) |
 | `no_pipes`, `zero_weight` | polygons with a flow and no pipe, or with pipes that all weigh 0 (counted as served) |
+| `fallback` | polygons some of whose pipes took the fallback weight |
 | `unallocated_design_flow` | the design flow of both, placed nowhere and not scaled (formerly `unallocated`) |
 | `scale` | the factor applied to every flow to reach a given total |
 

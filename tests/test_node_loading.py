@@ -6,7 +6,7 @@ import importlib.util
 import numpy as np
 import pandas as pd
 import pytest
-from conftest import DENDRITIC, REPO, read_sections, subnetwork, write_inp
+from conftest import DENDRITIC, REPO, TEMPLATE, read_sections, subnetwork, write_inp
 
 from swmmbuilder import Inflow, NodeLoading, dwf_from_population, pattern_inflows
 
@@ -86,6 +86,7 @@ def test_matches_the_assembly_by_hand(parts):
     expected, expected_table = by_hand(*parts)
     loading = loading_of(*parts)
     options = loading.options()
+    assert options.pop("flow_units") == "LPS"
     assert list(options) == list(expected)
     assert options == expected
     assert all(isinstance(i, Inflow) for i in options["inflows"].values())
@@ -150,13 +151,13 @@ def test_a_patterned_kind_may_not_take_the_name_of_a_part(kind):
 
 
 def test_only_the_options_needed():
-    assert set(NodeLoading(steady={"A1": 0.1, "B1": 0.0}).options()) == {"inflows"}
+    assert set(NodeLoading(steady={"A1": 0.1, "B1": 0.0}).options()) == {"inflows", "flow_units"}
     assert NodeLoading(steady={"A1": 0.1}).options()["inflows"] == {"A1": Inflow(baseline=0.1)}
     options = NodeLoading(population={"A1": 100}, per_capita=0.001, unit="m3/s").options()
-    assert options == {"dwf": {"A1": pytest.approx(0.1 * 1000)}}
+    assert options == {"dwf": {"A1": pytest.approx(0.1 * 1000)}, "flow_units": "LPS"}
     patterned = NodeLoading(patterned={"COM": {"A1": 0.2}}, patterns={"COM": FLAT}, days=1)
-    assert set(patterned.options()) == {"inflows", "timeseries"}
-    assert NodeLoading(steady={"A1": 0.0}).options() == {}
+    assert set(patterned.options()) == {"inflows", "timeseries", "flow_units"}
+    assert NodeLoading(steady={"A1": 0.0}).options() == {"flow_units": "LPS"}
 
 
 def test_sanitary_pattern_by_name():
@@ -174,8 +175,52 @@ def test_sanitary_pattern_by_name():
 
 
 def test_flow_units():
-    loading = NodeLoading(population={"A1": 1000}, per_capita=86.4, flow_units="CMS")
+    loading = NodeLoading(population={"A1": 1000}, per_capita=86.4, flow_units="cms")
     assert loading.options()["dwf"]["A1"] == pytest.approx(0.001)
+    assert loading.options()["flow_units"] == "CMS" == loading.flow_units
+
+
+@pytest.mark.parametrize("kwargs", [{"steady": {"A1": 1.0}}, {"population": {"A1": 10}}])
+def test_invalid_flow_units_refused(kwargs):
+    # Refused without a population too, which used to be the only part that checked it (#158).
+    with pytest.raises(ValueError, match="flow_units must be one of CMS, LPS, MLD, not 'CFS'"):
+        NodeLoading(**kwargs, per_capita=200, flow_units="cfs")
+
+
+def units_template(tmp_path, units):
+    path = tmp_path / f"template_{units}.inp"
+    path.write_text(
+        TEMPLATE.read_text().replace("FLOW_UNITS           LPS", f"FLOW_UNITS           {units}")
+    )
+    return path
+
+
+@pytest.mark.parametrize(
+    "loading_units, template_units", [("LPS", "CMS"), ("CMS", "LPS"), ("MLD", "LPS")]
+)
+def test_load_in_other_units_than_the_template_refused(
+    network, tmp_path, loading_units, template_units
+):
+    # An L/s load in a CMS template would be 1000 times too large (#158).
+    sub = subnetwork(network, [("A1", "A2"), ("A2", "J1")])
+    loading = NodeLoading(steady={"A1": 1.0}, flow_units=loading_units)
+    with pytest.raises(ValueError, match=f"not the template's FLOW_UNITS {template_units}"):
+        sub.to_inp(
+            tmp_path / "m.inp",
+            ["J1"],
+            template_path=units_template(tmp_path, template_units),
+            **loading.options(),
+        )
+    assert not (tmp_path / "m.inp").exists()
+
+
+def test_load_in_the_template_units_written(network, tmp_path):
+    sub = subnetwork(network, [("A1", "A2"), ("A2", "J1")])
+    loading = NodeLoading(population={"A1": 1000}, per_capita=86.4, flow_units="CMS")
+    path = tmp_path / "m.inp"
+    sub.to_inp(path, ["J1"], template_path=units_template(tmp_path, "CMS"), **loading.options())
+    (dwf,) = read_sections(path)["DWF"]
+    assert dwf[0] == "A1" and float(dwf[2]) == pytest.approx(0.001)
 
 
 @pytest.mark.parametrize(
