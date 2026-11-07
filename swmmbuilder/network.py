@@ -837,10 +837,12 @@ class Network:
         maintenance-hole layer, then one in another node layer, then the smallest. Pairs whose
         inverts differ by more than ``max_invert_difference`` (pipes that cross rather than join),
         pairs already joined by a pipe, and pairs split from one reused ID (see
-        ``split_tolerance``) are not merged. Since merging is transitive, both
+        ``split_tolerance``) are not merged. A missing invert is unknown, not different: only
+        known inverts are compared, so a pair with a missing invert is merged on distance and the
+        pipe rule alone. Since merging is transitive, both
         rules hold for each merged group as a whole: a pair is not merged if that would put two
-        nodes joined by a pipe, or two inverts more than ``max_invert_difference`` apart, into
-        one group. Merged IDs are kept in ``aliases``, so either ID can be used.
+        nodes joined by a pipe, or two known inverts more than ``max_invert_difference`` apart,
+        into one group. Merged IDs are kept in ``aliases``, so either ID can be used.
 
         Snapping changes the network in place: subnetworks made before a snap that merges
         nodes are out of date and raise when used (rebuild them with :meth:`subnetwork`). Prefer
@@ -858,8 +860,9 @@ class Network:
         -------
         pandas.DataFrame
             One row per pair of nodes within ``tolerance``: ``node_1``, ``node_2``, ``distance``,
-            ``invert_1``, ``invert_2``, ``snapped`` (bool), ``kept`` (the ID they were merged
-            into) and ``reason`` (why a pair was not merged).
+            ``invert_1``, ``invert_2``, ``invert_known`` (both inverts present, so the invert
+            limit was checked for the pair), ``snapped`` (bool), ``kept`` (the ID they were
+            merged into) and ``reason`` (why a pair was not merged).
 
         Raises
         ------
@@ -906,15 +909,16 @@ class Network:
                 reason = "joined by a pipe"
             elif a in split_from and split_from[a] == split_from.get(b):
                 reason = "split from one node ID"
-            elif max_invert_difference is not None and not difference <= max_invert_difference:
+            elif max_invert_difference is not None and difference > max_invert_difference:
                 reason = f"inverts differ by more than {max_invert_difference} m"
             elif root(a) != root(b):
                 union = group(a) | group(b)
-                spread = inverts[sorted(union)]
+                spread = inverts[sorted(union)].dropna()
                 if any(neighbours(n) & union for n in group(a)):
                     reason = "would merge nodes joined by a pipe"
-                elif max_invert_difference is not None and (
-                    spread.isna().any() or not spread.max() - spread.min() <= max_invert_difference
+                elif (
+                    max_invert_difference is not None
+                    and spread.max() - spread.min() > max_invert_difference
                 ):
                     reason = (
                         "would merge nodes whose inverts differ by more than "
@@ -926,7 +930,8 @@ class Network:
                     members[ra] = union
                     members.pop(rb, None)
             distance = present[a].distance(present[b]) * metres
-            pairs.append((a, b, distance, inverts[a], inverts[b], reason is None, reason))
+            known = bool(pd.notna(inverts[a]) and pd.notna(inverts[b]))
+            pairs.append((a, b, distance, inverts[a], inverts[b], known, reason is None, reason))
 
         groups: dict[NodeId, set[NodeId]] = {}
         for node in set(parent) | set(parent.values()):
@@ -942,9 +947,18 @@ class Network:
 
         report = pd.DataFrame(
             pairs,
-            columns=["node_1", "node_2", "distance", "invert_1", "invert_2", "snapped", "reason"],
+            columns=[
+                "node_1",
+                "node_2",
+                "distance",
+                "invert_1",
+                "invert_2",
+                "invert_known",
+                "snapped",
+                "reason",
+            ],
         )
-        report.insert(6, "kept", report["node_1"].map(lambda n: merged.get(n, n)))
+        report.insert(7, "kept", report["node_1"].map(lambda n: merged.get(n, n)))
         report["kept"] = report["kept"].where(report["snapped"])
         if merged:
             self.full_data = self.full_data.assign(
@@ -1142,6 +1156,17 @@ class Network:
         """
         return to_geodataframe(self.full_data, self.nodes, kind, values)
 
+    def pipes(self) -> gpd.GeoDataFrame:
+        """The rows of :attr:`full_data` of the pipes in the network's graph, sorted by pipe_id:
+        those of :meth:`Subnetwork.pipes <swmmbuilder.Subnetwork.pipes>` for the whole network.
+
+        A pipe kept in ``full_data`` with a missing ``from_node`` or ``to_node`` is not in the
+        graph, so it is left out.
+        """
+        data = self.full_data
+        ids = {key for _, _, key in self.graph.edges(keys=True)}
+        return data[data["pipe_id"].isin(ids)].sort_values("pipe_id")
+
     def check_nodes(self, nodes: Iterable[NodeId]) -> None:
         """Raise ValueError listing the ``nodes`` that are not in the network."""
         missing = sorted(n for n in nodes if n not in self.graph)
@@ -1177,6 +1202,7 @@ class Network:
         flag: float | None = None,
         replace_above: float | None = None,
         replace_below: float | None = None,
+        z_factor: float | None = None,
     ) -> RimEstimate:
         """Compare the recorded rims with a ground-elevation model (DEM), and estimate the
         missing ones from it.
@@ -1209,8 +1235,9 @@ class Network:
         ----------
         dem : path, rasterio dataset, or list of them
             A single-band elevation raster (e.g. a GeoTIFF of a lidar bare-earth model) or a list
-            of tiles, in any CRS, with elevations in m in the vertical datum of the network's
-            data (see :func:`swmmbuilder.elevation.sample_dem`). Needs rasterio:
+            of tiles, in any CRS, with elevations in the vertical datum of the network's data,
+            in metres unless the raster declares feet or ``z_factor`` is given (see
+            :func:`swmmbuilder.elevation.sample_dem`). Needs rasterio:
             ``pip install 'swmmbuilder[elevation]'``.
 
         window : float
@@ -1236,6 +1263,10 @@ class Network:
             the ground (``deviation`` above ``replace_above`` or below ``-replace_below``), in
             m. A replaced rim is flagged too. A DEM estimate at or below the invert does not
             replace a rim.
+
+        z_factor : float, optional
+            Metres per elevation unit of the DEM (e.g. 0.3048 for a DEM in feet). Default: from
+            the raster's vertical CRS, or else its band units, or else 1 (metres).
 
         Returns
         -------
@@ -1266,7 +1297,7 @@ class Network:
         table = self.nodes.loc[ids]
         recorded = table["rim_elevation"].astype(float)
         invert = table["invert"].astype(float)
-        dem_values = sample_dem(dem, table.geometry, window, statistic)
+        dem_values = sample_dem(dem, table.geometry, window, statistic, z_factor)
 
         usable = recorded.notna() & ~(recorded <= invert)
         has_dem = dem_values.notna()

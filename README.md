@@ -61,7 +61,8 @@ net = Network(
     split_tolerance=50.0,                      # split IDs reused for structures > 50 m apart
 )
 net.nodes            # GeoDataFrame: node_type, name, invert, rim_elevation, depth, ...
-net.snap_report      # merged pairs: both IDs, distance, both inverts, kept ID or why not merged
+net.pipes()          # the pipes of the graph (sub.pipes() for a subnetwork's)
+net.snap_report      # pairs: both IDs, distance, both inverts, invert_known, kept ID or why not merged
 net.split_report     # split IDs: new ID, its pipes, distance to the other structures, attributes
 sub = net.catchment("WT6011")
 sub.split_report()   # the same, with the node after snapping and whether it is in the catchment
@@ -87,7 +88,8 @@ sub.to_inp("model.inp")  # outfalls default to the outfall nodes of the subnetwo
   `snap_tolerance=` on loading) merges node IDs whose points are within the tolerance, preferring
   the ID in the maintenance-hole layer. Pairs whose inverts differ by more than
   `max_invert_difference` (pipes crossing rather than joining) and pairs already joined by a pipe
-  are not merged. The merged IDs are kept in `net.aliases`, and every method that takes node IDs
+  are not merged. A missing invert counts as unknown, not different, so a pair with one is merged
+  on distance alone (`invert_known` in the report marks these). The merged IDs are kept in `net.aliases`, and every method that takes node IDs
   accepts either one. Geographic coordinates are projected to the local UTM zone for this.
 - **Reused IDs.** One ID is sometimes used for two structures far apart (a newer subdivision
   given the IDs of an older one, or a mistyped ID), which joins the two in the graph and can make
@@ -107,6 +109,10 @@ sub.to_inp("model.inp")  # outfalls default to the outfall nodes of the subnetwo
   with at least one structure in the subnetwork.
 - **ID normalisation.** `normalize_ids` is applied to the node IDs of the pipes, the node layers,
   and those passed to `catchment`, `subnetwork` and `Subnetwork.from_node_list`.
+- **Network and Subnetwork.** `net.nodes` is a GeoDataFrame of node data and `sub.nodes` a list
+  of node IDs; both have `pipes()`; `split_report` is an attribute of the network and a method of
+  the subnetwork; and `estimate_rims` belongs to the network (pass `nodes=sub.nodes` for one
+  catchment). The API reference's Network page compares them.
 - **Validation.** `TopologyReport` also has `dead_end_types`, `force_mains`, and
   `pipe_count_mismatches`: maintenance holes whose recorded `pipes_in`/`pipes_out` differ from
   the network's graph. For pumping stations it lists `stations_without_force_main`,
@@ -235,24 +241,33 @@ net.ends()                       # every node with no outlet, by the size of wha
 ### Summaries
 
 The results of the main steps reduce to the numbers a report cites with `summary()`, a flat
-dict of counts and totals under stable keys, documented in each method's docstring:
+dict of counts and totals under stable keys. Every key is listed on the Diagnostics page of the
+docs, and in each method's docstring:
 
-- `PopulationAllocation.summary(sub=None)`: population and loaded nodes (within a catchment if
-  given), connections, and polygons served, given their nearest pipe, or with no pipe;
-- `LandUseAllocation.summary()`: polygons, area, flow, and nodes per land use, nearest-pipe
-  distances, and the scale;
-- `TopologyReport.summary()`: nodes, pipes, splits, cycles, force mains, and gaps
-  (`data_gaps` counts every kind, including the non-blocking `no_rim`, so it can exceed the
-  pipes; `data_gaps_blocking` and `data_gaps_no_rim` split it);
+- `PopulationAllocation.summary(sub=None)` and `LandUseAllocation.summary(sub=None)`: people or
+  flow placed and the nodes given them (within a catchment if given), per land use, and the
+  polygons served, given their nearest pipe, or left out;
+- `NodeLoading.summary()`: flow and nodes of each part of the load, and of each patterned kind;
+- `TopologyReport.summary()`: nodes, pipes, splits, cycles (counted as loops, sets of nodes that
+  can all reach one another), force mains, boundary pipes, and gaps (`data_gaps` counts every
+  kind, including the non-blocking `no_rim`, so it can exceed the pipes; `data_gaps_blocking`
+  and `data_gaps_no_rim` split it);
 - `SwmmModel.summary()`: gaps found and filled, derived values by rule, the default depth,
-  stations (pump stations only, not pipes written as pumps), and outfall links.
+  stations (pump stations only, not pipes written as pumps), and outfall links;
+- `UpstreamTotals.summary()`, `PumpStationReport.summary()`, and `RimEstimate.summary()`.
+
+The keys follow one pattern: a bare plural noun counts things (`nodes`, `polygons`), `total` is
+the amount placed at the nodes (`allocation_total` over the whole allocation when cut to a
+catchment), and `<part>_<measure>` measures one part, part first (`COMMERCIAL_flow`,
+`COMMERCIAL_nodes`, `nearest_max_distance`). A key renamed to this pattern before the first
+release still reads, with a `DeprecationWarning`.
 
 The values are plain numbers, NaN where there is nothing to measure, so they go straight into
 f-strings. The wording stays with the caller:
 
 ```python
 s = alloc.summary(net.catchment("OUT"))
-print(f"{s['population']:,.0f} people at {s['nodes']} nodes; "
+print(f"{s['total']:,.0f} people at {s['nodes']} nodes; "
       f"{s['nearest']} polygons given their nearest pipe (up to {s['nearest_max_distance']:.0f} m)")
 ```
 
@@ -295,16 +310,19 @@ only those (see `swmmbuilder/schema.py`). These schemas ship with the package, a
   .inp coordinates are in metres. Toronto publishes only a diameter, so only circular pipes get a
   cross-section; the other shapes are reported on loading. Flow types other than `SAN`, `Storm`
   and `Combined` (`CSO`, `SCSO`, `FD`, `EO`) pass through unchanged, so e.g.
-  `flow_types={"sanitary", "combined"}` keeps sanitary and combined sewers.
+  `flow_types={"sanitary", "combined"}` keeps sanitary and combined sewers. Structure types
+  use London's codes (`SL` gravity, `OVF` overflow), so `include_overflows=False` works.
 - Six more Ontario cities' open data, each reprojected to its UTM zone 17N CRS:
-  - `WINDSOR_ON`: the SanitarySewer, StormSewer and CombinedSewer layers.
-  - `KITCHENER_ON`: Sanitary Pipes. `CATEGORY` is the structure type.
+  - `WINDSOR_ON`: the SanitarySewer, StormSewer and CombinedSewer layers. `SERV_STAT` is the
+    status; `TEMP. OUT-NEW CONSTRUCTION` and `PRIVATE` pipes are dropped by the default status
+    filter.
+  - `KITCHENER_ON`: Sanitary Pipes. `CATEGORY` is the structure type, `STATUS` the status.
   - `WATERLOO_ON`: Sanitary Sewer Gravity Mains. All pipes are taken as circular, and an invert
-    of 111.111 means none.
+    of 111.111 means none. `TYPE` is the structure type, `LIFECYCLESTATUS` the status.
   - `PETERBOROUGH_ON`: Sanitary (and Storm) Sewer Pipes. Only circular pipes get a cross-section.
-  - `BARRIE_ON`: Sanitary Pipes. `TYPE` is the structure type.
+  - `BARRIE_ON`: Sanitary Pipes. `TYPE` is the structure type, `STATUS` the status.
   - `SARNIA_ON`: Sanitary and Storm Sewers. All pipes are taken as circular; non-circular sizes
-    (`"W x H"`) are rejected if written.
+    (`"W x H"`) are rejected if written. `Lifecycle_Status` is the status.
 
   Each TOML file's header gives the dataset's URL and its quirks. The layers are ArcGIS services
   that return at most 1,000–2,000 pipes per query, so download them from the portal (GeoJSON) or
@@ -421,7 +439,9 @@ sync by a test). It uses SI units, `FLOW_UNITS LPS`, because the GIS lengths, in
 in metres. A custom template (`template_path=`) must use `CMS`, `LPS` or `MLD`, and may only
 contain the `{nodes}`, `{outfalls}`, `{storage}`, `{conduits}`, `{pumps}`, `{xsections}`,
 `{curves}`, `{dwf}`, `{patterns}`, `{coordinates}` and `{vertices}` placeholders; anything else
-(including US units) raises `ValueError`. Node `[COORDINATES]` and pipe `[VERTICES]` are written in
+(including US units) raises `ValueError`. Conduit offsets are written as depths above the node
+invert, so a template must keep `LINK_OFFSETS DEPTH` (SWMM's default); `ELEVATION` raises
+`ValueError`. A `flow_units` option passed to `to_inp` must match the template's `FLOW_UNITS`. Node `[COORDINATES]` and pipe `[VERTICES]` are written in
 the units of the GIS geometry.
 
 ## Pumps
@@ -476,7 +496,8 @@ given, else a junction) to it. The force-main pipes leaving the station (`Struct
 London), followed downstream through every node whose only outlet is a force main
 (`Subnetwork.force_main_chain`), start at `<node>_D` and stay conduits with their GIS lengths and a
 `FORCE_MAIN` cross-section; their interior nodes and `<node>_D` get `force_main_surcharge_depth`
-(default 100 m) so that the main can run pressurised under `DYNWAVE`. Where two stations' force
+(default 100 m) so that the main can run pressurised under `DYNWAVE`. Under any other routing
+SWMM treats a `FORCE_MAIN` as an open channel, so writing force mains gives an `OptionWarning`. Where two stations' force
 mains join, the shared main downstream is a force main of both; a chain stops at the next pump
 station, whose own pump starts its force main. Other outlets of the station, such as overflows,
 stay conduits (`include_overflows=False` drops them). A pump-station node with force mains that
@@ -619,7 +640,8 @@ scales the base flows (the same tolerance as `pattern_inflows`, which also warns
 `NodeLoading`, which refuses such a pattern unless `require_unit_mean=False`).
 The total base flow and the number of loaded nodes are logged, for comparison with the plant's
 measured dry-weather flow. `dwf_from_population` converts a per-capita flow (`unit` `L/d`,
-`m3/d`, `L/s`, or `m3/s`) to the template's `flow_units` (default `LPS`).
+`m3/d`, `L/s`, or `m3/s`) to the template's `flow_units` (default `LPS`). Its result carries no
+unit, so pass the same `flow_units` to `to_inp`, or use `NodeLoading`, whose options carry it.
 
 ### Population from polygons
 
@@ -642,14 +664,17 @@ sub = net.catchment("OUT")
 dwf = dwf_from_population(alloc.within(sub), per_capita=230, unit="L/d")
 ```
 
+- A midpoint on the edge two polygons share goes to the first of them. The network's CRS must
+  be projected in metres.
 - `max_distance` replaces the midpoint rule with a distance rule: each polygon is served by every
   pipe within that distance of it (in the CRS's units), with each pipe's whole weight. This suits
   small units such as census blocks, whose edges follow the streets the sewers run under: a pipe
   then serves the blocks on both sides. A polygon with no pipe that close contributes no one,
   unless it is flagged in `sewered` (a column of booleans, e.g. residential zoning): a flagged
   polygon left with no pipe, such as a development on private sewers, is given its nearest pipe,
-  up to `max_nearest_distance` away (no limit by default). `dominant_category` gives such a
-  flag from a zoning layer, the category covering the largest area of each polygon:
+  up to `max_nearest_distance` away (no limit by default). The flags must be booleans (or 0 and
+  1); text such as `"N"` raises `ValueError` rather than reading as true. `dominant_category`
+  gives such a flag from a zoning layer, the category covering the largest area of each polygon:
 
   ```python
   from swmmbuilder import dominant_category
@@ -663,7 +688,12 @@ dwf = dwf_from_population(alloc.within(sub), per_capita=230, unit="L/d")
   is False).
 - Force mains take no service connections: they serve no polygon and weigh 0, unless
   `serve_force_mains=True`.
-- `weight` is a pipe column, a function of the pipes, or None for the length.
+- `weight` is None or `"length"` for the length, `"diameter_length"` (diameter times length; for
+  a non-circular pipe, the mean of its height and width), a pipe column, or a function of the
+  pipes returning an array in their order or a Series indexed exactly like them (anything else
+  raises). `allocate_land_use` and `distribute_flow` take the same `weight` and `max_weight`, and
+  `allocate_land_use` the same `impute` and `fallback_weight`. Invalid weights give a
+  `DataWarning` in all three, and so does a key of `rates` that is the land use of no polygon.
 - `impute` is `"per_length"` (default: an invalid weight becomes the pipe's length times the
   median weight per metre of the valid pipes of its own polygon) or `"zero"`. The polygons passed
   serve for both the share and the imputation.
@@ -680,7 +710,11 @@ polygons it comes from; `alloc.nearest` gives the flagged polygons sent to their
 with the distance, and `alloc.fallback` those given the fallback weight. `alloc.pipes` has
 one row per pipe and polygon it serves, `alloc.by_pipe()` sums each pipe's shares, and
 `alloc.polygons` has one row per polygon. `alloc.within(sub)` keeps the shares of the
-subnetwork's own pipes, so people on a pipe leaving it are not counted.
+subnetwork's own pipes, so people on a pipe leaving it are not counted. The land-use result has
+the same `pipes`, `polygons`, `by_pipe()`, `within(sub)`, and `summary(sub)`; `within(sub)`
+returns the type of the result's `nodes` (a dict here, a nodes × land uses DataFrame there).
+`alloc.nodes` lists every node a share is placed at, 0 included, while the land-use and
+`distribute_flow` results leave out nodes given nothing.
 
 ### Census polygons
 
@@ -713,6 +747,10 @@ alloc = allocate_population(net, blocks, max_distance=15)
   [Statistics Canada Open Licence](https://www.statcan.gc.ca/en/reference/licence), which asks
   for a source notice, and CensusMapper asks that cancensus be cited. The cache records the
   source, dataset, regions, and fetch date.
+- A cache is read only for the request it was fetched for: the same level, an area it covers,
+  and, when a source is given, the same parameters (for `CensusMapper`, the dataset, regions, and
+  resolution; for `PolygonFile`, the file name and columns). A mismatch is refused, naming the
+  parameter that differs; `refresh=True` fetches it again.
 - With no `regions=`, `CensusMapper` finds the census subdivisions (municipalities) meeting the
   network with CensusMapper's intersecting-geometries query; `regions={"CSD": ["3539036"]}` names
   them instead.
@@ -753,7 +791,7 @@ loading = NodeLoading(
 )
 sub.to_inp("loaded_catchment.inp", outfalls=["WT1420"], **loading.options())
 loading.table().to_csv("node_loading.csv")  # population, sanitary, steady, COMMERCIAL, ...
-loading.summary()                           # {'sanitary': ..., 'sanitary_nodes': ..., ...}
+loading.summary()                           # {'total': ..., 'nodes': ..., 'sanitary_flow': ..., ...}
 ```
 
 - `options()` holds only what is needed of `dwf`, `patterns`, `dwf_patterns`, `inflows`, and
@@ -765,8 +803,11 @@ loading.summary()                           # {'sanitary': ..., 'sanitary_nodes'
   are those of the model; `require_unit_mean` sets another tolerance, or `False` turns the check
   off. `pattern` may also name a pattern of `patterns`.
 - `table(columns={"steady": "infiltration_L_s", ...})` renames the columns, to keep a build's own
-  names. A patterned kind cannot be named `population`, `sanitary`, or `steady`, the table's other
-  columns. Flows are in the template's `FLOW_UNITS` (`flow_units`, default `LPS`).
+  names. A patterned kind cannot be named after a part (`population`, `sanitary`, `steady`, or
+  `patterned`). Flows are in the template's `FLOW_UNITS` (`flow_units`, default `LPS`). `options()`
+  includes `flow_units`, so `to_inp` refuses a template with other `FLOW_UNITS`. The
+  `patterned` and `steady` flows must already be in that unit (e.g. `allocate_land_use` with the
+  same `flow_units`).
 
 ## Conduit geometry
 
@@ -836,12 +877,16 @@ It needs the `elevation` extra (`pip install "swmmbuilder[elevation]"`: rasterio
 
 ```python
 est = net.estimate_rims(["tile_1.tif", "tile_2.tif"], window=1.0, offset="median")
-print(est.summary())                 # recorded rim - DEM: median, IQR, 5-95 %, largest
+print(est)                           # recorded rim - DEM: median, IQR, 5-95 %, largest
+est.summary()                        # the same as numbers: difference_median, estimated, ...
 est.largest_differences(10)          # recorded rims that are probably wrong, or raised lids
 est.samples                          # DEM value, difference, estimate and status of each node
 sub.to_inp("model.inp", rims=est.rims, max_depth="median")
 ```
 
+- Cells the raster masks (its nodata value, a mask band or file, or an alpha band) are left out.
+  Elevations are taken as metres unless the raster declares feet (in a vertical CRS or its band
+  units); `z_factor=0.3048` converts a DEM in feet that does not say so.
 - `window=0` (default) takes the cell at the node; `window=1.0` the median (or `statistic="mean"`)
   of the cells within 1 m, to soften curbs and ditches.
 - Only nodes with no usable rim are estimated, as the DEM value plus `offset` (a number, or

@@ -10,6 +10,7 @@ from shapely.geometry import box
 from test_population import CRS, PIPES, X0, Y0, make_network
 
 from swmmbuilder import (
+    DataWarning,
     LandUseAllocation,
     allocate_land_use,
     hourly_series,
@@ -125,11 +126,14 @@ def test_units_and_placement(net):
 
 
 def test_weight_column(net):
-    # PDC_Count: pipe 1 has 2 and pipe 2 has 6; Q's pipe 3 is missing (0) and pipe 4 has 2.
-    flows = allocate_land_use(net, zoning(), land_use="use", rates=RATES, weight="PDC_Count")
+    # PDC_Count: pipe 1 has 2 and pipe 2 has 6; Q's pipe 3 is missing and pipe 4 has 2, so pipe 3
+    # is imputed from Q's 2 per 40 m as 3 (it used to count as 0).
+    with pytest.warns(DataWarning, match="1 pipes have no valid weight"):
+        flows = allocate_land_use(net, zoning(), land_use="use", rates=RATES, weight="PDC_Count")
     assert flows.nodes.loc["N1", "COMMERCIAL"] == pytest.approx(0.025)
-    assert flows.nodes.loc["N4", "INDUSTRIAL"] == pytest.approx(0.2)
-    assert "N3" not in flows.nodes.index
+    assert flows.nodes.loc["N3", "INDUSTRIAL"] == pytest.approx(0.12)
+    assert flows.nodes.loc["N4", "INDUSTRIAL"] == pytest.approx(0.08)
+    assert flows.pipes["weight_imputed"].tolist() == [False, False, True, False, False]
 
 
 def test_force_mains_take_nothing():
@@ -316,3 +320,46 @@ def test_land_use_option_errors_listed_together(net, values):
         assert "land_use: missing polygon IDs: ['Q', 'R']" in message
     else:
         assert "land_use must be a column name or pandas.Series" in message
+
+
+# ---- one weight type and stricter inputs (#157) ------------------------------------------------
+
+
+def test_zero_weight_polygon_falls_back_like_population(net):
+    # P's pipes have no connections: their flow is shared equally, not lost.
+    weight = lambda p: np.where(p["pipe_id"] <= 2, 0.0, 1.0)  # noqa: E731
+    flows = allocate_land_use(net, zoning(), land_use="use", rates=RATES, weight=weight)
+    assert flows.nodes.loc["N1", "COMMERCIAL"] == pytest.approx(0.05)
+    assert flows.nodes.loc["N2", "COMMERCIAL"] == pytest.approx(0.05)
+    assert flows.pipes["weight_fallback"].tolist()[:2] == [True, True]
+    assert flows.no_pipes == ["R"]
+    assert flows.summary()["fallback"] == 1 and flows.summary()["zero_weight"] == 0
+    lost = allocate_land_use(
+        net, zoning(), land_use="use", rates=RATES, weight=weight, fallback_weight=None
+    )
+    assert lost.no_pipes == ["P", "R"]
+    assert lost.summary()["fallback"] == 0 and lost.summary()["zero_weight"] == 1
+
+
+def test_max_weight_and_impute(net):
+    # Pipe 2's 6 connections are above max_weight: imputed from pipe 1's 2 per 50 m as 1.2, or 0.
+    options = dict(land_use="use", rates=RATES, weight="PDC_Count", max_weight=5)
+    with pytest.warns(DataWarning, match="2 pipes have no valid weight"):
+        imputed = allocate_land_use(net, zoning(), **options)
+    assert imputed.pipes.loc[2, "weight"] == pytest.approx(1.2)
+    with pytest.warns(DataWarning, match="counted as 0"):
+        zero = allocate_land_use(net, zoning(), impute="zero", **options)
+    assert zero.nodes.loc["N1", "COMMERCIAL"] == pytest.approx(0.1)
+    with pytest.raises(ValueError, match="impute must be"):
+        allocate_land_use(net, zoning(), land_use="use", rates=RATES, impute="mean")
+
+
+def test_rates_matching_no_land_use_warn(net):
+    rates = {"commercial": 8640.0, "INDUSTRIAL": 17280.0, 3: 1.0}
+    with pytest.warns(DataWarning) as record:
+        allocate_land_use(net, zoning(), land_use="use", rates=rates)
+    messages = [str(w.message) for w in record if "land use of no polygon" in str(w.message)]
+    assert len(messages) == 2
+    assert messages[0].startswith("rates: 'commercial' is the land use of no polygon")
+    assert "'COMMERCIAL', 'INDUSTRIAL'" in messages[0]
+    assert messages[1].startswith("rates: 3 is")

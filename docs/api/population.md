@@ -5,3 +5,4 @@
       members:
         - allocate_population
         - PopulationAllocation
+        - Weight

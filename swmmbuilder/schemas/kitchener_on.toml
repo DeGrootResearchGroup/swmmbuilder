@@ -6,7 +6,8 @@
 # height, so they get no cross-section. CATEGORY is the structure type (force mains are kept, and
 # reported by validate). The service stores the
 # geometry in Web Mercator, which is why LENGTH (not Shape__Length) is the length; the geometry is
-# reprojected to UTM zone 17N (EPSG:26917, metres).
+# reprojected to UTM zone 17N (EPSG:26917, metres). STATUS is ACTIVE for every pipe (checked
+# November 2026). There is no flow-type column; the dataset holds sanitary pipes only.
 name = "Kitchener, ON"
 null_nodes = [-1]
 nonpositive_inverts_missing = true
@@ -24,11 +25,15 @@ shape = "PIPE_SHAPE"
 diameter = "WIDTH"
 height = "HEIGHT"
 width = "WIDTH"
+status = "STATUS"
 structure_type = "CATEGORY"
 material = "MATERIAL"
 
 [shapes]
 ROUND = "CIRCULAR"
+
+[statuses]
+ACTIVE = "built"
 
 [structure_types]
 GRAVITY = "gravity"

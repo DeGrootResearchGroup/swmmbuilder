@@ -9,7 +9,8 @@ commercial allowance in L/ha/d. Given zoning polygons with a land use each:
 2. each polygon whose land use has a rate gets its area (optionally only the part within a given
    area, such as the network's footprint) times that rate;
 3. the polygon's flow is shared among its pipes in proportion to a weight (by default the pipe
-   length) and placed at their upstream nodes (or as asked);
+   length), with invalid weights imputed and a fallback weight as in
+   :func:`~swmmbuilder.allocate_population`, and placed at their upstream nodes (or as asked);
 4. optionally, every flow is scaled so that their sum is a given total, which makes the rates
    relative weights of the land uses.
 
@@ -25,28 +26,35 @@ from __future__ import annotations
 
 import logging
 import math
+import warnings
 from collections.abc import Mapping
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Literal
 
 import geopandas as gpd
 import numpy as np
 import pandas as pd
 from pyproj import CRS
 
-from .diagnostics import Problems
+from ._summary import Summary
+from .diagnostics import DataWarning, Problems
 from .population import (
+    IMPUTATIONS,
     PLACEMENTS,
     Placement,
     Weight,
     _assign,
+    _check_metres,
     _check_polygon_values,
+    _check_weight,
     _log_left_out,
     _missing_node,
     _nearest,
     _pipes_of,
+    _pipes_within,
     _polygon_values,
     _quiet,
+    _share_weights,
     _weights,
 )
 from .units import _FLOW_UNIT_LPS, _TIME_SECONDS, _VOLUME_LITRES, SI_FLOW_UNITS, _is_real
@@ -73,7 +81,8 @@ class LandUseAllocation:
     pipes : pandas.DataFrame
         One row per pipe and polygon it serves (one row per pipe with the midpoint rule), indexed
         by pipe_id, with ``from_node``, ``to_node``, ``length``, ``polygon`` (missing for a pipe
-        that serves none), ``land_use``, ``weight``, and ``flow``.
+        that serves none), ``land_use``, ``weight_imputed`` (bool), ``weight_fallback`` (bool),
+        ``weight`` (after imputation), and ``flow``.
 
     polygons : pandas.DataFrame
         One row per polygon whose land use has a rate, indexed by polygon ID, with ``land_use``,
@@ -117,15 +126,34 @@ class LandUseAllocation:
         """Flow placed at the nodes, all land uses."""
         return float(self.nodes.to_numpy().sum())
 
+    def by_pipe(self) -> pd.Series:
+        """Flow of each pipe, summed over the polygons it serves, indexed by pipe_id, in
+        :attr:`flow_units` (see :meth:`PopulationAllocation.by_pipe
+        <swmmbuilder.PopulationAllocation.by_pipe>`)."""
+        return self.pipes.groupby(level=0, sort=False)["flow"].sum()
+
     def within(self, sub: Subnetwork) -> pd.DataFrame:
-        """Flow at the nodes of ``sub`` by land use, from the shares of the subnetwork's own pipes
-        (see :meth:`PopulationAllocation.within <swmmbuilder.PopulationAllocation.within>`)."""
-        keys = {key for _, _, key in sub.graph.edges(keys=True)}
-        table = self.pipes[self.pipes.index.isin(keys)]
+        """Flow at the nodes of ``sub`` by land use, from the shares of the subnetwork's own pipes:
+        :attr:`nodes` cut to the subnetwork, of the same type (see
+        :meth:`PopulationAllocation.within <swmmbuilder.PopulationAllocation.within>`)."""
+        table = _pipes_within(self.pipes, sub)
         return _place_by_use(table, self.placement, list(self.nodes.columns))
 
-    def summary(self) -> dict[str, float | int]:
+    def summary(self, sub: Subnetwork | None = None) -> dict[str, float | int]:
         """Counts and totals of the allocation, to cite in a report.
+
+        The keys follow the rules of every ``summary()`` (see the Diagnostics page of the
+        documentation), and match those of :meth:`PopulationAllocation.summary
+        <swmmbuilder.PopulationAllocation.summary>` where they measure the same thing.
+
+        Parameters
+        ----------
+        sub : Subnetwork, optional
+            A subnetwork (e.g. a catchment) of the network the flows were allocated over. The
+            keys marked "within ``sub``" count only its pipes and the nodes they place flow at
+            (see :meth:`within`); without it, they count every pipe and node. Scaling to a
+            ``total`` is over the whole allocation, so ``total`` within ``sub`` is the
+            subnetwork's share of it.
 
         Returns
         -------
@@ -136,51 +164,74 @@ class LandUseAllocation:
 
             - ``<use>_polygons``: its polygons served by at least one pipe.
             - ``<use>_area_ha``: their area counted, in ha.
-            - ``<use>_flow``: its flow placed at the nodes, in :attr:`flow_units`.
-            - ``<use>_nodes``: nodes given a flow above 0 from it.
+            - ``<use>_flow``: its flow placed at the nodes, in :attr:`flow_units`, within
+              ``sub``.
+            - ``<use>_nodes``: nodes given a flow above 0 from it, within ``sub``.
 
             And over all land uses:
 
+            - ``total``: flow placed at the nodes, within ``sub``.
+            - ``nodes``: nodes given a flow above 0, within ``sub``.
+            - ``weight``: total weight of the pipes, within ``sub`` (each pipe counted once).
+            - ``allocation_total``: flow placed at the nodes over the whole allocation
+              (:attr:`total`).
             - ``polygons``: polygons with a rate.
-            - ``polygons_served``: those served by at least one pipe.
+            - ``polygons_served``: those with at least one pipe.
             - ``area_ha``: area counted of the polygons served, in ha.
             - ``nearest``: polygons given their nearest pipe (:attr:`nearest`).
             - ``nearest_median_distance``, ``nearest_max_distance``: the median and the
-              farthest of their distances to it (NaN if none).
-            - ``no_pipes``: polygons with a flow and no pipe (:attr:`no_pipes`).
-            - ``unallocated``: their design flow, placed nowhere (:attr:`unallocated`).
+              farthest of their distances to it, in m (NaN if none).
+            - ``no_pipes``: polygons with a flow and no pipe.
+            - ``zero_weight``: polygons with a flow whose pipes all weigh 0 (counted in
+              ``polygons_served``). These and ``no_pipes`` make up :attr:`no_pipes`.
+            - ``fallback``: polygons some of whose pipes took the fallback weight.
+            - ``unallocated_design_flow``: the design flow of both, placed nowhere and not
+              scaled (:attr:`unallocated`), in :attr:`flow_units`.
             - ``scale``: the factor applied to every flow (:attr:`scale`).
-            - ``total``: flow placed at the nodes (:attr:`total`).
+
+            ``unallocated``, the former name of ``unallocated_design_flow``, still reads, with
+            a ``DeprecationWarning``.
 
         Examples
         --------
         ::
 
-            s = land.summary()
+            s = land.summary(net.catchment("OUT"))
             print(f"commercial: {s['COMMERCIAL_flow']:.1f} L/s at {s['COMMERCIAL_nodes']} nodes")
         """
+        pipes = self.pipes
+        nodes = self.nodes
+        if sub is not None:
+            pipes = _pipes_within(pipes, sub)
+            nodes = _place_by_use(pipes, self.placement, list(self.nodes.columns))
         served = self.polygons[self.polygons["pipes"] > 0]
+        lost = self.polygons.index.isin(list(self.no_pipes))
         result: dict[str, float | int] = {}
         for use in self.nodes.columns:
             mine = served["land_use"] == use
             result[f"{use}_polygons"] = int(mine.sum())
             result[f"{use}_area_ha"] = float(served.loc[mine, "area_ha"].sum())
-            result[f"{use}_flow"] = float(self.nodes[use].sum())
-            result[f"{use}_nodes"] = int((self.nodes[use] > 0).sum())
+            result[f"{use}_flow"] = float(nodes[use].sum())
+            result[f"{use}_nodes"] = int((nodes[use] > 0).sum())
         nearest = self.nearest
         result.update(
+            total=float(nodes.to_numpy().sum()),
+            nodes=int((nodes.sum(axis=1) > 0).sum()),
+            weight=float(pipes.groupby(level=0)["weight"].mean().sum()),
+            allocation_total=self.total,
             polygons=len(self.polygons),
             polygons_served=len(served),
             area_ha=float(served["area_ha"].sum()),
             nearest=len(nearest),
             nearest_median_distance=float(nearest.median()) if len(nearest) else math.nan,
             nearest_max_distance=float(nearest.max()) if len(nearest) else math.nan,
-            no_pipes=len(self.no_pipes),
-            unallocated=float(self.unallocated),
+            no_pipes=int((lost & (self.polygons["pipes"] == 0)).sum()),
+            zero_weight=int((lost & (self.polygons["pipes"] > 0)).sum()),
+            fallback=int(self.pipes.loc[self.pipes["weight_fallback"], "polygon"].nunique()),
+            unallocated_design_flow=float(self.unallocated),
             scale=float(self.scale),
-            total=self.total,
         )
-        return result
+        return Summary(result, {"unallocated": "unallocated_design_flow"})
 
 
 def _place_by_use(table, placement, uses):
@@ -228,6 +279,8 @@ def _check(
     placement,
     weight,
     max_nearest_distance=None,
+    max_weight=None,
+    impute="per_length",
 ):
     problems = Problems("Invalid land-use allocation")
     if max_nearest_distance is not None and not max_nearest_distance >= 0:
@@ -247,18 +300,16 @@ def _check(
         problems.add(f"max_distance must be a distance >= 0 or None, not {max_distance!r}")
     if placement not in PLACEMENTS:
         problems.add(f"placement must be one of {', '.join(PLACEMENTS)}, not {placement!r}")
-    if isinstance(weight, str) and weight not in pipes.columns:
-        problems.add(f"weight: the pipes have no column {weight!r}")
+    _check_weight(pipes, weight, max_weight, problems)
+    if impute not in IMPUTATIONS:
+        problems.add(f"impute must be one of {', '.join(IMPUTATIONS)}, not {impute!r}")
     repeated = polygons.index[polygons.index.duplicated()].unique()
     if len(repeated):
         problems.add(f"polygon IDs (the index of polygons) repeated: {list(repeated)[:20]}")
     for name, layer in (("the network", pipes), ("polygons", polygons)):
         if layer.crs is None:
             problems.add(f"{name} has no CRS")
-    if pipes.crs is not None:
-        crs = CRS.from_user_input(pipes.crs)
-        if not (crs.is_projected and math.isclose(crs.axis_info[0].unit_conversion_factor, 1.0)):
-            problems.add(f"the network's CRS must be projected in metres, not {crs.name}")
+    _check_metres(pipes, problems)
     if area_within is not None and not hasattr(area_within, "area"):
         problems.add("area_within must be a shapely geometry in the network's CRS, or None")
     problems.raise_if_any()
@@ -277,6 +328,9 @@ def allocate_land_use(
     max_nearest_distance: float | None = None,
     serve_force_mains: bool = False,
     weight: Weight = None,
+    max_weight: float | None = None,
+    impute: Literal["per_length", "zero"] = "per_length",
+    fallback_weight: float | None = 1.0,
     placement: Placement = "upstream",
     flow_units: str = "LPS",
 ) -> LandUseAllocation:
@@ -306,7 +360,9 @@ def allocate_land_use(
     rates : dict
         {land use: flow per hectare, in ``unit``}, e.g. ``{'COMMERCIAL': 23000,
         'INDUSTRIAL': 20000}`` in L/ha/d. Polygons of any other land use take no flow, but their
-        pipes are still assigned to them, so a pipe in a residential polygon takes nothing.
+        pipes are still assigned to them, so a pipe in a residential polygon takes nothing. A key
+        found in no polygon's land use (a difference of case, or a code given as text) gives a
+        ``DataWarning``.
 
     unit : {'L/ha/d', 'm3/ha/d', 'L/ha/s', 'm3/ha/s'}
         Unit of the rates (default L/ha/d).
@@ -340,16 +396,35 @@ def allocate_land_use(
         Let force mains take flow (default False).
 
     weight : str, callable or None
-        Weight of each pipe in its polygon's share: a column of the pipes, a function of the pipes
-        returning one value per pipe, or None (default) for the pipe length. Missing, non-numeric,
-        or negative weights count as 0.
+        Weight of each pipe in its polygon's share, as in
+        :func:`~swmmbuilder.allocate_population`: None (default) or ``'length'``,
+        ``'diameter_length'``, a column of the pipes, or a function of the pipes (see
+        :data:`~swmmbuilder.population.Weight`).
+
+    max_weight : float, optional
+        Weights above this are invalid. Missing, non-numeric, and negative weights always are,
+        and are imputed (with a ``DataWarning``).
+
+    impute : {'per_length', 'zero'}
+        What an invalid weight becomes, as in :func:`~swmmbuilder.allocate_population`: the
+        pipe's length times the median weight per metre of the valid pipes of its polygon
+        (default), or 0.
+
+    fallback_weight : float or None
+        As in :func:`~swmmbuilder.allocate_population` (default 1): the weight of an invalid
+        weight with no median to impute from, and of every pipe of a polygon whose pipes would
+        weigh 0 in all, so that its flow is shared equally. None leaves such a polygon's flow
+        placed nowhere, and reports it in ``no_pipes``.
 
     placement : {'upstream', 'downstream', 'split'}
         Where a pipe's share is placed: its upstream node (default), its downstream node, or half
         at each.
 
     flow_units : {'LPS', 'CMS', 'MLD'}
-        Unit of the flows returned, and of ``total`` (default LPS, the shipped template's).
+        Unit of the flows returned, and of ``total`` (default LPS, the shipped template's). It
+        must be the FLOW_UNITS of the template the model is written with, and the ``flow_units``
+        of the :class:`~swmmbuilder.NodeLoading` the flows go to; nothing checks the flows
+        themselves.
 
     Returns
     -------
@@ -368,7 +443,8 @@ def allocate_land_use(
     -----
     DataWarning
         With the midpoint rule, if a pipe midpoint is in more than one polygon (it takes the
-        first).
+        first). If some pipes have no valid weight (they are imputed). For each key of
+        ``rates`` found in no polygon's land use.
 
     Examples
     --------
@@ -396,6 +472,9 @@ def allocate_land_use(
         max_nearest_distance=max_nearest_distance,
         serve_force_mains=serve_force_mains,
         weight=weight,
+        max_weight=max_weight,
+        impute=impute,
+        fallback_weight=fallback_weight,
         placement=placement,
         flow_units=flow_units,
     )
@@ -427,6 +506,9 @@ def _allocate_land_use(
     max_nearest_distance,
     serve_force_mains,
     weight,
+    max_weight,
+    impute,
+    fallback_weight,
     placement,
     flow_units,
 ) -> LandUseAllocation:
@@ -442,6 +524,8 @@ def _allocate_land_use(
         placement,
         weight,
         max_nearest_distance,
+        max_weight,
+        impute,
     )
     per_second = _per_second(unit)
     flow_units = str(flow_units).upper()
@@ -451,6 +535,15 @@ def _allocate_land_use(
         )
     to_units = per_second / _FLOW_UNIT_LPS[flow_units]
     uses = _polygon_values(polygons, land_use)
+    found_uses = set(uses.dropna())
+    for key in rates:
+        if key not in found_uses:
+            warnings.warn(
+                f"rates: {key!r} is the land use of no polygon, so it gives no flow (land uses "
+                f"found: {', '.join(sorted(map(repr, found_uses))[:20])})",
+                DataWarning,
+                stacklevel=3,
+            )
     polygons = polygons.to_crs(pipes.crs)
 
     if serve_force_mains or "structure_type" not in pipes.columns:
@@ -504,11 +597,7 @@ def _allocate_land_use(
     table["land_use"] = table["polygon"].map(uses)
 
     given = pd.Series(_weights(pipes, weight).to_numpy()[position])
-    invalid = given.isna() | (given < 0)
-    if invalid.any():
-        logger.info("%d pipe weights missing or negative; counted as 0", int(invalid.sum()))
-    table["weight"] = given.where(~invalid, 0.0)
-    table.loc[~serving[position], "weight"] = 0.0
+    _share_weights(table, given, serving[position], weight, max_weight, impute, fallback_weight)
 
     in_rated = table["polygon"].isin(summary.index)
     weights = table[in_rated].groupby("polygon")["weight"].sum()

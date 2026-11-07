@@ -154,7 +154,7 @@ def test_snap_report(snapped):
     dup = report.loc[("DUP1", "DUP2")]
     assert dup["distance"] == pytest.approx(0.2, abs=1e-6)
     assert (dup["invert_1"], dup["invert_2"]) == (246.0, 245.95)
-    assert dup["snapped"] and dup["kept"] == "DUP1"
+    assert dup["snapped"] and dup["kept"] == "DUP1" and dup["invert_known"]
     crossing = report.loc[("X2", "Y1")]
     assert crossing["distance"] == pytest.approx(0.3, abs=1e-6)
     assert not crossing["snapped"] and "inverts differ" in crossing["reason"]
@@ -253,6 +253,26 @@ def test_snapping_limits_the_invert_spread_of_a_group():
     net = _chain({"A": 10.0, "B": 10.3, "C": 10.6}, pipe_a_to_c=False)
     assert net.snap_nodes(0.5)["snapped"].all()
     assert net.aliases == {"B": "A", "C": "A"}
+
+
+def test_a_missing_invert_does_not_block_a_merge():
+    # B has no invert: it is unknown, not different, so A~B and B~C merge on distance (#172).
+    net = _chain({"A": 10.0, "B": float("nan"), "C": 10.2}, pipe_a_to_c=False)
+    net.nodes.loc["B", "invert"] = float("nan")
+    report = net.snap_nodes(0.5, max_invert_difference=1.0)
+    assert report["snapped"].all() and report["reason"].isna().all()
+    assert report["invert_known"].tolist() == [False, False]
+    assert net.aliases == {"B": "A", "C": "A"}
+
+
+def test_known_inverts_still_limit_a_group_with_a_missing_one():
+    # B's invert is unknown, but A and C differ by 2 m: B joins A, and C stays apart.
+    net = _chain({"A": 10.0, "B": float("nan"), "C": 12.0}, pipe_a_to_c=False)
+    net.nodes.loc["B", "invert"] = float("nan")
+    report = net.snap_nodes(0.5, max_invert_difference=1.0)
+    assert report["snapped"].tolist() == [True, False]
+    assert "would merge nodes whose inverts differ" in report.loc[1, "reason"]
+    assert net.aliases == {"B": "A"}
 
 
 def test_snapping_in_geographic_crs():

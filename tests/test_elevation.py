@@ -155,11 +155,127 @@ def test_points_outside_the_dem_or_on_nodata_get_nan(network, tmp_path):
     [
         ({"window": -1.0}, "window must be 0 or more"),
         ({"statistic": "max"}, "statistic must be one of"),
+        ({"z_factor": 0}, "z_factor must be a positive number"),
+        ({"z_factor": float("nan")}, "z_factor must be a positive number"),
     ],
 )
 def test_invalid_sampling_options(network, dem, kwargs, message):
     with pytest.raises(ValueError, match=message):
         sample_dem(dem, network.nodes.geometry, **kwargs)
+
+
+def hole_around(xs, ys, point, half=3):
+    """True for the cells within ``half`` m of ``point`` in each direction."""
+    return (np.abs(xs - point.x) <= half) & (np.abs(ys - point.y) <= half)
+
+
+def test_a_masked_dem_with_no_nodata_value_is_read_as_masked(network, tmp_path):
+    # A mask (as GDAL writes for a raster with holes) and no nodata value: the fill under the
+    # mask must not be read as an elevation.
+    rasterio = pytest.importorskip("rasterio")
+    xs, ys = grid()
+    values = ground(xs, ys)
+    hole = hole_around(xs, ys, network.nodes.geometry["A1"])
+    values[hole] = 0.0  # the fill
+    path = write_dem(tmp_path / "masked.tif", values)
+    with rasterio.open(path, "r+") as dst:
+        dst.write_mask(np.where(hole, 0, 255).astype("uint8"))
+    sampled = sample_dem(path, network.nodes.geometry[["A1", "A2"]], window=5)
+    assert np.isfinite(sampled["A1"])  # from the unmasked cells of the window only
+    assert sampled["A1"] == pytest.approx(ground_at(network, "A1"), abs=0.02)
+    assert np.isnan(sample_dem(path, network.nodes.geometry[["A1"]])["A1"])
+    assert sampled["A2"] == pytest.approx(ground_at(network, "A2"), abs=2e-3)
+
+
+def test_an_alpha_band_masks_the_dem(network, tmp_path):
+    # GDAL reads an alpha band as a mask for integer rasters, e.g. a DEM in whole metres.
+    rasterio = pytest.importorskip("rasterio")
+    from rasterio.transform import from_origin
+
+    xs, ys = grid()
+    values = np.round(ground(xs, ys))
+    hole = hole_around(xs, ys, network.nodes.geometry["A1"])
+    values[hole] = 0
+    path = tmp_path / "alpha.tif"
+    with rasterio.open(
+        path,
+        "w",
+        driver="GTiff",
+        width=WIDTH,
+        height=HEIGHT,
+        count=2,
+        dtype="uint16",
+        crs=CRS,
+        transform=from_origin(X0, Y0 + HEIGHT, 1.0, 1.0),
+        photometric="MINISBLACK",
+        alpha="YES",
+    ) as dst:
+        dst.write(values.astype("uint16"), 1)
+        dst.write(np.where(hole, 0, 65535).astype("uint16"), 2)
+    sampled = sample_dem(path, network.nodes.geometry[["A1", "A2"]])
+    assert np.isnan(sampled["A1"])
+    assert sampled["A2"] == pytest.approx(ground_at(network, "A2"), abs=0.51)
+
+
+FOOT = 0.3048
+US_FOOT = 1200 / 3937
+
+
+def feet_dem(path, units=None, crs=CRS):
+    """The synthetic ground in feet, with band units ``units``."""
+    rasterio = pytest.importorskip("rasterio")
+    write_dem(path, ground(*grid()) / FOOT, crs=crs)
+    if units is not None:
+        with rasterio.open(path, "r+") as dst:
+            dst.units = (units,)
+    return path
+
+
+def test_z_factor_converts_a_dem_in_feet(network, tmp_path):
+    points = network.nodes.geometry
+    expected = ground(points.x, points.y)
+    path = feet_dem(tmp_path / "feet.tif")
+    assert not np.allclose(sample_dem(path, points), expected, atol=0.01)  # read as metres
+    assert np.allclose(sample_dem(path, points, z_factor=FOOT), expected, atol=0.0016)
+
+
+def test_band_units_in_feet_are_converted(network, tmp_path, caplog):
+    points = network.nodes.geometry
+    path = feet_dem(tmp_path / "feet.tif", units="ft")
+    caplog.set_level("INFO", logger="swmmbuilder.elevation")
+    sampled = sample_dem(path, points)
+    assert np.allclose(sampled, ground(points.x, points.y), atol=0.0016)
+    assert "converted to metres" in caplog.text
+    # A z_factor given wins over the units.
+    assert np.allclose(sample_dem(path, points, z_factor=1.0) * FOOT, sampled)
+
+
+def test_a_vertical_crs_in_feet_is_converted(network, tmp_path):
+    rasterio = pytest.importorskip("rasterio")
+    # NAD83(CSRS) / UTM 17N with NAVD88 heights in US survey feet.
+    try:
+        crs = rasterio.crs.CRS.from_user_input("EPSG:2958+6360")
+    except Exception:
+        pytest.skip("this GDAL cannot build a compound CRS")
+    values = ground(*grid()) / US_FOOT
+    path = write_dem(tmp_path / "vertical.tif", values, crs=crs)
+    with rasterio.open(path) as src:
+        if src.crs is None or "foot" not in src.crs.to_wkt().lower():
+            pytest.skip("the GeoTIFF did not keep the vertical CRS")
+    points = network.nodes.geometry
+    assert np.allclose(sample_dem(path, points), ground(points.x, points.y), atol=0.0016)
+
+
+def test_unknown_elevation_units_warn(network, tmp_path):
+    path = feet_dem(tmp_path / "odd.tif", units="cubits")
+    with pytest.warns(DataWarning, match="'cubits'.*taken as metres"):
+        sample_dem(path, network.nodes.geometry)
+
+
+def test_estimate_rims_takes_z_factor(network, recorded, tmp_path):
+    path = feet_dem(tmp_path / "feet.tif")
+    estimate = network.estimate_rims(path, z_factor=FOOT)
+    assert estimate.validation["median"] == pytest.approx(LID, abs=0.002)
 
 
 def test_a_dem_with_no_crs_is_refused(network, tmp_path):
@@ -187,7 +303,12 @@ def test_the_validation_report(network, recorded, dem):
     assert v["max_abs"] == pytest.approx(LID + 1.5, abs=2e-3)
     assert list(estimate.largest_differences(1).index) == ["J1"]
     assert set(estimate.compared.index) == set(recorded)
-    assert "median +0.10" in estimate.summary()
+    assert "median +0.10" in estimate.report() == str(estimate)
+    s = estimate.summary()
+    assert (s["nodes"], s["compared"]) == (len(estimate.samples), 4)
+    assert s["difference_median"] == pytest.approx(LID, abs=2e-3)
+    assert s["difference_max_abs"] == pytest.approx(LID + 1.5, abs=2e-3)
+    assert all(type(v) in (int, float) for v in s.values()) and "difference_count" not in s
 
 
 def test_estimating_changes_nothing(network, recorded, dem):
@@ -370,8 +491,10 @@ def test_implausible_rims_are_flagged_from_the_median(network, recorded, odd, de
     assert set(estimate.rims) == set(estimate.estimated.index)  # nothing replaced
     assert set(estimate.rims.implausible) == {"J1", "A2"}
     assert "implausible (more than 1 m from the median difference): 2, of which 0 replaced" in (
-        estimate.summary()
+        estimate.report()
     )
+    s = estimate.summary()
+    assert (s["implausible"], s["replaced"], s["compared"]) == (2, 0, 4)
 
 
 def test_separate_thresholds_above_and_below_the_ground(network, recorded, odd, dem):

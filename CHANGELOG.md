@@ -11,6 +11,43 @@ earlier history is in the git log.
 
 ### Fixed
 
+- **A missing invert no longer blocks a node merge** (#172): `snap_nodes` with
+  `max_invert_difference` compares only known inverts, for each pair and for each merged group.
+  A missing invert made the comparison fail, so two IDs at one point were never merged when one
+  had no invert, and the report gave the reason as an invert difference. Those pairs are now
+  merged on distance and the pipe rule, which changes the network for data with missing inverts.
+  The report gains `invert_known` (both inverts present).
+- **Flow units and link offsets checked against the template** (#158): `NodeLoading.options()` now
+  includes `flow_units`, so `to_inp` refuses a template whose `FLOW_UNITS` differ from the load's
+  (an L/s load in a CMS template was written 1000 times too large). `NodeLoading` refuses an invalid
+  `flow_units` even without a population (upper or lower case is accepted). `check_template` refuses
+  a `LINK_OFFSETS` other than `DEPTH`, since offsets are written as depths. Force mains written
+  under routing other than `DYNWAVE` give an `OptionWarning`, since SWMM then treats them as open
+  channels.
+- **Topology checks on looped areas** (#159): `Subnetwork.validate()` finds cycles as strongly
+  connected components rather than listing every simple cycle, whose number grows exponentially
+  with the size of a looped area (a 7 × 7 grid of pipes drawn both ways did not finish). It now
+  takes linear time.
+- **Census cache and DEM checks** (#163): a `census_polygons` cache read with a source is
+  refused if it was fetched with other parameters, naming the one that differs. Before, a cache
+  for one dataset or set of regions was returned for another. `CensusMapper` and `PolygonFile`
+  gain a `provenance()` method (the dataset, regions, region level, and resolution, or the file
+  name and columns), compared with what the cache records; a cache that does not record them
+  gives a `DataWarning`. The cache now records the regions sorted, and the region level and the
+  file's columns. `sample_dem` reads rasters masked, so cells under a mask band, mask file, or
+  alpha band are left out (before, a masked DEM with no nodata value gave its fill values as
+  elevations). `sample_dem` and `Network.estimate_rims` take `z_factor` (metres per elevation
+  unit); by default a DEM whose vertical CRS or band units are in feet is converted to metres.
+- **Stricter loader inputs** (#157): `sewered` must hold booleans or 0 and 1 (missing for not
+  flagged); text such as `"N"`, `"No"`, or `"0"` used to read as true and now raises
+  `ValueError`. A key of `rates` that is the land use of no polygon (a difference of case, or a
+  code given as text) gives a `DataWarning` instead of silently no flow. A pipe midpoint on the
+  edge two polygons share now goes to the first of them, not to neither. `allocate_population`
+  requires a network CRS projected in metres, as `allocate_land_use` does. `distribute_flow`
+  takes `weight=None` for the length instead of raising `KeyError`.
+- **Land-use summary counted a polygon twice** (#161): a rated polygon whose pipes all weigh 0
+  was counted in both `polygons_served` and `no_pipes`; it is now counted in `polygons_served`
+  and `zero_weight`.
 - **Small fixes in the model writer and design rules** (#160). `write_inp` applied
   `design="schema"` twice, logging a second, misleading line that the rules were given
   explicitly; it now applies it once. `outfall_link={}` added no links; it now takes the
@@ -21,9 +58,8 @@ earlier history is in the git log.
   by `height_correction` (`fill_gaps` takes `correction_rules`). `swap_nodes` swaps
   `us_node_type` and `ds_node_type` with the IDs. `Subnetwork.data_gaps()` takes `design`,
   `station_invert`, and the station options, so that its report is the one `to_inp` gives.
-  `NodeLoading` refuses a patterned kind named `population`, `sanitary`, or `steady`, which
-  overwrote that column of `table()`. The docs of `design="schema"` say that an ideal default
-  pump raises SWMM's ERROR 134 at a station with an overflow, and how to give it a curve.
+  The docs of `design="schema"` say that an ideal default pump raises SWMM's ERROR 134 at a
+  station with an overflow, and how to give it a curve.
 
 - **Polygon allocation option validation** (issue #147): `population`, `sewered`, and
   `land_use` reject unindexed lists/arrays and Series with missing or repeated polygon IDs.
@@ -34,6 +70,27 @@ earlier history is in the git log.
 
 ### Changed
 
+- **One weight type for the three loaders** (#157): `allocate_population`, `allocate_land_use`,
+  and `distribute_flow` take the same `weight` (`swmmbuilder.population.Weight`): None or
+  `"length"`, `"diameter_length"`, a column, or a function of the pipes. A function must return an
+  array of one value per pipe or a Series indexed exactly like the pipes; a misaligned Series
+  used to be realigned, giving pipes their neighbours' weights or none, and now raises
+  `ValueError`. `"diameter_length"` gives a non-circular pipe the mean of its height and width.
+  `distribute_flow` and `pipe_weights` gain `max_weight`, and `distribute.PipeWeight` is kept as
+  an alias of `Weight`.
+- **Land-use weights imputed as for population** (#157): `allocate_land_use` gains `max_weight`,
+  `impute`, and `fallback_weight`, with the defaults of `allocate_population`, so an invalid
+  weight is imputed from its polygon's median weight per metre rather than counted as 0, and a
+  rated polygon whose pipes all weigh 0 shares its flow equally rather than losing it. Its
+  `pipes` table gains `weight_imputed` and `weight_fallback`. `fallback_weight=None` keeps the
+  old loss of such polygons.
+- **Invalid weights warn in every loader** (#157): `allocate_population` and `allocate_land_use`
+  give a `DataWarning` listing the pipes serving a polygon whose weight is invalid, as
+  `distribute_flow` did, instead of an INFO log.
+- **One cycle per loop** (#159): `TopologyReport.cycles` holds one cycle per loop (the shortest
+  through the loop's smallest node) instead of every simple cycle, and `summary()["cycles"]`
+  counts loops. The new `TopologyReport.loops` lists the nodes of each loop, a set of nodes that
+  can all reach one another. A network with no cycles reports the same as before.
 - **Summary counts and pattern means** (#160). `SwmmModel.summary()["stations"]` counts pump
   stations only (the new `SwmmModel.stations`), no longer the inlets of pipes pumped by `pumps=`.
   `SwmmModel.summary()` and `TopologyReport.summary()` gain `data_gaps_blocking` and
@@ -44,6 +101,19 @@ earlier history is in the git log.
 
 ### Added
 
+- **Status and structure types for more Ontario presets.** The Barrie, Kitchener, Sarnia,
+  Waterloo, and Windsor presets map their status columns, and Toronto and Waterloo their
+  structure-type columns, so the status filter and `include_overflows=False` work for them (#154).
+  The codes were checked against each city's full layer. Windsor's `TEMP. OUT-NEW CONSTRUCTION`
+  and `PRIVATE` pipes are now dropped by the default status filter, and rarer codes (Toronto's
+  `SP`, `PF`, ..., Waterloo's `WWTP Outfall`) pass through unmapped. Each TOML header says which
+  columns a dataset lacks.
+- **One shape for every result** (#161): `LandUseAllocation` gains `by_pipe()` and
+  `summary(sub=None)`, like the population result; `UpstreamTotals`, `PumpStationReport`, and
+  `RimEstimate` gain a `summary()` dict; `RimEstimate.report()` (also `str()`) gives its text;
+  and `Network.pipes()` gives the pipes of the graph, as `Subnetwork.pipes()` does for a
+  subnetwork. The Diagnostics page of the docs lists every `summary()` key of every result and
+  the rules they follow, and the Network page compares `Network` and `Subnetwork`.
 - **Pipes crossing a subnetwork's boundary** (#152): `Subnetwork.boundary_pipes(values=None)`
   lists the pipes with one end in the subnetwork, which it leaves out, classified as `force_main`,
   `split`, `summit`, or `inflow`, with the nodes (or values) upstream, where a leaving pipe's flow
@@ -200,6 +270,27 @@ earlier history is in the git log.
 
 ### Changed
 
+- **`NodeLoading.options()` includes `flow_units`** (#158): the dictionary always has a
+  `flow_units` key, even when there is nothing else to write.
+- **`summary()` keys follow one pattern** (#161): a bare plural noun counts things, `total` is
+  the amount placed at the nodes, and `<part>_<measure>` measures one part, part first. Renamed
+  keys still read, with a `DeprecationWarning`, but are not listed.
+  - `PopulationAllocation.summary()`: `population` is now `total`, and `population_total` is
+    now `allocation_total`.
+  - `LandUseAllocation.summary()`: `unallocated` is now `unallocated_design_flow` (it was
+    always the design flow before scaling). `no_pipes` now counts only the polygons with no pipe;
+    those whose pipes all weigh 0 are counted under the new `zero_weight`, as in the population
+    result. The new `nodes`, `weight`, and `allocation_total` keys come after the per-use keys,
+    and `total` moves up beside them. The new `fallback` counts the polygons some of whose pipes
+    took the fallback weight (#157), as in the population result.
+  - `NodeLoading.summary()`: `sanitary`, `patterned`, and `steady` are now `sanitary_flow`,
+    `patterned_flow`, and `steady_flow`; `loaded_nodes` is now `nodes`; and
+    `patterned_<kind>` and `patterned_<kind>_nodes` are now `<kind>_flow` and `<kind>_nodes`
+    (as in the land-use summary). `total` and `nodes` come first. A patterned kind named
+    `population`, `sanitary`, `steady`, or `patterned` is now refused, since its keys and
+    `table()` columns would collide with those of the parts.
+  - `RimEstimate.summary()` returns a dict instead of text; the text is now `report()` (and
+    `str(est)`), so `print(est)` prints it.
 - **Data-gaps reports list nodes with no usable rim**: `data_gaps()`, `model.data_gaps`, and
   `TopologyReport.data_gaps` now have a `no_rim` row (not blocking) for every node with no rim
   recorded, or one at or below the invert, so existing reports gain rows. Unless the `rims` option

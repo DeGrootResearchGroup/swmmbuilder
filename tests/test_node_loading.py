@@ -6,7 +6,7 @@ import importlib.util
 import numpy as np
 import pandas as pd
 import pytest
-from conftest import DENDRITIC, REPO, read_sections, subnetwork, write_inp
+from conftest import DENDRITIC, REPO, TEMPLATE, read_sections, subnetwork, write_inp
 
 from swmmbuilder import (
     DesignWarning,
@@ -92,6 +92,7 @@ def test_matches_the_assembly_by_hand(parts):
     expected, expected_table = by_hand(*parts)
     loading = loading_of(*parts)
     options = loading.options()
+    assert options.pop("flow_units") == "LPS"
     assert list(options) == list(expected)
     assert options == expected
     assert all(isinstance(i, Inflow) for i in options["inflows"].values())
@@ -121,25 +122,48 @@ def test_table_and_summary(parts):
     s = loading.summary()
     sanitary = 240.5 * 230 / 86400
     assert s["population"] == pytest.approx(240.5) and s["population_nodes"] == 3
-    assert s["sanitary"] == pytest.approx(sanitary) and s["sanitary_nodes"] == 3
-    assert s["steady"] == pytest.approx(0.045) and s["steady_nodes"] == 3
-    assert s["patterned"] == pytest.approx(1.0) and s["patterned_nodes"] == 3
-    assert s["patterned_COMMERCIAL"] == pytest.approx(0.5)
-    assert s["patterned_COMMERCIAL_nodes"] == 2
-    assert s["patterned_INDUSTRIAL"] == 0 and s["patterned_INDUSTRIAL_nodes"] == 0
+    assert s["sanitary_flow"] == pytest.approx(sanitary) and s["sanitary_nodes"] == 3
+    assert s["steady_flow"] == pytest.approx(0.045) and s["steady_nodes"] == 3
+    assert s["patterned_flow"] == pytest.approx(1.0) and s["patterned_nodes"] == 3
+    assert s["COMMERCIAL_flow"] == pytest.approx(0.5)
+    assert s["COMMERCIAL_nodes"] == 2
+    assert s["INDUSTRIAL_flow"] == 0 and s["INDUSTRIAL_nodes"] == 0
     assert s["total"] == pytest.approx(sanitary + 1.045)
-    assert s["loaded_nodes"] == 6  # A1, A2, B1, B2, C1, J1
+    assert s["nodes"] == 6  # A1, A2, B1, B2, C1, J1
+    assert list(s)[:4] == ["total", "nodes", "population", "population_nodes"]
+    assert all(type(v) in (int, float) for v in s.values())
     assert "sanitary=" in repr(loading)
 
 
+def test_summary_former_keys_still_read(parts):
+    s = loading_of(*parts).summary()
+    for old, new in [
+        ("sanitary", "sanitary_flow"),
+        ("steady", "steady_flow"),
+        ("patterned", "patterned_flow"),
+        ("loaded_nodes", "nodes"),
+        ("patterned_COMMERCIAL", "COMMERCIAL_flow"),
+        ("patterned_COMMERCIAL_nodes", "COMMERCIAL_nodes"),
+    ]:
+        with pytest.warns(DeprecationWarning, match=f"'{old}' is now '{new}'"):
+            assert s[old] == s[new]
+        assert old not in s
+
+
+@pytest.mark.parametrize("kind", ["sanitary", "steady", "population", "patterned"])
+def test_a_patterned_kind_may_not_take_the_name_of_a_part(kind):
+    with pytest.raises(ValueError, match=f"patterned kind '{kind}' is the name of a part"):
+        NodeLoading(patterned={kind: {"A1": 1.0}}, patterns={kind: [1.0] * 24}, days=1)
+
+
 def test_only_the_options_needed():
-    assert set(NodeLoading(steady={"A1": 0.1, "B1": 0.0}).options()) == {"inflows"}
+    assert set(NodeLoading(steady={"A1": 0.1, "B1": 0.0}).options()) == {"inflows", "flow_units"}
     assert NodeLoading(steady={"A1": 0.1}).options()["inflows"] == {"A1": Inflow(baseline=0.1)}
     options = NodeLoading(population={"A1": 100}, per_capita=0.001, unit="m3/s").options()
-    assert options == {"dwf": {"A1": pytest.approx(0.1 * 1000)}}
+    assert options == {"dwf": {"A1": pytest.approx(0.1 * 1000)}, "flow_units": "LPS"}
     patterned = NodeLoading(patterned={"COM": {"A1": 0.2}}, patterns={"COM": FLAT}, days=1)
-    assert set(patterned.options()) == {"inflows", "timeseries"}
-    assert NodeLoading(steady={"A1": 0.0}).options() == {}
+    assert set(patterned.options()) == {"inflows", "timeseries", "flow_units"}
+    assert NodeLoading(steady={"A1": 0.0}).options() == {"flow_units": "LPS"}
 
 
 def test_sanitary_pattern_by_name():
@@ -157,8 +181,52 @@ def test_sanitary_pattern_by_name():
 
 
 def test_flow_units():
-    loading = NodeLoading(population={"A1": 1000}, per_capita=86.4, flow_units="CMS")
+    loading = NodeLoading(population={"A1": 1000}, per_capita=86.4, flow_units="cms")
     assert loading.options()["dwf"]["A1"] == pytest.approx(0.001)
+    assert loading.options()["flow_units"] == "CMS" == loading.flow_units
+
+
+@pytest.mark.parametrize("kwargs", [{"steady": {"A1": 1.0}}, {"population": {"A1": 10}}])
+def test_invalid_flow_units_refused(kwargs):
+    # Refused without a population too, which used to be the only part that checked it (#158).
+    with pytest.raises(ValueError, match="flow_units must be one of CMS, LPS, MLD, not 'CFS'"):
+        NodeLoading(**kwargs, per_capita=200, flow_units="cfs")
+
+
+def units_template(tmp_path, units):
+    path = tmp_path / f"template_{units}.inp"
+    path.write_text(
+        TEMPLATE.read_text().replace("FLOW_UNITS           LPS", f"FLOW_UNITS           {units}")
+    )
+    return path
+
+
+@pytest.mark.parametrize(
+    "loading_units, template_units", [("LPS", "CMS"), ("CMS", "LPS"), ("MLD", "LPS")]
+)
+def test_load_in_other_units_than_the_template_refused(
+    network, tmp_path, loading_units, template_units
+):
+    # An L/s load in a CMS template would be 1000 times too large (#158).
+    sub = subnetwork(network, [("A1", "A2"), ("A2", "J1")])
+    loading = NodeLoading(steady={"A1": 1.0}, flow_units=loading_units)
+    with pytest.raises(ValueError, match=f"not the template's FLOW_UNITS {template_units}"):
+        sub.to_inp(
+            tmp_path / "m.inp",
+            ["J1"],
+            template_path=units_template(tmp_path, template_units),
+            **loading.options(),
+        )
+    assert not (tmp_path / "m.inp").exists()
+
+
+def test_load_in_the_template_units_written(network, tmp_path):
+    sub = subnetwork(network, [("A1", "A2"), ("A2", "J1")])
+    loading = NodeLoading(population={"A1": 1000}, per_capita=86.4, flow_units="CMS")
+    path = tmp_path / "m.inp"
+    sub.to_inp(path, ["J1"], template_path=units_template(tmp_path, "CMS"), **loading.options())
+    (dwf,) = read_sections(path)["DWF"]
+    assert dwf[0] == "A1" and float(dwf[2]) == pytest.approx(0.001)
 
 
 @pytest.mark.parametrize(
@@ -209,13 +277,6 @@ def test_pattern_inflows_warns_of_a_mean_by_default(recwarn):
     assert not [w for w in recwarn if issubclass(w.category, DesignWarning)]
 
 
-@pytest.mark.parametrize("kind", ["population", "sanitary", "steady"])
-def test_patterned_kind_cannot_take_a_table_column(kind):
-    # #160: the kind's column overwrote the part's in table().
-    with pytest.raises(ValueError, match=f"patterned kinds cannot be named {kind}"):
-        NodeLoading(patterned={kind: {"A1": 1.0}}, patterns={kind: FLAT}, days=1)
-
-
 @pytest.mark.parametrize("require", [True, 1e-3, 0.0])
 def test_pattern_inflows_require_unit_mean_names_the_pattern(require):
     patterns = {"COM": FLAT, "IND": [1.01] * 24}
@@ -247,7 +308,7 @@ def test_loaded_catchment_example(tmp_path, capsys):
     assert {row[0] for row in sections["PATTERNS"]} == {"diurnal"}
     assert {"LU_COMMERCIAL", "LU_INDUSTRIAL"} <= {row[0] for row in sections["TIMESERIES"]}
     assert summary["population"] == pytest.approx(sum(300 + 50 * k for k in range(6)))
-    assert summary["patterned_COMMERCIAL"] > 0 and summary["patterned_INDUSTRIAL"] > 0
+    assert summary["COMMERCIAL_flow"] > 0 and summary["INDUSTRIAL_flow"] > 0
     table = pd.read_csv(tmp_path / "node_loading.csv", index_col="node")
-    assert table["sanitary"].sum() == pytest.approx(summary["sanitary"], rel=1e-5)
+    assert table["sanitary"].sum() == pytest.approx(summary["sanitary_flow"], rel=1e-5)
     assert "wrote" in capsys.readouterr().out
