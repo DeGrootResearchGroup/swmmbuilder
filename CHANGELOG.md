@@ -45,6 +45,9 @@ earlier history is in the git log.
   edge two polygons share now goes to the first of them, not to neither. `allocate_population`
   requires a network CRS projected in metres, as `allocate_land_use` does. `distribute_flow`
   takes `weight=None` for the length instead of raising `KeyError`.
+- **Land-use summary counted a polygon twice** (#161): a rated polygon whose pipes all weigh 0
+  was counted in both `polygons_served` and `no_pipes`; it is now counted in `polygons_served`
+  and `zero_weight`.
 
 - **Polygon allocation option validation** (issue #147): `population`, `sewered`, and
   `land_use` reject unindexed lists/arrays and Series with missing or repeated polygon IDs.
@@ -86,6 +89,12 @@ earlier history is in the git log.
   and `PRIVATE` pipes are now dropped by the default status filter, and rarer codes (Toronto's
   `SP`, `PF`, ..., Waterloo's `WWTP Outfall`) pass through unmapped. Each TOML header says which
   columns a dataset lacks.
+- **One shape for every result** (#161): `LandUseAllocation` gains `by_pipe()` and
+  `summary(sub=None)`, like the population result; `UpstreamTotals`, `PumpStationReport`, and
+  `RimEstimate` gain a `summary()` dict; `RimEstimate.report()` (also `str()`) gives its text;
+  and `Network.pipes()` gives the pipes of the graph, as `Subnetwork.pipes()` does for a
+  subnetwork. The Diagnostics page of the docs lists every `summary()` key of every result and
+  the rules they follow, and the Network page compares `Network` and `Subnetwork`.
 - **Pipes crossing a subnetwork's boundary** (#152): `Subnetwork.boundary_pipes(values=None)`
   lists the pipes with one end in the subnetwork, which it leaves out, classified as `force_main`,
   `split`, `summit`, or `inflow`, with the nodes (or values) upstream, where a leaving pipe's flow
@@ -244,6 +253,25 @@ earlier history is in the git log.
 
 - **`NodeLoading.options()` includes `flow_units`** (#158): the dictionary always has a
   `flow_units` key, even when there is nothing else to write.
+- **`summary()` keys follow one pattern** (#161): a bare plural noun counts things, `total` is
+  the amount placed at the nodes, and `<part>_<measure>` measures one part, part first. Renamed
+  keys still read, with a `DeprecationWarning`, but are not listed.
+  - `PopulationAllocation.summary()`: `population` is now `total`, and `population_total` is
+    now `allocation_total`.
+  - `LandUseAllocation.summary()`: `unallocated` is now `unallocated_design_flow` (it was
+    always the design flow before scaling). `no_pipes` now counts only the polygons with no pipe;
+    those whose pipes all weigh 0 are counted under the new `zero_weight`, as in the population
+    result. The new `nodes`, `weight`, and `allocation_total` keys come after the per-use keys,
+    and `total` moves up beside them. The new `fallback` counts the polygons some of whose pipes
+    took the fallback weight (#157), as in the population result.
+  - `NodeLoading.summary()`: `sanitary`, `patterned`, and `steady` are now `sanitary_flow`,
+    `patterned_flow`, and `steady_flow`; `loaded_nodes` is now `nodes`; and
+    `patterned_<kind>` and `patterned_<kind>_nodes` are now `<kind>_flow` and `<kind>_nodes`
+    (as in the land-use summary). `total` and `nodes` come first. A patterned kind named
+    `population`, `sanitary`, `steady`, or `patterned` is now refused, since its keys and
+    `table()` columns would collide with those of the parts.
+  - `RimEstimate.summary()` returns a dict instead of text; the text is now `report()` (and
+    `str(est)`), so `print(est)` prints it.
 - **Data-gaps reports list nodes with no usable rim**: `data_gaps()`, `model.data_gaps`, and
   `TopologyReport.data_gaps` now have a `no_rim` row (not blocking) for every node with no rim
   recorded, or one at or below the invert, so existing reports gain rows. Unless the `rims` option

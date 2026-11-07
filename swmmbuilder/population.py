@@ -40,6 +40,7 @@ import numpy as np
 import pandas as pd
 from pyproj import CRS
 
+from ._summary import Summary
 from .diagnostics import DataWarning, Problems
 
 if TYPE_CHECKING:
@@ -130,16 +131,18 @@ class PopulationAllocation:
 
     def within(self, sub: Subnetwork) -> dict[NodeId, float]:
         """{node: population} placed by the pipes of ``sub``, e.g. a catchment of the network the
-        population was allocated over.
+        population was allocated over: :attr:`nodes` cut to the subnetwork, of the same type.
 
         Only the shares of the subnetwork's own pipes count: a pipe leaving the subnetwork from
         one of its nodes (at a flow split, say) takes its people out of it.
         """
-        keys = {key for _, _, key in sub.graph.edges(keys=True)}
-        return _place(self.pipes[self.pipes.index.isin(keys)], self.placement)
+        return _place(_pipes_within(self.pipes, sub), self.placement)
 
     def summary(self, sub: Subnetwork | None = None) -> dict[str, float | int]:
         """Counts and totals of the allocation, to cite in a report.
+
+        The keys follow the rules of every ``summary()`` (see the Diagnostics page of the
+        documentation).
 
         Parameters
         ----------
@@ -154,43 +157,47 @@ class PopulationAllocation:
             Plain Python numbers (``int`` for counts, ``float`` for totals, NaN where there is
             nothing to measure), under these keys:
 
-            - ``population``: population placed at the nodes, within ``sub``.
+            - ``total``: population placed at the nodes, within ``sub``.
             - ``nodes``: nodes given a population above 0, within ``sub``.
             - ``weight``: total weight of the pipes (e.g. service connections), within ``sub``.
               A pipe serving several polygons may carry a different imputed weight in each, so
               each pipe counts once, with the mean of its weights.
-            - ``population_total``: population placed at the nodes over the whole allocation.
+            - ``allocation_total``: population placed at the nodes over the whole allocation
+              (:attr:`total`).
             - ``unallocated``: population placed at no node (:attr:`unallocated`).
             - ``polygons``: polygons given.
             - ``polygons_served``: polygons with at least one pipe.
             - ``nearest``: polygons given their nearest pipe (:attr:`nearest`).
             - ``nearest_population``: their population.
-            - ``nearest_max_distance``: the farthest of them from its pipe (NaN if none).
+            - ``nearest_max_distance``: the farthest of them from its pipe, in m (NaN if none).
             - ``no_pipes``: polygons with people and no pipe (:attr:`no_pipes`).
             - ``no_pipes_population``: their population, not allocated.
             - ``no_valid_weight``: polygons left unallocated with no valid weight.
-            - ``zero_weight``: polygons left unallocated whose pipes all weigh 0.
+            - ``zero_weight``: polygons left unallocated whose pipes all weigh 0 (counted in
+              ``polygons_served``).
             - ``fallback``: polygons some of whose pipes were given the fallback weight.
+
+            ``population`` and ``population_total``, the former names of ``total`` and
+            ``allocation_total``, still read, with a ``DeprecationWarning``.
 
         Examples
         --------
         ::
 
             s = alloc.summary(net.catchment("OUT"))
-            print(f"{s['population']:,.0f} people at {s['nodes']} nodes")
+            print(f"{s['total']:,.0f} people at {s['nodes']} nodes")
         """
         pipes = self.pipes
         nodes = self.nodes
         if sub is not None:
-            keys = {key for _, _, key in sub.graph.edges(keys=True)}
-            pipes = pipes[pipes.index.isin(keys)]
-            nodes = self.within(sub)
+            pipes = _pipes_within(pipes, sub)
+            nodes = _place(pipes, self.placement)
         population = self.polygons["population"]
-        return {
-            "population": float(sum(nodes.values())),
+        values = {
+            "total": float(sum(nodes.values())),
             "nodes": sum(1 for p in nodes.values() if p > 0),
             "weight": float(pipes.groupby(level=0)["weight"].mean().sum()),
-            "population_total": float(self.pipes["population"].sum()),
+            "allocation_total": float(self.pipes["population"].sum()),
             "unallocated": float(self.unallocated),
             "polygons": len(self.polygons),
             "polygons_served": int((self.polygons["pipes"] > 0).sum()),
@@ -203,6 +210,14 @@ class PopulationAllocation:
             "zero_weight": len(self.zero_weight),
             "fallback": len(self.fallback),
         }
+        return Summary(values, {"population": "total", "population_total": "allocation_total"})
+
+
+def _pipes_within(table: pd.DataFrame, sub: Subnetwork) -> pd.DataFrame:
+    """The rows of ``table`` (the ``pipes`` of an allocation, indexed by pipe_id) of the pipes of
+    ``sub``."""
+    keys = {key for _, _, key in sub.graph.edges(keys=True)}
+    return table[table.index.isin(keys)]
 
 
 def _place(table, placement):

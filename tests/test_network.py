@@ -65,3 +65,12 @@ def test_missing_flow_type_dropped_and_logged(tmp_path, caplog):
 def test_network_from_geodataframe():
     network = Network(gpd.read_file(FIXTURE))
     assert set(network.graph.edges(keys=True)) == set(Network(FIXTURE).graph.edges(keys=True))
+
+
+def test_network_pipes_match_a_whole_subnetwork(network):
+    # Network.pipes() is Subnetwork.pipes() for the whole network (#161).
+    pipes = network.pipes()
+    whole = network.subnetwork(network.nodes.index).pipes()
+    assert list(pipes["pipe_id"]) == list(whole["pipe_id"])
+    assert len(pipes) == network.graph.number_of_edges()
+    assert list(pipes.columns) == list(network.full_data.columns)

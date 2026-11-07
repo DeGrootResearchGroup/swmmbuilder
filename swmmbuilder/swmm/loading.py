@@ -19,6 +19,7 @@ from typing import TYPE_CHECKING, Any
 import numpy as np
 import pandas as pd
 
+from .._summary import Summary
 from ..diagnostics import Problems
 from ..units import SI_FLOW_UNITS, _is_finite_number
 from .dwf import dwf_from_population
@@ -29,6 +30,9 @@ if TYPE_CHECKING:
 
 # Name of the [DWF] pattern when it is given as multipliers.
 DWF_PATTERN_NAME = "diurnal"
+
+# The parts of a load, named in NodeLoading.table() and summary(): no patterned kind may take one.
+PARTS = ("population", "sanitary", "steady", "patterned")
 
 
 def _node_values(values: Mapping[NodeId, float] | pd.Series, what: str) -> pd.Series:
@@ -112,9 +116,10 @@ class NodeLoading:
     ------
     ValueError
         If ``flow_units`` is not an SI flow unit, no part is given, ``population`` comes without
-        ``per_capita``, ``patterned`` without ``days``, or ``pattern`` without ``population``; a
-        pattern is missing or its mean is not 1; or a population or flow is negative or not
-        finite.
+        ``per_capita``, ``patterned`` without ``days`` or with a kind named after a part
+        (``population``, ``sanitary``, ``steady``, or ``patterned``), or ``pattern`` without
+        ``population``; a pattern is missing or its mean is not 1; or a population or flow is
+        negative or not finite.
 
     Examples
     --------
@@ -158,6 +163,10 @@ class NodeLoading:
             problems.add("patterned needs days")
         if isinstance(pattern, str) and pattern not in patterns:
             problems.add(f"pattern {pattern!r} is not in patterns")
+        if patterned is not None:
+            names = patterned.columns if isinstance(patterned, pd.DataFrame) else patterned
+            for kind in [k for k in names if k in PARTS]:
+                problems.add(f"patterned kind {kind!r} is the name of a part; rename it")
         problems.raise_if_any()
 
         self.flow_units = flow_units
@@ -264,42 +273,62 @@ class NodeLoading:
         table = pd.DataFrame(parts).fillna(0.0).rename_axis("node")
         return table.rename(columns=dict(columns)) if columns else table
 
-    def summary(self) -> dict[str, float]:
+    def summary(self) -> dict[str, float | int]:
         """Totals and node counts by part, for the build log or a check against plant flow.
+
+        The keys follow the rules of every ``summary()`` (see the Diagnostics page of the
+        documentation).
 
         Returns
         -------
         dict
-            ``population`` (people) and ``population_nodes``; ``sanitary``, ``steady``,
-            ``patterned`` (all kinds), and ``total`` (the three) flows in ``flow_units``, each
-            with the number of nodes carrying it (``sanitary_nodes``, ``steady_nodes``,
-            ``patterned_nodes``, ``loaded_nodes``); and for each kind of ``patterned``,
-            ``patterned_<kind>`` and ``patterned_<kind>_nodes``.
+            Plain Python numbers (``int`` for counts, ``float`` for totals), with flows in
+            ``flow_units``, under these keys:
+
+            - ``total``: flow of the three parts (sanitary, patterned, and steady).
+            - ``nodes``: nodes given a flow above 0.
+            - ``population``: people, and ``population_nodes``, the nodes with any.
+            - ``sanitary_flow``, ``sanitary_nodes``: the [DWF] base flow, and its nodes.
+            - ``patterned_flow``, ``patterned_nodes``: the patterned flows, all kinds.
+            - ``steady_flow``, ``steady_nodes``: the steady flows.
+            - ``<kind>_flow``, ``<kind>_nodes``: for each kind of ``patterned`` (e.g.
+              ``COMMERCIAL_flow``), its flow and nodes.
+
+            The former names (``sanitary``, ``patterned``, ``steady``, ``loaded_nodes``,
+            ``patterned_<kind>``, and ``patterned_<kind>_nodes``) still read, with a
+            ``DeprecationWarning``.
         """
         table = self.table()
         kinds = list(self.patterned.columns) if self.patterned is not None else []
         patterned = table[kinds].sum(axis=1)
         flows = table["sanitary"] + table["steady"] + patterned
-        out: dict[str, float] = {}
+        out: dict[str, float | int] = {
+            "total": float(flows.sum()),
+            "nodes": int((flows > 0).sum()),
+        }
+        renamed = {"loaded_nodes": "nodes"}
         for name, values in [
             ("population", table["population"]),
-            ("sanitary", table["sanitary"]),
-            ("steady", table["steady"]),
-            ("patterned", patterned),
+            ("sanitary_flow", table["sanitary"]),
+            ("patterned_flow", patterned),
+            ("steady_flow", table["steady"]),
         ]:
+            part = name.removesuffix("_flow")
             out[name] = float(values.sum())
-            out[f"{name}_nodes"] = int((values > 0).sum())
-        out["total"] = float(flows.sum())
-        out["loaded_nodes"] = int((flows > 0).sum())
+            out[f"{part}_nodes"] = int((values > 0).sum())
+            renamed[part] = name
         for kind in kinds:
-            out[f"patterned_{kind}"] = float(table[kind].sum())
-            out[f"patterned_{kind}_nodes"] = int((table[kind] > 0).sum())
-        return out
+            out[f"{kind}_flow"] = float(table[kind].sum())
+            out[f"{kind}_nodes"] = int((table[kind] > 0).sum())
+            renamed[f"patterned_{kind}"] = f"{kind}_flow"
+            renamed[f"patterned_{kind}_nodes"] = f"{kind}_nodes"
+        renamed.pop("population")
+        return Summary(out, renamed)
 
     def __repr__(self) -> str:
         s = self.summary()
         return (
-            f"NodeLoading(sanitary={s['sanitary']:.4g} at {s['sanitary_nodes']} nodes, "
-            f"patterned={s['patterned']:.4g} at {s['patterned_nodes']}, "
-            f"steady={s['steady']:.4g} at {s['steady_nodes']}, {self.flow_units})"
+            f"NodeLoading(sanitary={s['sanitary_flow']:.4g} at {s['sanitary_nodes']} nodes, "
+            f"patterned={s['patterned_flow']:.4g} at {s['patterned_nodes']}, "
+            f"steady={s['steady_flow']:.4g} at {s['steady_nodes']}, {self.flow_units})"
         )

@@ -333,10 +333,12 @@ def test_zero_weight_polygon_falls_back_like_population(net):
     assert flows.nodes.loc["N2", "COMMERCIAL"] == pytest.approx(0.05)
     assert flows.pipes["weight_fallback"].tolist()[:2] == [True, True]
     assert flows.no_pipes == ["R"]
+    assert flows.summary()["fallback"] == 1 and flows.summary()["zero_weight"] == 0
     lost = allocate_land_use(
         net, zoning(), land_use="use", rates=RATES, weight=weight, fallback_weight=None
     )
     assert lost.no_pipes == ["P", "R"]
+    assert lost.summary()["fallback"] == 0 and lost.summary()["zero_weight"] == 1
 
 
 def test_max_weight_and_impute(net):

@@ -61,6 +61,7 @@ net = Network(
     split_tolerance=50.0,                      # split IDs reused for structures > 50 m apart
 )
 net.nodes            # GeoDataFrame: node_type, name, invert, rim_elevation, depth, ...
+net.pipes()          # the pipes of the graph (sub.pipes() for a subnetwork's)
 net.snap_report      # pairs: both IDs, distance, both inverts, invert_known, kept ID or why not merged
 net.split_report     # split IDs: new ID, its pipes, distance to the other structures, attributes
 sub = net.catchment("WT6011")
@@ -108,6 +109,10 @@ sub.to_inp("model.inp")  # outfalls default to the outfall nodes of the subnetwo
   with at least one structure in the subnetwork.
 - **ID normalisation.** `normalize_ids` is applied to the node IDs of the pipes, the node layers,
   and those passed to `catchment`, `subnetwork` and `Subnetwork.from_node_list`.
+- **Network and Subnetwork.** `net.nodes` is a GeoDataFrame of node data and `sub.nodes` a list
+  of node IDs; both have `pipes()`; `split_report` is an attribute of the network and a method of
+  the subnetwork; and `estimate_rims` belongs to the network (pass `nodes=sub.nodes` for one
+  catchment). The API reference's Network page compares them.
 - **Validation.** `TopologyReport` also has `dead_end_types`, `force_mains`, and
   `pipe_count_mismatches`: maintenance holes whose recorded `pipes_in`/`pipes_out` differ from
   the network's graph. For pumping stations it lists `stations_without_force_main`,
@@ -236,23 +241,31 @@ net.ends()                       # every node with no outlet, by the size of wha
 ### Summaries
 
 The results of the main steps reduce to the numbers a report cites with `summary()`, a flat
-dict of counts and totals under stable keys, documented in each method's docstring:
+dict of counts and totals under stable keys. Every key is listed on the Diagnostics page of the
+docs, and in each method's docstring:
 
-- `PopulationAllocation.summary(sub=None)`: population and loaded nodes (within a catchment if
-  given), connections, and polygons served, given their nearest pipe, or with no pipe;
-- `LandUseAllocation.summary()`: polygons, area, flow, and nodes per land use, nearest-pipe
-  distances, and the scale;
-- `TopologyReport.summary()`: nodes, pipes, splits, cycles (counted as loops, sets of nodes
-  that can all reach one another), and force mains;
+- `PopulationAllocation.summary(sub=None)` and `LandUseAllocation.summary(sub=None)`: people or
+  flow placed and the nodes given them (within a catchment if given), per land use, and the
+  polygons served, given their nearest pipe, or left out;
+- `NodeLoading.summary()`: flow and nodes of each part of the load, and of each patterned kind;
+- `TopologyReport.summary()`: nodes, pipes, splits, cycles (counted as loops, sets of nodes that
+  can all reach one another), force mains, and boundary pipes;
 - `SwmmModel.summary()`: gaps found and filled, derived values by rule, the default depth,
-  stations, and outfall links.
+  stations, and outfall links;
+- `UpstreamTotals.summary()`, `PumpStationReport.summary()`, and `RimEstimate.summary()`.
+
+The keys follow one pattern: a bare plural noun counts things (`nodes`, `polygons`), `total` is
+the amount placed at the nodes (`allocation_total` over the whole allocation when cut to a
+catchment), and `<part>_<measure>` measures one part, part first (`COMMERCIAL_flow`,
+`COMMERCIAL_nodes`, `nearest_max_distance`). A key renamed to this pattern before the first
+release still reads, with a `DeprecationWarning`.
 
 The values are plain numbers, NaN where there is nothing to measure, so they go straight into
 f-strings. The wording stays with the caller:
 
 ```python
 s = alloc.summary(net.catchment("OUT"))
-print(f"{s['population']:,.0f} people at {s['nodes']} nodes; "
+print(f"{s['total']:,.0f} people at {s['nodes']} nodes; "
       f"{s['nearest']} polygons given their nearest pipe (up to {s['nearest_max_distance']:.0f} m)")
 ```
 
@@ -689,7 +702,11 @@ polygons it comes from; `alloc.nearest` gives the flagged polygons sent to their
 with the distance, and `alloc.fallback` those given the fallback weight. `alloc.pipes` has
 one row per pipe and polygon it serves, `alloc.by_pipe()` sums each pipe's shares, and
 `alloc.polygons` has one row per polygon. `alloc.within(sub)` keeps the shares of the
-subnetwork's own pipes, so people on a pipe leaving it are not counted.
+subnetwork's own pipes, so people on a pipe leaving it are not counted. The land-use result has
+the same `pipes`, `polygons`, `by_pipe()`, `within(sub)`, and `summary(sub)`; `within(sub)`
+returns the type of the result's `nodes` (a dict here, a nodes × land uses DataFrame there).
+`alloc.nodes` lists every node a share is placed at, 0 included, while the land-use and
+`distribute_flow` results leave out nodes given nothing.
 
 ### Census polygons
 
@@ -766,7 +783,7 @@ loading = NodeLoading(
 )
 sub.to_inp("loaded_catchment.inp", outfalls=["WT1420"], **loading.options())
 loading.table().to_csv("node_loading.csv")  # population, sanitary, steady, COMMERCIAL, ...
-loading.summary()                           # {'sanitary': ..., 'sanitary_nodes': ..., ...}
+loading.summary()                           # {'total': ..., 'nodes': ..., 'sanitary_flow': ..., ...}
 ```
 
 - `options()` holds only what is needed of `dwf`, `patterns`, `dwf_patterns`, `inflows`, and
@@ -849,7 +866,8 @@ It needs the `elevation` extra (`pip install "swmmbuilder[elevation]"`: rasterio
 
 ```python
 est = net.estimate_rims(["tile_1.tif", "tile_2.tif"], window=1.0, offset="median")
-print(est.summary())                 # recorded rim - DEM: median, IQR, 5-95 %, largest
+print(est)                           # recorded rim - DEM: median, IQR, 5-95 %, largest
+est.summary()                        # the same as numbers: difference_median, estimated, ...
 est.largest_differences(10)          # recorded rims that are probably wrong, or raised lids
 est.samples                          # DEM value, difference, estimate and status of each node
 sub.to_inp("model.inp", rims=est.rims, max_depth="median")

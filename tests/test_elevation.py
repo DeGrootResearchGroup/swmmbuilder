@@ -303,7 +303,12 @@ def test_the_validation_report(network, recorded, dem):
     assert v["max_abs"] == pytest.approx(LID + 1.5, abs=2e-3)
     assert list(estimate.largest_differences(1).index) == ["J1"]
     assert set(estimate.compared.index) == set(recorded)
-    assert "median +0.10" in estimate.summary()
+    assert "median +0.10" in estimate.report() == str(estimate)
+    s = estimate.summary()
+    assert (s["nodes"], s["compared"]) == (len(estimate.samples), 4)
+    assert s["difference_median"] == pytest.approx(LID, abs=2e-3)
+    assert s["difference_max_abs"] == pytest.approx(LID + 1.5, abs=2e-3)
+    assert all(type(v) in (int, float) for v in s.values()) and "difference_count" not in s
 
 
 def test_estimating_changes_nothing(network, recorded, dem):
@@ -486,8 +491,10 @@ def test_implausible_rims_are_flagged_from_the_median(network, recorded, odd, de
     assert set(estimate.rims) == set(estimate.estimated.index)  # nothing replaced
     assert set(estimate.rims.implausible) == {"J1", "A2"}
     assert "implausible (more than 1 m from the median difference): 2, of which 0 replaced" in (
-        estimate.summary()
+        estimate.report()
     )
+    s = estimate.summary()
+    assert (s["implausible"], s["replaced"], s["compared"]) == (2, 0, 4)
 
 
 def test_separate_thresholds_above_and_below_the_ground(network, recorded, odd, dem):

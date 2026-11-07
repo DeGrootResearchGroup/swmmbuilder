@@ -38,6 +38,7 @@ from typing import TYPE_CHECKING
 import numpy as np
 import pandas as pd
 
+from ._summary import Summary
 from .diagnostics import DataWarning
 
 if TYPE_CHECKING:
@@ -460,8 +461,56 @@ class RimEstimate:
         spread = (compared["difference"] - compared["difference"].median()).abs()
         return compared.loc[spread.sort_values(ascending=False, kind="stable").index[:n]]
 
-    def summary(self) -> str:
-        """A few lines describing the comparison and the fill."""
+    def summary(self) -> dict[str, float | int]:
+        """Counts and statistics of the comparison and the fill, to cite in a report.
+
+        The keys follow the rules of every ``summary()`` (see the Diagnostics page of the
+        documentation). :meth:`report` gives the same as text.
+
+        Returns
+        -------
+        dict
+            Plain Python numbers (``int`` for counts, ``float`` for values in m, NaN where there
+            is nothing to measure), under these keys:
+
+            - ``nodes``: nodes sampled (rows of :attr:`samples`).
+            - ``compared``: those with a usable recorded rim and a DEM value (:attr:`compared`,
+              including those flagged or replaced).
+            - ``implausible``: recorded rims flagged as implausible, replaced or not
+              (:attr:`implausible`).
+            - ``replaced``: those replaced by the DEM estimate (:attr:`replaced`).
+            - ``estimated``: nodes with no usable rim given an estimate (:attr:`estimated`).
+            - ``no_dem_value``, ``dem_not_above_invert``: nodes of those statuses (see
+              :data:`STATUSES`).
+            - ``offset``: added to the DEM values (:attr:`offset`).
+            - ``difference_<statistic>``: recorded rim - DEM over the nodes compared, for each
+              statistic of :attr:`validation` but the count (``median``, ``mean``, ``std``,
+              ``iqr``, ``p05``, ``p95``, and ``max_abs``).
+
+        Examples
+        --------
+        ::
+
+            s = est.summary()
+            print(f"{s['estimated']} rims estimated; median difference {s['difference_median']:+.2f} m")
+        """
+        counts = self.samples["status"].value_counts()
+        values: dict[str, float | int] = {
+            "nodes": len(self.samples),
+            "compared": len(self.compared),
+            "implausible": len(self.implausible),
+            "replaced": len(self.replaced),
+            "estimated": len(self.estimated),
+            "no_dem_value": int(counts.get("no_dem_value", 0)),
+            "dem_not_above_invert": int(counts.get("dem_not_above_invert", 0)),
+            "offset": float(self.offset),
+        }
+        validation = self.validation.drop("count")
+        values.update({f"difference_{k}": float(v) for k, v in validation.items()})
+        return Summary(values)
+
+    def report(self) -> str:
+        """A few lines describing the comparison and the fill, to print (also ``str()``)."""
         v = self.validation
         counts = self.samples["status"].value_counts()
         lines = [f"Rims from {self.source}: {len(self.samples)} nodes sampled"]
@@ -482,3 +531,6 @@ class RimEstimate:
             if status not in ("compared", "implausible", "replaced") and counts.get(status, 0):
                 lines.append(f"  {status}: {counts[status]}")
         return "\n".join(lines)
+
+    def __str__(self) -> str:
+        return self.report()
