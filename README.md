@@ -642,14 +642,17 @@ sub = net.catchment("OUT")
 dwf = dwf_from_population(alloc.within(sub), per_capita=230, unit="L/d")
 ```
 
+- A midpoint on the edge two polygons share goes to the first of them. The network's CRS must
+  be projected in metres.
 - `max_distance` replaces the midpoint rule with a distance rule: each polygon is served by every
   pipe within that distance of it (in the CRS's units), with each pipe's whole weight. This suits
   small units such as census blocks, whose edges follow the streets the sewers run under: a pipe
   then serves the blocks on both sides. A polygon with no pipe that close contributes no one,
   unless it is flagged in `sewered` (a column of booleans, e.g. residential zoning): a flagged
   polygon left with no pipe, such as a development on private sewers, is given its nearest pipe,
-  up to `max_nearest_distance` away (no limit by default). `dominant_category` gives such a
-  flag from a zoning layer, the category covering the largest area of each polygon:
+  up to `max_nearest_distance` away (no limit by default). The flags must be booleans (or 0 and
+  1); text such as `"N"` raises `ValueError` rather than reading as true. `dominant_category`
+  gives such a flag from a zoning layer, the category covering the largest area of each polygon:
 
   ```python
   from swmmbuilder import dominant_category
@@ -663,7 +666,12 @@ dwf = dwf_from_population(alloc.within(sub), per_capita=230, unit="L/d")
   is False).
 - Force mains take no service connections: they serve no polygon and weigh 0, unless
   `serve_force_mains=True`.
-- `weight` is a pipe column, a function of the pipes, or None for the length.
+- `weight` is None or `"length"` for the length, `"diameter_length"` (diameter times length; for
+  a non-circular pipe, the mean of its height and width), a pipe column, or a function of the
+  pipes returning an array in their order or a Series indexed exactly like them (anything else
+  raises). `allocate_land_use` and `distribute_flow` take the same `weight` and `max_weight`, and
+  `allocate_land_use` the same `impute` and `fallback_weight`. Invalid weights give a
+  `DataWarning` in all three, and so does a key of `rates` that is the land use of no polygon.
 - `impute` is `"per_length"` (default: an invalid weight becomes the pipe's length times the
   median weight per metre of the valid pipes of its own polygon) or `"zero"`. The polygons passed
   serve for both the share and the imputation.

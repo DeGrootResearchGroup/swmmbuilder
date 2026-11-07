@@ -11,15 +11,25 @@ result, {node: flow}, can be passed as ``dwf`` (a steady flow with no pattern) o
 from __future__ import annotations
 
 import logging
-import warnings
-from collections.abc import Callable
 from typing import TYPE_CHECKING
 
 import geopandas as gpd
 import pandas as pd
 
-from .diagnostics import DataWarning, Problems
-from .population import PLACEMENTS, Placement, _log_left_out, _missing_node, _pipes_of
+from .diagnostics import Problems
+from .population import (
+    PLACEMENTS,
+    Placement,
+    Weight,
+    _check_weight,
+    _invalid_weights,
+    _log_left_out,
+    _missing_node,
+    _pipes_of,
+    _warn_invalid,
+    _weight_label,
+    _weights,
+)
 from .units import _is_real
 
 if TYPE_CHECKING:
@@ -29,28 +39,52 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-PipeWeight = str | Callable[[gpd.GeoDataFrame], pd.Series]
+# The name before the loaders shared one weight type.
+PipeWeight = Weight
 
 
-def pipe_weights(pipes: gpd.GeoDataFrame, weight: PipeWeight = "length") -> pd.Series:
-    """The weight of each pipe: ``'length'`` (m), ``'diameter_length'`` (diameter times length,
-    m^2), a column of the pipes, or a function of the pipes returning one value per pipe.
-    Missing, non-numeric, or negative values are returned as missing."""
-    if callable(weight):
-        values = pd.Series(weight(pipes), index=pipes.index)
-    elif weight == "diameter_length":
-        values = pd.to_numeric(pipes["diameter"], errors="coerce") * pipes["length"]
-    else:
-        values = pipes[weight]
-    values = pd.to_numeric(values, errors="coerce").astype(float)
-    return values.where(values >= 0)
+def pipe_weights(
+    pipes: gpd.GeoDataFrame, weight: Weight = "length", max_weight: float | None = None
+) -> pd.Series:
+    """The weight of each pipe.
+
+    Parameters
+    ----------
+    pipes : geopandas.GeoDataFrame
+        The pipes, e.g. a Network's ``full_data``.
+
+    weight : str, callable or None
+        As in :func:`distribute_flow`: None or ``'length'``, ``'diameter_length'``, a column of
+        the pipes, or a function of the pipes (see :data:`~swmmbuilder.population.Weight`).
+
+    max_weight : float, optional
+        Weights above this are invalid.
+
+    Returns
+    -------
+    pandas.Series
+        The weight of each pipe, indexed like ``pipes``; missing, non-numeric, negative, and
+        invalid values are missing.
+
+    Raises
+    ------
+    ValueError
+        If ``weight`` names no column of the pipes, or a function returns other than one value
+        per pipe (an array in their order, or a Series indexed exactly like them).
+    """
+    problems = Problems("Invalid pipe weight")
+    _check_weight(pipes, weight, max_weight, problems)
+    problems.raise_if_any()
+    values = _weights(pipes, weight)
+    return values.where(~_invalid_weights(values, max_weight))
 
 
 def distribute_flow(
     network: Network | Subnetwork,
     total: float | None = None,
     rate: float | None = None,
-    weight: PipeWeight = "length",
+    weight: Weight = "length",
+    max_weight: float | None = None,
     serve_force_mains: bool = False,
     placement: Placement = "upstream",
 ) -> dict[NodeId, float]:
@@ -74,10 +108,16 @@ def distribute_flow(
     rate : float, optional
         Flow per unit of weight, e.g. L/s per metre of pipe with ``weight='length'``.
 
-    weight : str or callable
-        ``'length'`` (default), ``'diameter_length'`` (diameter times length, both in m), a
-        column of the pipes, or a function of the pipes returning one value per pipe. A pipe
-        whose weight is missing, non-numeric, or negative takes no flow (with a warning).
+    weight : str, callable or None
+        ``'length'`` (default) or None for the pipe length, ``'diameter_length'`` (diameter times
+        length, both in m; for a non-circular pipe, the mean of its height and width times its
+        length), a column of the pipes, or a function of the pipes returning an array of one
+        value per pipe, in their order, or a Series indexed exactly like the pipes (see
+        :data:`~swmmbuilder.population.Weight`). A pipe whose weight is missing, non-numeric,
+        negative, or above ``max_weight`` takes no flow (with a ``DataWarning``).
+
+    max_weight : float, optional
+        Weights above this are invalid.
 
     serve_force_mains : bool
         Let force mains take flow (default False: groundwater does not enter a pressurised
@@ -96,7 +136,8 @@ def distribute_flow(
     ------
     ValueError
         If neither or both of ``total`` and ``rate`` are given, either is negative or not a
-        number, ``placement`` or ``weight`` is invalid, or ``total`` is positive but the pipes
+        number, ``placement``, ``weight``, or ``max_weight`` is invalid (including a function
+        that returns other than one value per pipe), or ``total`` is positive but the pipes
         weigh nothing.
 
     Warns
@@ -121,26 +162,20 @@ def distribute_flow(
             problems.add(f"{name} must be a non-negative number, not {value!r}")
     if placement not in PLACEMENTS:
         problems.add(f"placement must be one of {', '.join(PLACEMENTS)}, not {placement!r}")
-    if isinstance(weight, str) and weight not in ("length", "diameter_length"):
-        if weight not in pipes.columns:
-            problems.add(f"weight: the pipes have no column {weight!r}")
+    _check_weight(pipes, weight, max_weight, problems)
     problems.raise_if_any()
 
-    weights = pipe_weights(pipes, weight)
+    weights = _weights(pipes, weight)
+    weights = weights.where(~_invalid_weights(weights, max_weight))
     if not serve_force_mains and "structure_type" in pipes.columns:
         weights = weights.where(pipes["structure_type"] != "force_main", 0.0)
     no_node = _missing_node(pipes)
     left_out = float(weights[no_node].fillna(0.0).sum())
     everything, pipes, weights = pipes, pipes[~no_node], weights[~no_node]
     missing = weights.isna()
-    label = weight if isinstance(weight, str) else "callable"
+    label = _weight_label(weight)
     if missing.any():
-        warnings.warn(
-            f"{int(missing.sum())} pipes have no valid weight ({label}); they take no flow: "
-            f"{list(weights.index[missing])[:20]}",
-            DataWarning,
-            stacklevel=2,
-        )
+        _warn_invalid(weights.index[missing], weight, "they take no flow", 2)
         weights = weights.fillna(0.0)
     if total is not None:
         weight_sum = float(weights.sum())

@@ -32,6 +32,13 @@ earlier history is in the git log.
   alpha band are left out (before, a masked DEM with no nodata value gave its fill values as
   elevations). `sample_dem` and `Network.estimate_rims` take `z_factor` (metres per elevation
   unit); by default a DEM whose vertical CRS or band units are in feet is converted to metres.
+- **Stricter loader inputs** (#157): `sewered` must hold booleans or 0 and 1 (missing for not
+  flagged); text such as `"N"`, `"No"`, or `"0"` used to read as true and now raises
+  `ValueError`. A key of `rates` that is the land use of no polygon (a difference of case, or a
+  code given as text) gives a `DataWarning` instead of silently no flow. A pipe midpoint on the
+  edge two polygons share now goes to the first of them, not to neither. `allocate_population`
+  requires a network CRS projected in metres, as `allocate_land_use` does. `distribute_flow`
+  takes `weight=None` for the length instead of raising `KeyError`.
 
 - **Polygon allocation option validation** (issue #147): `population`, `sewered`, and
   `land_use` reject unindexed lists/arrays and Series with missing or repeated polygon IDs.
@@ -42,6 +49,23 @@ earlier history is in the git log.
 
 ### Changed
 
+- **One weight type for the three loaders** (#157): `allocate_population`, `allocate_land_use`,
+  and `distribute_flow` take the same `weight` (`swmmbuilder.population.Weight`): None or
+  `"length"`, `"diameter_length"`, a column, or a function of the pipes. A function must return an
+  array of one value per pipe or a Series indexed exactly like the pipes; a misaligned Series
+  used to be realigned, giving pipes their neighbours' weights or none, and now raises
+  `ValueError`. `"diameter_length"` gives a non-circular pipe the mean of its height and width.
+  `distribute_flow` and `pipe_weights` gain `max_weight`, and `distribute.PipeWeight` is kept as
+  an alias of `Weight`.
+- **Land-use weights imputed as for population** (#157): `allocate_land_use` gains `max_weight`,
+  `impute`, and `fallback_weight`, with the defaults of `allocate_population`, so an invalid
+  weight is imputed from its polygon's median weight per metre rather than counted as 0, and a
+  rated polygon whose pipes all weigh 0 shares its flow equally rather than losing it. Its
+  `pipes` table gains `weight_imputed` and `weight_fallback`. `fallback_weight=None` keeps the
+  old loss of such polygons.
+- **Invalid weights warn in every loader** (#157): `allocate_population` and `allocate_land_use`
+  give a `DataWarning` listing the pipes serving a polygon whose weight is invalid, as
+  `distribute_flow` did, instead of an INFO log.
 - **One cycle per loop** (#159): `TopologyReport.cycles` holds one cycle per loop (the shortest
   through the loop's smallest node) instead of every simple cycle, and `summary()["cycles"]`
   counts loops. The new `TopologyReport.loops` lists the nodes of each loop, a set of nodes that
