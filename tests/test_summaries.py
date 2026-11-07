@@ -303,14 +303,19 @@ def test_within_returns_the_type_of_nodes(net):
 
 
 def test_land_use_summary_counts_a_polygon_with_zero_weight_once():
-    # Q's pipes (3 and 4) weigh 0, so Q is served but unallocated, and R has no pipe. Q used to
-    # be counted both in polygons_served and in no_pipes.
+    # Q's pipes (3 and 4) weigh 0, so with no fallback weight Q is served but unallocated, and R
+    # has no pipe. Q used to be counted both in polygons_served and in no_pipes.
     pipes = [
         (p, u, d, x0, x1, 0 if p in (3, 4) else 1) for p, u, d, x0, x1, _ in test_population.PIPES
     ]
     net = test_population.make_network(pipes)
     land = allocate_land_use(
-        net, test_land_use.zoning(), land_use="use", rates=test_land_use.RATES, weight="PDC_Count"
+        net,
+        test_land_use.zoning(),
+        land_use="use",
+        rates=test_land_use.RATES,
+        weight="PDC_Count",
+        fallback_weight=None,
     )
     assert sorted(land.no_pipes) == ["Q", "R"]
     s = land.summary()
