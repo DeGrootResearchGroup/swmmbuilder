@@ -20,6 +20,7 @@ from ..design import (
     check_force_main_equation,
     check_force_mains,
     force_main_roughnesses,
+    inlet_end,
     pump_level_problem,
 )
 from ..diagnostics import DataWarning, DesignWarning, OptionWarning, Problems, check_options
@@ -346,12 +347,12 @@ def _found_stations(subnetwork, pump_stations, exclude, extra, unlisted, default
     return stations, choices
 
 
-def _lowest_inlet_inverts(subnetwork, inputs, slope):
+def _lowest_inlet_inverts(subnetwork, stations, height_correction, slope):
     """({station: invert}, [Derived]) of the ``station_invert='lowest_inlet'`` rule of
-    :func:`build_model`, for the stations of ``inputs`` without a ``height_correction``."""
+    :func:`build_model`, for the ``stations`` without a ``height_correction``."""
     pipes = subnetwork.pipes()
-    given = set(inputs.height_correction or {})
-    stations = [n for n in inputs.stations if n not in given]
+    given = set(height_correction or {})
+    stations = [n for n in stations if n not in given]
     current = lowest_inverts(pipes, set(stations))
     found, derived = {}, []
     for node in stations:
@@ -364,12 +365,7 @@ def _lowest_inlet_inverts(subnetwork, inputs, slope):
             arriving["length"],
             strict=True,
         ):
-            end, how = _invert(ds), "recorded downstream invert"
-            if end is None and slope is not None and _invert(us) is not None:
-                end, how = (
-                    _invert(us) - slope * float(length),
-                    f"upstream invert - {slope} x length",
-                )
+            end, how = inlet_end(us, ds, length, slope)
             if end is not None:
                 ends.append((end, pipe, how))
         if not ends:
@@ -388,6 +384,79 @@ def _lowest_inlet_inverts(subnetwork, inputs, slope):
             )
             logger.info("Station %s: invert %s -> %.3f (%s)", node, before, end, basis)
     return found, derived
+
+
+def _apply_station_invert(subnetwork, stations, height_correction, station_invert, slope):
+    """(height_correction, [Derived], correction_rules) of the ``station_invert`` option of
+    :func:`build_model` for ``stations``: the stations it lowers join ``height_correction``
+    (matched, and winning over the rule), and ``correction_rules`` ({node: (rule, basis)}, see
+    :func:`fill_gaps`) names the rule as their source."""
+    if station_invert is None:
+        return height_correction, [], {}
+    if station_invert != "lowest_inlet":
+        raise ValueError(f"station_invert must be 'lowest_inlet' or None, not {station_invert!r}.")
+    found, lowered = _lowest_inlet_inverts(subnetwork, stations, height_correction, slope)
+    if found:
+        height_correction = {**found, **(height_correction or {})}
+    rules = {d.id: (d.rule, d.basis) for d in lowered}
+    return height_correction, lowered, rules
+
+
+# The options of build_model that Subnetwork.data_gaps takes besides the fill rules: those that
+# change which gaps there are or how they are filled.
+GAP_OPTIONS = (
+    "pumps",
+    "height_correction",
+    "design",
+    "station_invert",
+    "pump_stations",
+    "pump_stations_exclude",
+    "pump_stations_extra",
+    "pump_stations_unlisted",
+    "default_pump",
+)
+
+
+def _gap_report(subnetwork, options):
+    """The gap report of :meth:`Subnetwork.data_gaps`: the gaps of ``subnetwork`` and how
+    :func:`build_model` with ``options`` (fill rules and :data:`GAP_OPTIONS`) fills them."""
+    options = dict(options)
+    design = options.pop("design", None)
+    if design is not None:
+        given = {name: options.get(name) for name in DESIGN_RULES}
+        options.update(_schema_design(subnetwork, design, given))
+    fills = {name: options[name] for name in FILL_OPTIONS if name in options}
+    pumps = resolve_pumps(subnetwork, options.get("pumps"))
+    height_correction = options.get("height_correction")
+    rules = {}
+    station_invert = options.get("station_invert")
+    if station_invert is not None:
+        # The stations are resolved as build_model resolves them, for their nodes.
+        if height_correction is not None:
+            height_correction = subnetwork.match_nodes(height_correction, "height_correction")
+        default_pump = options.get("default_pump")
+        stations, choices = _found_stations(
+            subnetwork,
+            options.get("pump_stations"),
+            options.get("pump_stations_exclude"),
+            options.get("pump_stations_extra"),
+            options.get("pump_stations_unlisted", "warn"),
+            default_pump,
+        )
+        excluded = () if choices is None else choices.loc[choices["source"] == "excluded", "node"]
+        stations, _ = resolve_pump_stations(
+            subnetwork, stations, outfall_types(None, subnetwork), default_pump, excluded
+        )
+        height_correction, _, rules = _apply_station_invert(
+            subnetwork, stations, height_correction, station_invert, fills.get("headwater_slope")
+        )
+    return fill_gaps(
+        subnetwork,
+        pumps=pumps,
+        height_correction=height_correction,
+        correction_rules=rules,
+        **fills,
+    ).report
 
 
 def _rims(subnetwork):
@@ -461,9 +530,12 @@ def _refuse_remaining_gaps(subnetwork, filled):
         )
 
 
-def _apply_design_rules(subnetwork, inputs, pipes, inverts, wet_well_defaults, rims=None):
+def _apply_design_rules(
+    subnetwork, inputs, pipes, inverts, wet_well_defaults, rims=None, headwater_slope=None
+):
     """Apply ``wet_well_defaults`` (filling ``inputs.wet_wells`` and the stations), check the
-    pumps' wet wells and levels, and return the :class:`Derived` values."""
+    pumps' wet wells and levels, and return the :class:`Derived` values. ``headwater_slope``
+    estimates the inlets with no downstream invert, as ``station_invert`` does."""
     stations, wet_wells = inputs.stations, inputs.wet_wells
     derived = []
     if wet_well_defaults is not None:
@@ -483,6 +555,7 @@ def _apply_design_rules(subnetwork, inputs, pipes, inverts, wet_well_defaults, r
                 for node in stations
             },
             rims=rims,
+            headwater_slope=headwater_slope,
         )
     wet_wells.update({n: s.wet_well for n, s in stations.items() if s.wet_well is not None})
     problems = [
@@ -1043,8 +1116,10 @@ def build_model(
         ``'lowest_inlet'``, each arriving pipe's downstream end is its recorded invert or, if
         missing, its upstream invert minus ``headwater_slope`` times its length (a pipe with
         neither, or no ``headwater_slope``, does not count), and a station whose invert is
-        above the lowest of these ends, or has none, is lowered to it. ``height_correction``
-        wins over the rule. Each change is listed in :attr:`SwmmModel.derived`. Not applied
+        above the lowest of these ends, or has none, is lowered to it. ``wet_well_defaults``
+        then takes the same estimated end as an inlet's invert. ``height_correction`` wins over
+        the rule. Each change is listed in :attr:`SwmmModel.derived`, and a station that had no
+        invert is reported in :attr:`SwmmModel.data_gaps` as filled by this rule. Not applied
         unless given.
 
     outfall_link : bool or dict, optional
@@ -1056,7 +1131,8 @@ def build_model(
         slope times its length. True uses :data:`OUTFALL_LINK_DEFAULTS` (a 30 m, 3 m diameter
         circular conduit at a slope of 0.01 with Manning's n 0.01; a much shorter conduit sets
         the dynamic-wave time step); a dict overrides any of ``length``, ``diameter``, ``slope``,
-        and ``roughness``. Outfalls with one inlet link are left as they are.
+        and ``roughness`` (an empty dict is the same as True). Outfalls with one inlet link are
+        left as they are.
 
     flow_units : str
         The template's FLOW_UNITS, in which pump curves and ``design_flow`` are given (default
@@ -1071,7 +1147,10 @@ def build_model(
         nor a ``design_flow``. A list, e.g. ``['force_main_roughness', 'wet_well_defaults']``,
         applies just those, and the schema must hold each. An option given explicitly (not
         None) always wins over the schema's rule. The rules applied are logged. Default None:
-        no rule of the schema is applied.
+        no rule of the schema is applied. A schema's ``default_pump`` may be ideal (London's
+        is), and an ideal pump must be its node's only outlet link (SWMM's ERROR 134), so with
+        ``pump_stations='found'`` a station with an overflow pipe raises; give it a pump with a
+        curve in ``pump_stations_extra``, or exclude it.
 
     Raises
     ------
@@ -1138,23 +1217,28 @@ def build_model(
         flow_units,
         excluded=() if choices is None else choices.loc[choices["source"] == "excluded", "node"],
     )
-    lowered = []
-    if station_invert is not None:
-        if station_invert != "lowest_inlet":
-            raise ValueError(
-                f"station_invert must be 'lowest_inlet' or None, not {station_invert!r}."
-            )
-        found, lowered = _lowest_inlet_inverts(subnetwork, inputs, fills.get("headwater_slope"))
-        if found:
-            inputs = replace(
-                inputs, height_correction={**found, **(inputs.height_correction or {})}
-            )
+    height_correction, lowered, correction_rules = _apply_station_invert(
+        subnetwork,
+        inputs.stations,
+        inputs.height_correction,
+        station_invert,
+        fills.get("headwater_slope"),
+    )
+    inputs = replace(inputs, height_correction=height_correction)
     filled = fill_gaps(
-        subnetwork, pumps=inputs.pumps, height_correction=inputs.height_correction, **fills
+        subnetwork,
+        pumps=inputs.pumps,
+        height_correction=inputs.height_correction,
+        correction_rules=correction_rules,
+        **fills,
     )
     _refuse_remaining_gaps(subnetwork, filled)
     pipes, inverts, rims = filled.pipes, filled.inverts, filled.rims
-    derived = _apply_design_rules(subnetwork, inputs, pipes, inverts, wet_well_defaults, rims)
+    # With station_invert, wet_well_defaults takes the inlet ends that rule estimates.
+    slope = fills.get("headwater_slope") if station_invert is not None else None
+    derived = _apply_design_rules(
+        subnetwork, inputs, pipes, inverts, wet_well_defaults, rims, slope
+    )
     derived += lowered
     depth_rule = None
     if not _is_real(max_depth):
@@ -1178,14 +1262,19 @@ def build_model(
             force_main_roughness_by_pipe or {}, "force_main_roughness_by_pipe", unknown="ignore"
         ),
     )
-    model = SwmmModel(data_gaps=filled.report, derived=derived, station_choices=choices)
+    model = SwmmModel(
+        data_gaps=filled.report,
+        derived=derived,
+        station_choices=choices,
+        stations=list(inputs.stations),
+    )
     discharge_of = _add_nodes(model, subnetwork, inputs, pipes, inverts, defaults, rims)
     adverse = _add_links(
         model, inputs, pipes, inverts, discharge_of, sections, roughness_of, defaults
     )
     _check_ideal_pumps(model)
     linked = []
-    if outfall_link:
+    if outfall_link is not None and outfall_link is not False:
         linked = _add_outfall_links(model, subnetwork, outfall_link, defaults, rims)
     if depth_rule is not None:
         # The other junctions given the rule's depth: station discharge nodes, and outfalls
@@ -1230,7 +1319,7 @@ def build_model(
 FILL_OPTIONS = tuple(
     name
     for name in inspect.signature(fill_gaps).parameters
-    if name not in ("subnetwork", "pumps", "height_correction")
+    if name not in ("subnetwork", "pumps", "height_correction", "correction_rules")
 )
 BUILD_OPTIONS = (
     *(
@@ -1296,8 +1385,10 @@ def write_inp(
     check_options(options, BUILD_OPTIONS, "write_inp")  # before any other work
     if dead_ends not in ("raise", "outfall"):
         raise ValueError("dead_ends must be 'raise' or 'outfall'.")
-    # The schema's rules are filled in here, so that the roughness rule's equation is checked.
-    options = {**options, **_schema_design(subnetwork, options.pop("design", None), options)}
+    # The schema's rules are filled in here, so that the roughness rule's equation is checked,
+    # and only here: design is taken out first, so that build_model does not apply it again.
+    design = options.pop("design", None)
+    options = {**options, **_schema_design(subnetwork, design, options)}
     template = read_template(template_path)
     check_template(template)
     check_force_main_equation(

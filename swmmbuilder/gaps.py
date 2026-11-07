@@ -254,6 +254,8 @@ def fill_gaps(
     headwater_slope: float | None = None,
     force_main_discharge: Mapping[str, float] | Callable[..., float] | None = None,
     rims: Mapping[NodeId, float] | None = None,
+    *,
+    correction_rules: Mapping[NodeId, tuple[str, str]] | None = None,
 ) -> FilledData:
     """Find every gap in a subnetwork's pipes and node inverts, and fill those the rules cover.
 
@@ -308,6 +310,12 @@ def fill_gaps(
         filled from ``rims``). A given rim also overrides a usable recorded rim. A rim at or
         below the node's invert (after the invert fills) is not used: it is listed with a
         :class:`DataWarning`. Keys are matched like ``height_correction``'s.
+
+    correction_rules : dict, optional
+        {node: (rule, source)} of ``height_correction`` values that come from a design rule
+        rather than the caller, e.g. ``station_invert`` of :func:`~swmmbuilder.swmm.build_model`:
+        the gap such a value fills is logged and reported as filled by that rule, from that
+        source, not by ``height_correction``.
 
     Returns
     -------
@@ -411,7 +419,8 @@ def fill_gaps(
         original[("node", node, "no_node_invert")] = "no invert from any pipe"
     for node, invert in height_corrections(subnetwork, height_correction).items():
         if node not in inverts:
-            record("node", node, "no_node_invert", "height_correction", invert)
+            rule, source = (correction_rules or {}).get(node, ("height_correction", ""))
+            record("node", node, "no_node_invert", rule, invert, source)
         inverts[node] = invert
     unknown_nodes = sorted(nodes - set(inverts), key=str)
     if invert_fill is not None or headwater_slope is not None:

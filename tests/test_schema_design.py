@@ -98,3 +98,17 @@ def test_rule_missing_from_schema_rejected():
     # 'schema' with no design table applies nothing (the force main is then a conduit).
     with pytest.warns(DataWarning, match="adverse slope"):
         build_model(sub, design="schema")
+
+
+def test_write_inp_applies_the_schema_once(sub, tmp_path, caplog):
+    """#160: write_inp took ``design`` out of the options only after copying them, so
+    build_model applied the schema again and logged its rules as given explicitly."""
+    caplog.set_level("INFO", logger="swmmbuilder.swmm")
+    sub.to_inp(
+        tmp_path / "model.inp",
+        template_path=template(tmp_path),
+        pump_stations={"PS": PumpStation()},
+        design="schema",
+    )
+    assert caplog.text.count("Design rules from schema") == 1
+    assert "given explicitly" not in caplog.text

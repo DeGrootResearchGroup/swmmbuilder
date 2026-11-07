@@ -249,9 +249,11 @@ docs, and in each method's docstring:
   polygons served, given their nearest pipe, or left out;
 - `NodeLoading.summary()`: flow and nodes of each part of the load, and of each patterned kind;
 - `TopologyReport.summary()`: nodes, pipes, splits, cycles (counted as loops, sets of nodes that
-  can all reach one another), force mains, and boundary pipes;
+  can all reach one another), force mains, boundary pipes, and gaps (`data_gaps` counts every
+  kind, including the non-blocking `no_rim`, so it can exceed the pipes; `data_gaps_blocking`
+  and `data_gaps_no_rim` split it);
 - `SwmmModel.summary()`: gaps found and filled, derived values by rule, the default depth,
-  stations, and outfall links;
+  stations (pump stations only, not pipes written as pumps), and outfall links;
 - `UpstreamTotals.summary()`, `PumpStationReport.summary()`, and `RimEstimate.summary()`.
 
 The keys follow one pattern: a bare plural noun counts things (`nodes`, `polygons`), `total` is
@@ -404,7 +406,8 @@ ID that is not in the data raises `ValueError`. Corrections are applied after th
 normalized the data and `normalize_ids` has been applied, and before any pipe is filtered out, so
 the `status` set above lets the pipe through the status filter. `set` takes canonical columns
 and values (`'built'`, not the source code `'Built'`; inverts and sizes in m). `swap_nodes`
-swaps only `from_node` and `to_node`; the inverts and geometry stay as recorded, so the
+swaps `from_node` and `to_node`, with their node types (`us_node_type` and `ds_node_type`, which
+belong to the IDs); the inverts and geometry stay as recorded, so the
 upstream invert stays at the pipe's drawn upstream end, which becomes its `from_node`. Dropped
 pipes are counted in `network.removed['corrections']`. The same corrections can be kept in a
 TOML file and passed as its path:
@@ -599,7 +602,10 @@ is not in `pump_stations` gets a warning: its force mains are written as ordinar
   every station; name the rules to apply instead, e.g.
   `design=["force_main_roughness", "default_pump", "wet_well_defaults"]` (each must be in the
   schema). An option passed explicitly (not None) always wins, and the rules applied are logged.
-  The default, `design=None`, applies none.
+  The default, `design=None`, applies none. London's `default_pump` is ideal, and an ideal pump
+  must be its node's only outlet (SWMM's ERROR 134), so with `pump_stations="found"` a station
+  with an overflow pipe raises; give it a pump with a curve in `pump_stations_extra` (e.g.
+  `{"SL6001": PumpStation(pump=dict(curve=[...]))}`), or exclude it.
 - A pipe in both `pumps` and a station's force main, a station with no force-main outlet, and a
   wet well given both in `wet_wells` and a station are errors. A schema's design-rule presets are
   checked when it is made, so a typo in a TOML preset is caught on loading.
@@ -629,7 +635,9 @@ sub.to_inp(
 
 Nodes must be in the subnetwork and not outfalls, flows non-negative and finite, and patterns
 defined, of the right length and positive; otherwise `ValueError` is raised before anything is
-written. An hourly pattern whose mean is not 1 gives a warning, since it scales the base flows.
+written. An hourly pattern whose mean is off 1 by more than 0.001 gives a warning, since it
+scales the base flows (the same tolerance as `pattern_inflows`, which also warns, and
+`NodeLoading`, which refuses such a pattern unless `require_unit_mean=False`).
 The total base flow and the number of loaded nodes are logged, for comparison with the plant's
 measured dry-weather flow. `dwf_from_population` converts a per-capita flow (`unit` `L/d`,
 `m3/d`, `L/s`, or `m3/s`) to the template's `flow_units` (default `LPS`). Its result carries no
@@ -795,7 +803,8 @@ loading.summary()                           # {'total': ..., 'nodes': ..., 'sani
   are those of the model; `require_unit_mean` sets another tolerance, or `False` turns the check
   off. `pattern` may also name a pattern of `patterns`.
 - `table(columns={"steady": "infiltration_L_s", ...})` renames the columns, to keep a build's own
-  names. Flows are in the template's `FLOW_UNITS` (`flow_units`, default `LPS`). `options()`
+  names. A patterned kind cannot be named after a part (`population`, `sanitary`, `steady`, or
+  `patterned`). Flows are in the template's `FLOW_UNITS` (`flow_units`, default `LPS`). `options()`
   includes `flow_units`, so `to_inp` refuses a template with other `FLOW_UNITS`. The
   `patterned` and `steady` flows must already be in that unit (e.g. `allocate_land_use` with the
   same `flow_units`).
@@ -826,7 +835,9 @@ subnetwork with any `unknown_shape`, `no_size` or `no_node_invert` gap left, lis
 Gaps can be filled by rules that the user chooses; none is applied by default. Every filled value
 is logged and flagged in the report's `filled_from` column (with `value`, `source` and the `order`
 of the fills), so nothing filled looks like City data. The same options go to `data_gaps` (to see
-what would be filled) and `to_inp` (whose returned model keeps the report as `model.data_gaps`):
+what would be filled) and `to_inp` (whose returned model keeps the report as `model.data_gaps`);
+`data_gaps` also takes `design` and `station_invert` (with the station options), so that its
+report is the one `to_inp` gives:
 
 ```python
 from swmmbuilder import LONDON_ON

@@ -54,8 +54,9 @@ class PipeCorrections:
         ``normalize_ids``. ``'reason'`` is optional.
 
     swap_nodes : dict
-        {pipe ID: reason}. The pipe's ``from_node`` and ``to_node`` are swapped, and nothing
-        else: its inverts, node types, and geometry stay as recorded. This is for a pipe whose
+        {pipe ID: reason}. The pipe's ``from_node`` and ``to_node`` are swapped, with their
+        node types (``us_node_type`` and ``ds_node_type``, which describe the node of each ID),
+        and nothing else: its inverts and geometry stay as recorded. This is for a pipe whose
         IDs were recorded the wrong way round while its drawing and inverts agree with each
         other (the geometry runs from the higher invert to the lower one, and the IDs say the
         opposite). ``us_invert`` is the invert at the pipe's upstream end, which is the end the

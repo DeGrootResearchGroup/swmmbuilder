@@ -80,7 +80,8 @@ class NodeLoading:
 
     patterned : pandas.DataFrame or dict, optional
         Mean flow at each node by kind: a DataFrame of nodes (index) by kinds (columns), or
-        {kind: {node: flow}}, in ``flow_units``.
+        {kind: {node: flow}}, in ``flow_units``. A kind cannot be named after a part
+        (``population``, ``sanitary``, ``steady``, or ``patterned``).
 
     patterns : dict, optional
         {name: 24 hourly multipliers, from 00:00}: one for every kind of ``patterned`` with a
@@ -103,7 +104,9 @@ class NodeLoading:
     require_unit_mean : bool or float
         Refuse an hourly pattern (the sanitary one, or one of ``patterned``) whose mean is not 1:
         True (default) for a tolerance of 0.001, a tolerance, or False to accept any mean. A
-        pattern's mean scales the mean flow, so that the table would not match the model.
+        pattern's mean scales the mean flow, so that the table would not match the model; this
+        is why the default refuses what :func:`~swmmbuilder.swmm.pattern_inflows` and a [DWF]
+        pattern only warn of, at the same tolerance.
 
     flow_units : {'LPS', 'CMS', 'MLD'}
         FLOW_UNITS of the template (default LPS, the shipped template's): the unit of the

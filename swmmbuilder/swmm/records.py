@@ -8,6 +8,8 @@ from dataclasses import dataclass, field
 
 import pandas as pd
 
+from ..gaps import BLOCKING_GAPS
+
 # Decimals that numbers are rounded to in the .inp file: 1 micrometre for lengths in metres.
 DECIMALS = 6
 # Significant figures that flows are written to, whatever the FLOW_UNITS: a flow in CMS can be far
@@ -186,6 +188,10 @@ class SwmmModel:
         stations pumped and left out, one row per node: ``node``, ``source`` (``'found'``,
         ``'extra'``, or ``'excluded'``), and ``reason`` (the reason given, else ``''``). None
         when the stations were given as a dict.
+    stations : list
+        The nodes of the pump stations (the ``pump_stations`` option of
+        :func:`~swmmbuilder.swmm.build_model`), in order; pipes written as pumps by ``pumps``
+        are not stations.
     """
 
     junctions: list = field(default_factory=list)
@@ -204,6 +210,7 @@ class SwmmModel:
     data_gaps: pd.DataFrame | None = None
     derived: list = field(default_factory=list)
     station_choices: pd.DataFrame | None = None
+    stations: list = field(default_factory=list)
 
     def derived_report(self) -> pd.DataFrame:
         """DataFrame of :attr:`derived`, one row per value (element, id, attribute, value, rule,
@@ -227,15 +234,21 @@ class SwmmModel:
 
             - ``junctions``, ``outfalls``, ``storage``, ``conduits``, ``pumps``: records
               written.
-            - ``stations``: pump stations, the nodes that pumps draw from.
+            - ``stations``: pump stations (:attr:`stations`); pipes written as pumps by the
+              ``pumps`` option are counted in ``pumps``, not here.
             - ``stations_extra``, ``stations_excluded``: stations added and left out by
               ``pump_stations_extra`` and ``pump_stations_exclude`` (see
               :attr:`station_choices`; 0 without them).
             - ``outfall_links``: outfalls added by the ``outfall_link`` option of
               :func:`~swmmbuilder.swmm.build_model`, found by their names (an outfall
               ``<node>_OUT`` reached from ``<node>`` by the conduit ``<node>_DUMMY``).
-            - ``data_gaps``: gaps found in the data (rows of :attr:`data_gaps`; 0 without it).
-            - ``data_gaps_filled``: those filled by a rule.
+            - ``data_gaps``: gaps found in the data, all kinds (rows of :attr:`data_gaps`; 0
+              without it). A node with no usable rim is a gap (``no_rim``) that does not stop
+              the model from being written, so this can exceed the number of pipes.
+            - ``data_gaps_blocking``: those of the kinds that stop a model from being written
+              unless filled (:data:`~swmmbuilder.gaps.BLOCKING_GAPS`).
+            - ``data_gaps_no_rim``: those of kind ``no_rim``.
+            - ``data_gaps_filled``: gaps filled by a rule.
             - ``derived``: values derived by a design rule, not from the data (:attr:`derived`).
             - ``derived_<element>_<attribute>``: those of each element and attribute, by any
               rule, e.g. ``derived_junction_max_depth``, ``derived_station_invert`` (stations
@@ -274,11 +287,13 @@ class SwmmModel:
             "storage": len(self.storage),
             "conduits": len(self.conduits),
             "pumps": len(self.pumps),
-            "stations": len({p.inlet for p in self.pumps}),
+            "stations": len(self.stations),
             "stations_extra": self._station_count("extra"),
             "stations_excluded": self._station_count("excluded"),
             "outfall_links": links,
             "data_gaps": 0 if gaps is None else len(gaps),
+            "data_gaps_blocking": 0 if gaps is None else int(gaps["gap"].isin(BLOCKING_GAPS).sum()),
+            "data_gaps_no_rim": 0 if gaps is None else int((gaps["gap"] == "no_rim").sum()),
             "data_gaps_filled": 0 if gaps is None else int(gaps["filled_from"].notna().sum()),
             "derived": len(derived),
         }

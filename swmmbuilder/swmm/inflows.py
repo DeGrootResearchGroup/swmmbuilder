@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import warnings
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from itertools import pairwise
@@ -11,14 +12,15 @@ from typing import TYPE_CHECKING, Any
 import numpy as np
 import pandas as pd
 
-from ..diagnostics import Problems
+from ..diagnostics import DesignWarning, Problems
 from ..units import _is_finite_number
 
 if TYPE_CHECKING:
     from .._types import Fields, NodeId
 
 
-# Tolerance on the mean of an hourly pattern with require_unit_mean=True.
+# Tolerance on the mean of an hourly pattern: [DWF] patterns and pattern_inflows warn beyond it,
+# and require_unit_mean=True refuses a pattern beyond it.
 UNIT_MEAN_TOLERANCE = 1e-3
 
 
@@ -181,9 +183,11 @@ def resolve_inflows(subnetwork, inflows, timeseries, patterns, outfalls=()) -> d
     return resolved
 
 
-def unit_mean_tolerance(require_unit_mean: bool | float) -> float | None:
+def unit_mean_tolerance(require_unit_mean: bool | float | None) -> float | None:
     """The tolerance on a pattern's mean meant by ``require_unit_mean`` (see
-    :func:`pattern_inflows`), or None for no check."""
+    :func:`pattern_inflows`), or None for no check (False) or a warning only (None)."""
+    if require_unit_mean is None:
+        return None
     if isinstance(require_unit_mean, bool):
         return UNIT_MEAN_TOLERANCE if require_unit_mean else None
     if not (_is_finite_number(require_unit_mean) and float(require_unit_mean) >= 0):
@@ -216,7 +220,7 @@ def pattern_inflows(
     baseline: Mapping[NodeId, float] | None = None,
     prefix: str = "",
     ramp_minutes: float = 1.0,
-    require_unit_mean: bool | float = False,
+    require_unit_mean: bool | float | None = None,
 ) -> tuple[dict[NodeId, Inflow], dict[str, list[tuple[float, float]]]]:
     """The ``inflows`` and ``timeseries`` options of :func:`build_model` for mean flows that each
     follow an hourly pattern, e.g. the land-use flows of :func:`~swmmbuilder.allocate_land_use`.
@@ -251,9 +255,11 @@ def pattern_inflows(
     ramp_minutes : float
         See :func:`hourly_series`.
 
-    require_unit_mean : bool or float
-        Refuse a pattern whose mean is not 1: True for a tolerance of 0.001, or a tolerance.
-        False (default) accepts any mean, and the mean flows are then scaled by it.
+    require_unit_mean : bool, float, or None
+        What to do with a pattern whose mean is not 1, which scales the mean flows: None
+        (default) gives a :class:`~swmmbuilder.diagnostics.DesignWarning` when it is off by more
+        than :data:`UNIT_MEAN_TOLERANCE` (0.001), as a [DWF] pattern does; True refuses it at
+        that tolerance, a number at that tolerance; False accepts any mean silently.
 
     Returns
     -------
@@ -288,6 +294,16 @@ def pattern_inflows(
             if problem:
                 problems.add(problem)
     problems.raise_if_any()
+    if require_unit_mean is None:
+        for kind, pattern in patterns.items():
+            problem = pattern_mean_problem(kind, pattern, UNIT_MEAN_TOLERANCE)
+            if problem:
+                warnings.warn(
+                    f"{problem[0].upper()}{problem[1:]}, so the mean flows of {kind} are scaled "
+                    "by it.",
+                    DesignWarning,
+                    stacklevel=2,
+                )
 
     series = {f"{prefix}{k}": hourly_series(p, days, ramp_minutes) for k, p in patterns.items()}
     multipliers = {k: np.asarray(p, dtype=float) for k, p in patterns.items()}
