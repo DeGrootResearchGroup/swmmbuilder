@@ -4,7 +4,8 @@
 # The Storm Pipe dataset has the same columns. Only a diameter is published, so only Circular
 # pipes have a cross-section; Elliptical, Arched, Rectangular, Irregular and Unknown pipes are
 # reported on loading and rejected if they are written. Lengths are computed from the geometry,
-# reprojected to UTM zone 17N (EPSG:2958, NAD83(CSRS), metres).
+# reprojected to UTM zone 17N (EPSG:2958, NAD83(CSRS), metres). The dataset has no flow-type,
+# status, or structure-type column; it holds sanitary gravity pipes only, so it has no force mains.
 name = "Peterborough, ON"
 nonpositive_inverts_missing = true
 size_unit = "mm"

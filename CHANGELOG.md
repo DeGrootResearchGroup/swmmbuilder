@@ -9,6 +9,44 @@ earlier history is in the git log.
 
 ## [Unreleased]
 
+### Fixed
+
+- **Flow units and link offsets checked against the template** (#158): `NodeLoading.options()` now
+  includes `flow_units`, so `to_inp` refuses a template whose `FLOW_UNITS` differ from the load's
+  (an L/s load in a CMS template was written 1000 times too large). `NodeLoading` refuses an invalid
+  `flow_units` even without a population (upper or lower case is accepted). `check_template` refuses
+  a `LINK_OFFSETS` other than `DEPTH`, since offsets are written as depths. Force mains written
+  under routing other than `DYNWAVE` give an `OptionWarning`, since SWMM then treats them as open
+  channels.
+- **Topology checks on looped areas** (#159): `Subnetwork.validate()` finds cycles as strongly
+  connected components rather than listing every simple cycle, whose number grows exponentially
+  with the size of a looped area (a 7 × 7 grid of pipes drawn both ways did not finish). It now
+  takes linear time.
+- **Census cache and DEM checks** (#163): a `census_polygons` cache read with a source is
+  refused if it was fetched with other parameters, naming the one that differs. Before, a cache
+  for one dataset or set of regions was returned for another. `CensusMapper` and `PolygonFile`
+  gain a `provenance()` method (the dataset, regions, region level, and resolution, or the file
+  name and columns), compared with what the cache records; a cache that does not record them
+  gives a `DataWarning`. The cache now records the regions sorted, and the region level and the
+  file's columns. `sample_dem` reads rasters masked, so cells under a mask band, mask file, or
+  alpha band are left out (before, a masked DEM with no nodata value gave its fill values as
+  elevations). `sample_dem` and `Network.estimate_rims` take `z_factor` (metres per elevation
+  unit); by default a DEM whose vertical CRS or band units are in feet is converted to metres.
+- **Stricter loader inputs** (#157): `sewered` must hold booleans or 0 and 1 (missing for not
+  flagged); text such as `"N"`, `"No"`, or `"0"` used to read as true and now raises
+  `ValueError`. A key of `rates` that is the land use of no polygon (a difference of case, or a
+  code given as text) gives a `DataWarning` instead of silently no flow. A pipe midpoint on the
+  edge two polygons share now goes to the first of them, not to neither. `allocate_population`
+  requires a network CRS projected in metres, as `allocate_land_use` does. `distribute_flow`
+  takes `weight=None` for the length instead of raising `KeyError`.
+
+- **Polygon allocation option validation** (issue #147): `population`, `sewered`, and
+  `land_use` reject unindexed lists/arrays and Series with missing or repeated polygon IDs.
+  These problems are reported together with other invalid options before allocation starts.
+  Partial `land_use` Series now raise `ValueError`; previously, missing polygons were left
+  unrated and contributed no flow. Complete Series remain aligned by ID, and explicitly
+  missing or non-numeric population values still count as zero.
+
 ### Changed
 
 - **One weight type for the three loaders** (#157): `allocate_population`, `allocate_land_use`,
@@ -28,26 +66,20 @@ earlier history is in the git log.
 - **Invalid weights warn in every loader** (#157): `allocate_population` and `allocate_land_use`
   give a `DataWarning` listing the pipes serving a polygon whose weight is invalid, as
   `distribute_flow` did, instead of an INFO log.
-
-### Fixed
-
-- **Stricter loader inputs** (#157): `sewered` must hold booleans or 0 and 1 (missing for not
-  flagged); text such as `"N"`, `"No"`, or `"0"` used to read as true and now raises
-  `ValueError`. A key of `rates` that is the land use of no polygon (a difference of case, or a
-  code given as text) gives a `DataWarning` instead of silently no flow. A pipe midpoint on the
-  edge two polygons share now goes to the first of them, not to neither. `allocate_population`
-  requires a network CRS projected in metres, as `allocate_land_use` does. `distribute_flow`
-  takes `weight=None` for the length instead of raising `KeyError`.
-
-- **Polygon allocation option validation** (issue #147): `population`, `sewered`, and
-  `land_use` reject unindexed lists/arrays and Series with missing or repeated polygon IDs.
-  These problems are reported together with other invalid options before allocation starts.
-  Partial `land_use` Series now raise `ValueError`; previously, missing polygons were left
-  unrated and contributed no flow. Complete Series remain aligned by ID, and explicitly
-  missing or non-numeric population values still count as zero.
+- **One cycle per loop** (#159): `TopologyReport.cycles` holds one cycle per loop (the shortest
+  through the loop's smallest node) instead of every simple cycle, and `summary()["cycles"]`
+  counts loops. The new `TopologyReport.loops` lists the nodes of each loop, a set of nodes that
+  can all reach one another. A network with no cycles reports the same as before.
 
 ### Added
 
+- **Status and structure types for more Ontario presets.** The Barrie, Kitchener, Sarnia,
+  Waterloo, and Windsor presets map their status columns, and Toronto and Waterloo their
+  structure-type columns, so the status filter and `include_overflows=False` work for them (#154).
+  The codes were checked against each city's full layer. Windsor's `TEMP. OUT-NEW CONSTRUCTION`
+  and `PRIVATE` pipes are now dropped by the default status filter, and rarer codes (Toronto's
+  `SP`, `PF`, ..., Waterloo's `WWTP Outfall`) pass through unmapped. Each TOML header says which
+  columns a dataset lacks.
 - **Pipes crossing a subnetwork's boundary** (#152): `Subnetwork.boundary_pipes(values=None)`
   lists the pipes with one end in the subnetwork, which it leaves out, classified as `force_main`,
   `split`, `summit`, or `inflow`, with the nodes (or values) upstream, where a leaving pipe's flow
@@ -204,6 +236,8 @@ earlier history is in the git log.
 
 ### Changed
 
+- **`NodeLoading.options()` includes `flow_units`** (#158): the dictionary always has a
+  `flow_units` key, even when there is nothing else to write.
 - **Data-gaps reports list nodes with no usable rim**: `data_gaps()`, `model.data_gaps`, and
   `TopologyReport.data_gaps` now have a `no_rim` row (not blocking) for every node with no rim
   recorded, or one at or below the invert, so existing reports gain rows. Unless the `rims` option

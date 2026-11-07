@@ -1,5 +1,5 @@
 """The packaged SI template (#5): loading, sync with the example copy, and rejection of templates
-the writer cannot fill."""
+the writer cannot fill (#158: LINK_OFFSETS other than DEPTH)."""
 
 import pytest
 from conftest import TEMPLATE, read_sections, subnetwork
@@ -64,5 +64,22 @@ def test_unknown_placeholder_rejected(sub, tmp_path):
 @pytest.mark.parametrize("units", SI_FLOW_UNITS)
 def test_si_units_template_accepted(sub, tmp_path, units):
     path = custom_template(tmp_path, "FLOW_UNITS           LPS", f"FLOW_UNITS           {units}")
+    sub.to_inp(tmp_path / "m.inp", ["J1"], template_path=path)
+    assert (tmp_path / "m.inp").exists()
+
+
+@pytest.mark.parametrize("offsets", ["ELEVATION", "elevation"])
+def test_elevation_offsets_template_rejected(sub, tmp_path, offsets):
+    # The offsets are written as depths; an ELEVATION template would read 0.2 m as an elevation.
+    path = custom_template(tmp_path, "LINK_OFFSETS         DEPTH", f"LINK_OFFSETS  {offsets}")
+    with pytest.raises(ValueError, match="LINK_OFFSETS ELEVATION"):
+        sub.to_inp(tmp_path / "m.inp", ["J1"], template_path=path)
+    assert not (tmp_path / "m.inp").exists()
+
+
+@pytest.mark.parametrize("line", ["", "link_offsets depth"])
+def test_depth_offsets_template_accepted(sub, tmp_path, line):
+    # DEPTH is SWMM's default, so a template without LINK_OFFSETS is accepted too.
+    path = custom_template(tmp_path, "LINK_OFFSETS         DEPTH", line)
     sub.to_inp(tmp_path / "m.inp", ["J1"], template_path=path)
     assert (tmp_path / "m.inp").exists()

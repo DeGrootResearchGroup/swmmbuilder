@@ -6,7 +6,8 @@
 # non-circular pipes are given as "W x H" and so have no diameter, and are rejected if they are
 # written. An invert of 0 means none. Flow types other than Sanitary, Combined and Storm (e.g.
 # Future Storm) pass through unchanged. Lengths are computed from the geometry, reprojected to UTM
-# zone 17N (EPSG:26917, metres).
+# zone 17N (EPSG:26917, metres). Lifecycle_Status is Active for every pipe of both datasets
+# (checked November 2026). There is no structure-type column, so force mains are not told apart.
 name = "Sarnia, ON"
 nonpositive_inverts_missing = true
 size_unit = "mm"
@@ -21,9 +22,13 @@ us_invert = "UpStreamIn"
 ds_invert = "DownStream"
 diameter = "Diam_m"
 flow_type = "Asset_Type"
+status = "Lifecycle_Status"
 material = "Material"
 
 [flow_types]
 Sanitary = "sanitary"
 Combined = "combined"
 Storm = "storm"
+
+[statuses]
+Active = "built"

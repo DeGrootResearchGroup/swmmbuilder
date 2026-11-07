@@ -309,3 +309,95 @@ def test_censusmapper_without_pycancensus(net, monkeypatch):
     monkeypatch.setitem(sys.modules, "pycancensus", None)
     with pytest.raises(ImportError, match=r"swmmbuilder\[census\]"):
         census_polygons(net, source=CensusMapper(api_key=KEY))
+
+
+# --- the cache is checked against the source's parameters (#163) ----------------------------
+
+
+@pytest.mark.parametrize(
+    "change, message",
+    [
+        ({"dataset": "CA16"}, "dataset='CA21', not 'CA16'"),
+        ({"regions": {"CSD": ["3539999"]}}, "regions="),
+        ({"resolution": "simplified"}, "resolution='high', not 'simplified'"),
+    ],
+)
+def test_censusmapper_cache_is_for_the_same_parameters(net, pycancensus, tmp_path, change, message):
+    cache = tmp_path / "blocks.gpkg"
+    given = {"regions": {"CSD": ["3539036"]}}
+    census_polygons(net, source=CensusMapper(api_key=KEY, **given), cache=cache)
+    pycancensus.calls.clear()
+    with pytest.raises(ValueError, match=f"{message}.*refresh=True"):
+        census_polygons(net, source=CensusMapper(**(given | change)), cache=cache)
+    assert pycancensus.calls == []
+    # refresh=True fetches it again with the new parameters.
+    census_polygons(
+        net, source=CensusMapper(api_key=KEY, **(given | change)), cache=cache, refresh=True
+    )
+    assert len(census_polygons(net, source=CensusMapper(**(given | change)), cache=cache)) == 2
+
+
+def test_censusmapper_cache_region_level_and_found_regions(net, pycancensus, tmp_path):
+    cache = tmp_path / "blocks.gpkg"
+    census_polygons(net, source=CensusMapper(api_key=KEY), cache=cache)  # regions found
+    pycancensus.calls.clear()
+    with pytest.raises(ValueError, match="region_level='CSD', not 'CD'"):
+        census_polygons(net, source=CensusMapper(region_level="CD"), cache=cache)
+    # The regions found are those given, in any order.
+    for regions in ({"CSD": ["3539036"]}, {"CSD": [3539036]}):
+        census_polygons(net, source=CensusMapper(regions=regions), cache=cache)
+    assert pycancensus.calls == []
+
+
+def test_censusmapper_cache_regions_in_another_order(net, pycancensus, tmp_path):
+    cache = tmp_path / "blocks.gpkg"
+    regions = {"CSD": ["3539036", "3539015"], "CD": ["3539"]}
+    census_polygons(net, source=CensusMapper(api_key=KEY, regions=regions), cache=cache)
+    shuffled = {"CD": ["3539"], "CSD": ["3539015", "3539036"]}
+    assert len(census_polygons(net, source=CensusMapper(regions=shuffled), cache=cache)) == 2
+
+
+@pytest.mark.parametrize(
+    "change, message",
+    [
+        ({"path": "other.gpkg"}, "file='zones.gpkg', not 'other.gpkg'"),
+        ({"id": "CODE"}, "id='ZONE', not 'CODE'"),
+        ({"population": "PEOPLE"}, "population='POP', not 'PEOPLE'"),
+        ({"parent": None}, "parent='DA', not ''"),
+        ({"layer": "other"}, "layer='zones', not 'other'"),
+    ],
+)
+def test_polygon_file_cache_is_for_the_same_file_and_columns(net, tmp_path, change, message):
+    path = tmp_path / "zones.gpkg"
+    data = boxes().rename(columns={"population": "POP"}).assign(DA=["d1", "d1", "d2", "d3"])
+    data.reset_index().rename(columns={"id": "ZONE"}).to_file(path, layer="zones")
+    given = {"path": path, "id": "ZONE", "population": "POP", "parent": "DA", "layer": "zones"}
+    cache = tmp_path / "cache.gpkg"
+    census_polygons(net, source=PolygonFile(**given), cache=cache)
+    # The same file and columns read the cache, wherever the file now is.
+    moved = given | {"path": tmp_path / "elsewhere" / "zones.gpkg"}
+    assert len(census_polygons(net, source=PolygonFile(**moved), cache=cache)) == 2
+    with pytest.raises(ValueError, match=f"{message}.*refresh=True"):
+        census_polygons(net, source=PolygonFile(**(given | change)), cache=cache)
+
+
+def test_a_cache_without_the_parameters_warns(net, tmp_path):
+    # A cache written before the check records no columns of a PolygonFile.
+    cache = tmp_path / "blocks.gpkg"
+    census_polygons(
+        net, source=FakeSource(name="file", provenance={"file": "zones.gpkg"}), cache=cache
+    )
+    source = PolygonFile(tmp_path / "zones.gpkg", id="ZONE", population="POP")
+    with pytest.warns(DataWarning, match="does not record id, population, parent, layer"):
+        polygons = census_polygons(net, source=source, cache=cache)
+    assert len(polygons) == 2
+    with pytest.raises(ValueError, match=r"file='zones\.gpkg', not 'z\.gpkg'"):
+        census_polygons(net, source=PolygonFile("z.gpkg", id="ZONE", population="POP"), cache=cache)
+
+
+def test_a_source_without_provenance_is_not_checked(net, tmp_path):
+    cache = tmp_path / "blocks.gpkg"
+    census_polygons(net, source=FakeSource(provenance={"dataset": "CA21"}), cache=cache)
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        assert len(census_polygons(net, source=NoFetch(), cache=cache)) == 2

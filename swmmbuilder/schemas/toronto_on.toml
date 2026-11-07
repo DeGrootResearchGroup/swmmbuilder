@@ -5,7 +5,9 @@
 # Trapezoidal pipes are reported on loading and rejected if they are written. Flow types other
 # than SAN, Storm and Combined (CSO, SCSO, FD, EO) pass through unchanged. The geometry is
 # reprojected to MTM zone 10 (EPSG:2952, metres), so that missing lengths can be computed and the
-# .inp coordinates are in metres.
+# .inp coordinates are in metres. Sewer Gravity Structure Type uses London's codes, SL for gravity
+# pipes and OVF for overflow pipes (checked November 2026); its rarer codes (SP, PF, IS, DP, WR, OR,
+# ...) pass through. There is no status column, and the dataset has no force mains.
 name = "Toronto, ON"
 null_values = ["None"]
 nonpositive_inverts_missing = true
@@ -22,6 +24,7 @@ ds_invert = "Downstream Elevation"
 shape = "Sewer Gravity Main Shape"
 diameter = "Sewer Gravity Diameter"
 flow_type = "Sewer Gravity Flow Type"
+structure_type = "Sewer Gravity Structure Type"
 material = "Sewer Gravity Material"
 
 [shapes]
@@ -31,3 +34,7 @@ Circular = "CIRCULAR"
 SAN = "sanitary"
 Storm = "storm"
 Combined = "combined"
+
+[structure_types]
+SL = "gravity"
+OVF = "overflow"

@@ -1,3 +1,5 @@
+import time
+
 import pytest
 from conftest import (
     DENDRITIC,
@@ -117,6 +119,42 @@ def test_validate_reports_topology(network):
 def test_validate_finds_cycles():
     sub = with_pipes(("J1", "A1")).subnetwork(["A1", "A2", "J1"])
     assert sub.validate().cycles == [["A1", "A2", "J1"]]
+
+
+def test_validate_reports_each_loop_once():
+    # Two loops, A1 <-> A2 and B1 -> B2 -> J1 -> B1, report one cycle each.
+    sub = with_pipes(("A2", "A1"), ("J1", "B1")).subnetwork(["A1", "A2", "B1", "B2", "J1"])
+    report = sub.validate()
+    assert report.loops == [["A1", "A2"], ["B1", "B2", "J1"]]
+    assert report.cycles == [["A1", "A2"], ["B1", "B2", "J1"]]
+    assert report.summary()["cycles"] == 2
+    assert not report.is_dendritic
+
+
+def test_validate_reports_a_pipe_to_itself_as_a_loop():
+    report = with_pipes(("A1", "A1")).subnetwork(["A1", "A2"]).validate()
+    assert report.loops == [["A1"]] and report.cycles == [["A1"]]
+
+
+def test_validate_handles_a_grid_of_two_way_pipes():
+    # A 7 x 7 grid with every pipe drawn both ways holds far too many simple cycles to list
+    # (a 6 x 6 one has about 2.4 million); it is one loop, shown by its shortest cycle.
+    n = 7
+    pairs = []
+    for i in range(n):
+        for j in range(n):
+            here = f"G{i}{j}"
+            for there in ([f"G{i + 1}{j}"] if i + 1 < n else []) + (
+                [f"G{i}{j + 1}"] if j + 1 < n else []
+            ):
+                pairs += [(here, there), (there, here)]
+    sub = with_pipes(*pairs).subnetwork({node for pair in pairs for node in pair})
+    start = time.perf_counter()
+    report = sub.validate()
+    assert time.perf_counter() - start < 5
+    assert report.loops == [sorted(sub.graph.nodes)]
+    assert report.cycles == [["G00", "G01"]]
+    assert report.summary()["cycles"] == 1
 
 
 def test_dendritic_network_validates_clean(network):
