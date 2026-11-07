@@ -1168,6 +1168,7 @@ class Network:
         flag: float | None = None,
         replace_above: float | None = None,
         replace_below: float | None = None,
+        z_factor: float | None = None,
     ) -> RimEstimate:
         """Compare the recorded rims with a ground-elevation model (DEM), and estimate the
         missing ones from it.
@@ -1200,8 +1201,9 @@ class Network:
         ----------
         dem : path, rasterio dataset, or list of them
             A single-band elevation raster (e.g. a GeoTIFF of a lidar bare-earth model) or a list
-            of tiles, in any CRS, with elevations in m in the vertical datum of the network's
-            data (see :func:`swmmbuilder.elevation.sample_dem`). Needs rasterio:
+            of tiles, in any CRS, with elevations in the vertical datum of the network's data,
+            in metres unless the raster declares feet or ``z_factor`` is given (see
+            :func:`swmmbuilder.elevation.sample_dem`). Needs rasterio:
             ``pip install 'swmmbuilder[elevation]'``.
 
         window : float
@@ -1227,6 +1229,10 @@ class Network:
             the ground (``deviation`` above ``replace_above`` or below ``-replace_below``), in
             m. A replaced rim is flagged too. A DEM estimate at or below the invert does not
             replace a rim.
+
+        z_factor : float, optional
+            Metres per elevation unit of the DEM (e.g. 0.3048 for a DEM in feet). Default: from
+            the raster's vertical CRS, or else its band units, or else 1 (metres).
 
         Returns
         -------
@@ -1257,7 +1263,7 @@ class Network:
         table = self.nodes.loc[ids]
         recorded = table["rim_elevation"].astype(float)
         invert = table["invert"].astype(float)
-        dem_values = sample_dem(dem, table.geometry, window, statistic)
+        dem_values = sample_dem(dem, table.geometry, window, statistic, z_factor)
 
         usable = recorded.notna() & ~(recorded <= invert)
         has_dem = dem_values.notna()
