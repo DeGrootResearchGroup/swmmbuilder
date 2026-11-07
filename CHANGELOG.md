@@ -11,6 +11,12 @@ earlier history is in the git log.
 
 ### Fixed
 
+- **A missing invert no longer blocks a node merge** (#172): `snap_nodes` with
+  `max_invert_difference` compares only known inverts, for each pair and for each merged group.
+  A missing invert made the comparison fail, so two IDs at one point were never merged when one
+  had no invert, and the report gave the reason as an invert difference. Those pairs are now
+  merged on distance and the pipe rule, which changes the network for data with missing inverts.
+  The report gains `invert_known` (both inverts present).
 - **Flow units and link offsets checked against the template** (#158): `NodeLoading.options()` now
   includes `flow_units`, so `to_inp` refuses a template whose `FLOW_UNITS` differ from the load's
   (an L/s load in a CMS template was written 1000 times too large). `NodeLoading` refuses an invalid
