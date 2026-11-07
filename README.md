@@ -62,7 +62,7 @@ net = Network(
 )
 net.nodes            # GeoDataFrame: node_type, name, invert, rim_elevation, depth, ...
 net.pipes()          # the pipes of the graph (sub.pipes() for a subnetwork's)
-net.snap_report      # merged pairs: both IDs, distance, both inverts, kept ID or why not merged
+net.snap_report      # pairs: both IDs, distance, both inverts, invert_known, kept ID or why not merged
 net.split_report     # split IDs: new ID, its pipes, distance to the other structures, attributes
 sub = net.catchment("WT6011")
 sub.split_report()   # the same, with the node after snapping and whether it is in the catchment
@@ -88,7 +88,8 @@ sub.to_inp("model.inp")  # outfalls default to the outfall nodes of the subnetwo
   `snap_tolerance=` on loading) merges node IDs whose points are within the tolerance, preferring
   the ID in the maintenance-hole layer. Pairs whose inverts differ by more than
   `max_invert_difference` (pipes crossing rather than joining) and pairs already joined by a pipe
-  are not merged. The merged IDs are kept in `net.aliases`, and every method that takes node IDs
+  are not merged. A missing invert counts as unknown, not different, so a pair with one is merged
+  on distance alone (`invert_known` in the report marks these). The merged IDs are kept in `net.aliases`, and every method that takes node IDs
   accepts either one. Geographic coordinates are projected to the local UTM zone for this.
 - **Reused IDs.** One ID is sometimes used for two structures far apart (a newer subdivision
   given the IDs of an older one, or a mistyped ID), which joins the two in the graph and can make
