@@ -40,7 +40,6 @@ import numpy as np
 import pandas as pd
 from pyproj import CRS
 
-from ._summary import Summary
 from .diagnostics import DataWarning, Problems
 
 if TYPE_CHECKING:
@@ -177,9 +176,6 @@ class PopulationAllocation:
               ``polygons_served``).
             - ``fallback``: polygons some of whose pipes were given the fallback weight.
 
-            ``population`` and ``population_total``, the former names of ``total`` and
-            ``allocation_total``, still read, with a ``DeprecationWarning``.
-
         Examples
         --------
         ::
@@ -210,7 +206,7 @@ class PopulationAllocation:
             "zero_weight": len(self.zero_weight),
             "fallback": len(self.fallback),
         }
-        return Summary(values, {"population": "total", "population_total": "allocation_total"})
+        return values
 
 
 def _pipes_within(table: pd.DataFrame, sub: Subnetwork) -> pd.DataFrame:

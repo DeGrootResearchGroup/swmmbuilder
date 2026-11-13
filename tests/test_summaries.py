@@ -333,20 +333,6 @@ def test_land_use_summary_counts_a_polygon_with_zero_weight_once():
     assert s["unallocated_design_flow"] == pytest.approx(0.1 + 0.2)
 
 
-def test_former_keys_still_read_with_a_warning(net):
-    s = test_population.allocate(net).summary()
-    with pytest.warns(DeprecationWarning, match="'population' is now 'total'"):
-        assert s["population"] == s["total"]
-    with pytest.warns(DeprecationWarning, match="'population_total' is now 'allocation_total'"):
-        assert s["population_total"] == s["allocation_total"]
-    assert "population" not in s and "population" not in list(s)
-    land = allocate_land_use(net, test_land_use.zoning(), land_use="use", rates=test_land_use.RATES)
-    with pytest.warns(DeprecationWarning, match="'unallocated' is now 'unallocated_design_flow'"):
-        assert land.summary()["unallocated"] == pytest.approx(0.1)
-    with pytest.raises(KeyError):
-        s["no_such_key"]
-
-
 def test_summaries_are_flat_dicts_of_numbers(net, network):
     sub = net.catchment("N4")
     people = test_population.allocate(net)
@@ -361,7 +347,7 @@ def test_summaries_are_flat_dicts_of_numbers(net, network):
         network.subnetwork(network.nodes.index).find_pump_stations().summary(),
     ]
     for s in results:
-        assert isinstance(s, dict)
+        assert type(s) is dict
         assert all(isinstance(k, str) for k in s)
         assert all(type(v) in (int, float) for v in s.values())
         assert dict(s) == s

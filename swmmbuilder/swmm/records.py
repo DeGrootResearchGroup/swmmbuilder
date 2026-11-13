@@ -435,7 +435,7 @@ class SwmmModel:
                     ('""' if i.timeseries is None else _name(i.timeseries), 16),
                     ("FLOW", 8),
                     (1.0, 8),
-                    (i.scale, 8),
+                    (_flow(i.scale), 8),
                     (_flow(i.baseline), 8),
                     *(() if i.baseline_pattern is None else ((_name(i.baseline_pattern), 0),)),
                 )

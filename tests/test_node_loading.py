@@ -135,21 +135,6 @@ def test_table_and_summary(parts):
     assert "sanitary=" in repr(loading)
 
 
-def test_summary_former_keys_still_read(parts):
-    s = loading_of(*parts).summary()
-    for old, new in [
-        ("sanitary", "sanitary_flow"),
-        ("steady", "steady_flow"),
-        ("patterned", "patterned_flow"),
-        ("loaded_nodes", "nodes"),
-        ("patterned_COMMERCIAL", "COMMERCIAL_flow"),
-        ("patterned_COMMERCIAL_nodes", "COMMERCIAL_nodes"),
-    ]:
-        with pytest.warns(DeprecationWarning, match=f"'{old}' is now '{new}'"):
-            assert s[old] == s[new]
-        assert old not in s
-
-
 @pytest.mark.parametrize("kind", ["sanitary", "steady", "population", "patterned"])
 def test_a_patterned_kind_may_not_take_the_name_of_a_part(kind):
     with pytest.raises(ValueError, match=f"patterned kind '{kind}' is the name of a part"):

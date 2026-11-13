@@ -84,6 +84,18 @@ def test_model_records(sub):
     assert model.timeseries == [swmm.TimeSeries("ts", ((0.0, 1.0), (1.0, 2.0)))]
 
 
+def test_small_scale_and_baseline_are_written_in_full(sub):
+    """The scale of a patterned flow (its mean, from pattern_inflows) is a flow, so a small one
+    in CMS keeps its significant figures, as the baseline does."""
+    model = swmm.build_model(
+        sub,
+        ["OUT"],
+        timeseries={"ts": [(0, 1.0), (1, 2.0)]},
+        inflows={"A1": dict(timeseries="ts", scale=3.4e-6, baseline=4e-7)},
+    )
+    assert model.sections()["inflows"].split()[5:7] == ["3.4e-06", "4e-07"]
+
+
 @pytest.mark.parametrize(
     "options, message",
     [

@@ -259,8 +259,7 @@ docs, and in each method's docstring:
 The keys follow one pattern: a bare plural noun counts things (`nodes`, `polygons`), `total` is
 the amount placed at the nodes (`allocation_total` over the whole allocation when cut to a
 catchment), and `<part>_<measure>` measures one part, part first (`COMMERCIAL_flow`,
-`COMMERCIAL_nodes`, `nearest_max_distance`). A key renamed to this pattern before the first
-release still reads, with a `DeprecationWarning`.
+`COMMERCIAL_nodes`, `nearest_max_distance`).
 
 The values are plain numbers, NaN where there is nothing to measure, so they go straight into
 f-strings. The wording stays with the caller:

@@ -16,7 +16,6 @@ import numpy as np
 import pandas as pd
 
 from . import gaps, swmm
-from ._summary import Summary
 from .diagnostics import DataWarning, check_options
 from .geometry import node_positions, to_geodataframe
 
@@ -165,7 +164,7 @@ class UpstreamTotals:
                 values[f"{column}_max"] = float(totals.max()) if len(totals) else math.nan
         else:
             values["max"] = float(self.nodes.max()) if len(self.nodes) else math.nan
-        return Summary(values)
+        return values
 
 
 @dataclass
@@ -210,13 +209,11 @@ class PumpStationReport:
             - ``unlisted``: likely lift stations missing from the station layer, one per force
               main (rows of :attr:`unlisted`).
         """
-        return Summary(
-            {
-                "stations": len(self.stations),
-                "no_force_main": len(self.no_force_main),
-                "unlisted": len(self.unlisted),
-            }
-        )
+        return {
+            "stations": len(self.stations),
+            "no_force_main": len(self.no_force_main),
+            "unlisted": len(self.unlisted),
+        }
 
 
 @dataclass
