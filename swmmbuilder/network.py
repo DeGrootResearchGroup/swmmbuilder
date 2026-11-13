@@ -1125,8 +1125,8 @@ class Network:
         Returns
         -------
         pandas.DataFrame
-            Indexed by node, with ``node_type`` and ``upstream_nodes`` (the nodes draining to
-            it, itself excluded), the largest first.
+            Indexed by node, with ``node_type`` and ``upstream_nodes`` (the number of nodes
+            draining to it, itself excluded), the largest first.
         """
         ends = [n for n in self.graph if self.graph.out_degree(n) == 0]
         frame = pd.DataFrame(

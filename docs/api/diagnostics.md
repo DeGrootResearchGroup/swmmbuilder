@@ -22,9 +22,6 @@ The keys of every `summary()` follow the same rules.
 - **Units** are those of the result: areas in ha (`_ha`), distances and elevations in m, flows
   in `flow_units`.
 
-A key renamed to fit these rules before the first release still reads, with a
-`DeprecationWarning` naming its new key, but is not listed.
-
 ### Every key
 
 [`PopulationAllocation.summary(sub=None)`][swmmbuilder.population.PopulationAllocation.summary]
@@ -32,10 +29,10 @@ A key renamed to fit these rules before the first release still reads, with a
 
 | Key | Meaning |
 | --- | --- |
-| `total`* | people placed at the nodes (formerly `population`) |
+| `total`* | people placed at the nodes |
 | `nodes`* | nodes given people |
 | `weight`* | total weight of the pipes, each pipe once |
-| `allocation_total` | people placed over the whole allocation (formerly `population_total`) |
+| `allocation_total` | people placed over the whole allocation |
 | `unallocated` | people placed at no node |
 | `polygons`, `polygons_served` | polygons given, and those with a pipe |
 | `nearest`, `nearest_population`, `nearest_max_distance` | polygons given their nearest pipe, their people, and the farthest distance (m) |
@@ -56,19 +53,19 @@ A key renamed to fit these rules before the first release still reads, with a
 | `nearest`, `nearest_median_distance`, `nearest_max_distance` | polygons given their nearest pipe, and their distances (m) |
 | `no_pipes`, `zero_weight` | polygons with a flow and no pipe, or with pipes that all weigh 0 (counted as served) |
 | `fallback` | polygons some of whose pipes took the fallback weight |
-| `unallocated_design_flow` | the design flow of both, placed nowhere and not scaled (formerly `unallocated`) |
+| `unallocated_design_flow` | the design flow of both, placed nowhere and not scaled |
 | `scale` | the factor applied to every flow to reach a given total |
 
 [`NodeLoading.summary()`][swmmbuilder.swmm.loading.NodeLoading.summary]:
 
 | Key | Meaning |
 | --- | --- |
-| `total`, `nodes` | flow of the three parts, and the nodes given any (formerly `loaded_nodes`) |
+| `total`, `nodes` | flow of the three parts, and the nodes given any |
 | `population`, `population_nodes` | people, and the nodes with any |
-| `sanitary_flow`, `sanitary_nodes` | the [DWF] base flow (formerly `sanitary`) |
-| `patterned_flow`, `patterned_nodes` | the patterned flows, all kinds (formerly `patterned`) |
-| `steady_flow`, `steady_nodes` | the steady flows (formerly `steady`) |
-| `<kind>_flow`, `<kind>_nodes` | each patterned kind (formerly `patterned_<kind>` and `patterned_<kind>_nodes`) |
+| `sanitary_flow`, `sanitary_nodes` | the [DWF] base flow |
+| `patterned_flow`, `patterned_nodes` | the patterned flows, all kinds |
+| `steady_flow`, `steady_nodes` | the steady flows |
+| `<kind>_flow`, `<kind>_nodes` | each patterned kind |
 
 [`UpstreamTotals.summary()`][swmmbuilder.subnetwork.UpstreamTotals.summary]:
 

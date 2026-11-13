@@ -263,9 +263,10 @@ earlier history is in the git log.
 - **Disjoint MultiLineStrings** (#126): `line_coords` keeps the parts of a pipe whose parts do not
   join in their order, as documented; `shapely.line_merge` could reorder them. A MultiLineString
   is merged only if it merges into one line.
-- **Small flows in the .inp file** (#129): dry-weather, pump-curve, conduit, and time-series flows,
-  and inflow baselines, are written to 10 significant figures (`swmm.FLOW_DIGITS`) instead of 6 decimals, so
-  a flow below a micro-unit (common in CMS) is no longer rounded off or written as 0.
+- **Small flows in the .inp file** (#129): dry-weather, pump-curve, and conduit flows, and the new
+  inflows and time series, are written to 10 significant figures (`swmm.FLOW_DIGITS`) instead of
+  6 decimals, so a flow below a micro-unit (common in CMS) is no longer rounded off or written
+  as 0.
 - **`Subnetwork.in_network`** builds its index of node IDs as text once, not on every call, which
   made `height_correction` slow on large networks (#129).
 

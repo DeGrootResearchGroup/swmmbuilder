@@ -19,7 +19,6 @@ from typing import TYPE_CHECKING, Any
 import numpy as np
 import pandas as pd
 
-from .._summary import Summary
 from ..diagnostics import Problems
 from ..units import SI_FLOW_UNITS, _is_finite_number
 from .dwf import dwf_from_population
@@ -296,10 +295,6 @@ class NodeLoading:
             - ``steady_flow``, ``steady_nodes``: the steady flows.
             - ``<kind>_flow``, ``<kind>_nodes``: for each kind of ``patterned`` (e.g.
               ``COMMERCIAL_flow``), its flow and nodes.
-
-            The former names (``sanitary``, ``patterned``, ``steady``, ``loaded_nodes``,
-            ``patterned_<kind>``, and ``patterned_<kind>_nodes``) still read, with a
-            ``DeprecationWarning``.
         """
         table = self.table()
         kinds = list(self.patterned.columns) if self.patterned is not None else []
@@ -309,24 +304,18 @@ class NodeLoading:
             "total": float(flows.sum()),
             "nodes": int((flows > 0).sum()),
         }
-        renamed = {"loaded_nodes": "nodes"}
         for name, values in [
             ("population", table["population"]),
             ("sanitary_flow", table["sanitary"]),
             ("patterned_flow", patterned),
             ("steady_flow", table["steady"]),
         ]:
-            part = name.removesuffix("_flow")
             out[name] = float(values.sum())
-            out[f"{part}_nodes"] = int((values > 0).sum())
-            renamed[part] = name
+            out[f"{name.removesuffix('_flow')}_nodes"] = int((values > 0).sum())
         for kind in kinds:
             out[f"{kind}_flow"] = float(table[kind].sum())
             out[f"{kind}_nodes"] = int((table[kind] > 0).sum())
-            renamed[f"patterned_{kind}"] = f"{kind}_flow"
-            renamed[f"patterned_{kind}_nodes"] = f"{kind}_nodes"
-        renamed.pop("population")
-        return Summary(out, renamed)
+        return out
 
     def __repr__(self) -> str:
         s = self.summary()

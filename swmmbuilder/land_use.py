@@ -36,7 +36,6 @@ import numpy as np
 import pandas as pd
 from pyproj import CRS
 
-from ._summary import Summary
 from .diagnostics import DataWarning, Problems
 from .population import (
     IMPUTATIONS,
@@ -189,9 +188,6 @@ class LandUseAllocation:
               scaled (:attr:`unallocated`), in :attr:`flow_units`.
             - ``scale``: the factor applied to every flow (:attr:`scale`).
 
-            ``unallocated``, the former name of ``unallocated_design_flow``, still reads, with
-            a ``DeprecationWarning``.
-
         Examples
         --------
         ::
@@ -231,7 +227,7 @@ class LandUseAllocation:
             unallocated_design_flow=float(self.unallocated),
             scale=float(self.scale),
         )
-        return Summary(result, {"unallocated": "unallocated_design_flow"})
+        return result
 
 
 def _place_by_use(table, placement, uses):

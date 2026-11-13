@@ -39,9 +39,6 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-# The name before the loaders shared one weight type.
-PipeWeight = Weight
-
 
 def pipe_weights(
     pipes: gpd.GeoDataFrame, weight: Weight = "length", max_weight: float | None = None

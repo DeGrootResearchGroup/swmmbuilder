@@ -38,7 +38,6 @@ from typing import TYPE_CHECKING
 import numpy as np
 import pandas as pd
 
-from ._summary import Summary
 from .diagnostics import DataWarning
 
 if TYPE_CHECKING:
@@ -507,7 +506,7 @@ class RimEstimate:
         }
         validation = self.validation.drop("count")
         values.update({f"difference_{k}": float(v) for k, v in validation.items()})
-        return Summary(values)
+        return values
 
     def report(self) -> str:
         """A few lines describing the comparison and the fill, to print (also ``str()``)."""
